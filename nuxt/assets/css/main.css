@@ -1,0 +1,103 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * The stuar.tc ramp: warm sand paper through ink, one accent.
+ *
+ * Channels rather than hex, so a token can be used at partial opacity without a
+ * second variable. Comma separated, not space separated: Tailwind 2 emits the
+ * legacy `rgba(var(--x), alpha)` form, and space separated channels make that
+ * invalid. Browsers resolve invalid colours to transparent, so the symptom is a
+ * dialog you can see straight through rather than an error anywhere.
+ */
+:root {
+  --c-paper: 250, 250, 248;
+  --c-surface: 255, 255, 255;
+  --c-elevated: 244, 244, 240;
+  --c-hairline: 226, 226, 220;
+
+  --c-ink: 24, 24, 26;
+  --c-body: 60, 60, 64;
+  --c-muted: 106, 106, 112;
+  --c-dimmed: 142, 142, 148;
+
+  /* Magenta, the default accent. WCAG AA on paper. */
+  --c-accent: 194, 26, 116;
+  --c-accent-contrast: 255, 255, 255;
+
+  color-scheme: light;
+}
+
+.dark {
+  --c-paper: 19, 19, 22;
+  --c-surface: 24, 24, 26;
+  --c-elevated: 34, 34, 38;
+  --c-hairline: 52, 52, 58;
+
+  --c-ink: 245, 245, 243;
+  --c-body: 208, 208, 204;
+  --c-muted: 158, 158, 156;
+  --c-dimmed: 122, 122, 122;
+
+  --c-accent: 255, 91, 176;
+  --c-accent-contrast: 24, 24, 26;
+
+  color-scheme: dark;
+}
+
+body {
+  @apply bg-paper text-body font-sans antialiased;
+}
+
+/* Editorial headings: tight, dark, and set in the display face. */
+h1,
+h2,
+h3 {
+  @apply text-ink font-semibold tracking-tight;
+}
+
+a {
+  @apply text-accent;
+}
+
+/*
+ * Eyebrow: the small monospace label above a heading. Structural rather than
+ * decorative, so it is a component class instead of a pile of utilities
+ * repeated at every call site.
+ */
+.eyebrow {
+  @apply font-mono text-[0.6875rem] uppercase tracking-eyebrow text-dimmed;
+}
+
+/* Placeholder colour: the `placeholder:` variant is Tailwind 3. */
+::placeholder {
+  @apply text-dimmed;
+}
+
+/* A hairline rule that reads as structure, not as a divider between equals. */
+.rule {
+  @apply border-t border-hairline;
+}
+
+/*
+ * Content images come from Drupal at their original size, which is usually far
+ * larger than the column they land in. Cap the height as well as the width, so
+ * a tall image cannot push the rest of the page off the screen.
+ */
+.prose-content img,
+main img {
+  @apply max-w-full h-auto rounded;
+
+  max-height: 60vh;
+  object-fit: contain;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

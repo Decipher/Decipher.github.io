@@ -33,7 +33,9 @@
     "lint:renovate": "npx --yes --package renovate renovate-config-validator",
     "lint:private": "node scripts/lint-private-refs.mjs",
     "test:unit": "node --test \"tests/unit/**/*.test.mjs\"",
-    "test:e2e": "playwright test --project=behaviour"
+    "test:e2e": "playwright test --project=behaviour",
+    "test:visual": "playwright test --project=phone --project=tablet --project=desktop --project=wide",
+    "test:visual:update": "npm run test:visual -- --update-snapshots"
   },
   "devDependencies": {
     "@commitlint/cli": "^21.2.2",

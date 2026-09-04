@@ -429,3 +429,11 @@ preview:frontend:
     paths:
       - .logs/
     expire_in: 1 day
+
+# This site's design, so this site's baselines. Screenshots are committed per
+# viewport and per architecture, because Chromium renders text differently on
+# arm64 and x86_64 and one baseline set cannot satisfy both runners.
+test_visual:
+  extends: .playwright
+  script:
+    - npm run test:visual
