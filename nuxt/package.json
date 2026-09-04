@@ -1,0 +1,24 @@
+{
+  "name": "quickstart-druxt-site",
+  "version": "0.3.0",
+  "private": true,
+  "scripts": {
+    "dev": "nuxt",
+    "build": "nuxt build",
+    "start": "nuxt start",
+    "generate": "nuxt generate"
+  },
+  "dependencies": {
+    "core-js": "3.25.1",
+    "dotenv": "^16.0.3",
+    "druxt-site": "^0.14.3",
+    "nuxt": "2.15.8",
+    "vue-server-renderer": "^2.7.14",
+    "vue-template-compiler": "^2.7.14"
+  },
+  "devDependencies": {
+    "@nuxt/image": "^0.7.1",
+    "@nuxtjs/storybook": "4.2.0",
+    "postcss": "8.4.16"
+  }
+}
