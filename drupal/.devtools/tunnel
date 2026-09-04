@@ -1,0 +1,134 @@
+#!/usr/bin/env bash
+##
+# Expose the local webserver on a public HTTPS URL via a Cloudflare Quick
+# Tunnel, and write the URL to ../.env as TUNNEL_URL.
+#
+# A Quick Tunnel needs no Cloudflare account, no login and no stored
+# credential, which is the whole reason it is used here: anyone who forks this
+# repository can start a session without setting anything up. The trade is that
+# the hostname is assigned per run and the tunnel has no access control of its
+# own, so a session is short and its administrator login is issued separately.
+#
+# Drupal is told to trust `*.trycloudflare.com` by .devtools/provision-authoring,
+# not here, because the pattern is the same for every tunnel.
+#
+# Usage:
+#   .devtools/tunnel          # start, or reuse a healthy existing one
+#   .devtools/tunnel --stop   # stop and clear TUNNEL_URL
+
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+
+LOG_DIR=".logs"
+PID_FILE="$LOG_DIR/cloudflared.pid"
+LOG_FILE="$LOG_DIR/cloudflared.log"
+ENV_FILE="../.env"
+
+env_write() {
+  # Same contract as helpers.php's dotenv_write_var: replace in place, or
+  # append. Keeps the frontend's single source of truth in one file.
+  local key="$1" value="$2"
+  touch "$ENV_FILE"
+  if grep -q "^${key}=" "$ENV_FILE" 2>/dev/null; then
+    sed -i "s|^${key}=.*|${key}=${value}|" "$ENV_FILE"
+  else
+    printf '%s=%s\n' "$key" "$value" >> "$ENV_FILE"
+  fi
+}
+
+env_clear() {
+  [ -f "$ENV_FILE" ] && sed -i "/^$1=/d" "$ENV_FILE" || true
+}
+
+extract_url() {
+  grep -oE 'https://[a-zA-Z0-9-]+\.trycloudflare\.com' "$LOG_FILE" 2>/dev/null | head -n1
+}
+
+stop_tunnel() {
+  if [ -f "$PID_FILE" ]; then
+    kill "$(cat "$PID_FILE")" 2>/dev/null || true
+    rm -f "$PID_FILE"
+  fi
+  env_clear TUNNEL_URL
+  echo "[tunnel] Stopped."
+}
+
+if [ "${1:-}" = "--stop" ]; then
+  stop_tunnel
+  exit 0
+fi
+
+# Resolve cloudflared: prefer PATH, then mise. mise installs it without
+# necessarily activating a shim on PATH, so `command -v` alone misses a
+# perfectly usable binary.
+CLOUDFLARED=""
+if command -v cloudflared >/dev/null 2>&1; then
+  CLOUDFLARED="cloudflared"
+elif command -v mise >/dev/null 2>&1 && MISE_PATH="$(mise which cloudflared 2>/dev/null)" && [ -n "$MISE_PATH" ]; then
+  CLOUDFLARED="$MISE_PATH"
+fi
+
+if [ -z "$CLOUDFLARED" ]; then
+  echo "[tunnel] cloudflared not found on PATH or via mise." >&2
+  echo "[tunnel] Install it, or run the session against a backend you expose yourself." >&2
+  exit 1
+fi
+
+mkdir -p "$LOG_DIR"
+
+WEBSERVER_PORT="${WEBSERVER_PORT:-$(grep -m1 '^WEBSERVER_PORT=' "$ENV_FILE" 2>/dev/null | cut -d= -f2- || true)}"
+WEBSERVER_PORT="${WEBSERVER_PORT:-8888}"
+
+# Health-check an existing tunnel before reusing it. A live cloudflared process
+# does not mean a live tunnel: quick tunnels can be dropped at the edge while
+# the process stays up perfectly happily, and reusing one of those gives a
+# session whose URL simply does not answer.
+if [ -f "$PID_FILE" ] && kill -0 "$(cat "$PID_FILE")" 2>/dev/null; then
+  EXISTING_URL="$(extract_url)"
+  if [ -n "$EXISTING_URL" ] && curl -sf -o /dev/null -m 5 "$EXISTING_URL"; then
+    echo "[tunnel] Reusing healthy tunnel: ${EXISTING_URL}"
+    env_write TUNNEL_URL "$EXISTING_URL"
+    exit 0
+  fi
+  echo "[tunnel] Existing tunnel is unhealthy; restarting."
+  kill "$(cat "$PID_FILE")" 2>/dev/null || true
+  sleep 1
+fi
+
+echo "[tunnel] Starting for http://localhost:${WEBSERVER_PORT} ..."
+: > "$LOG_FILE"
+nohup "$CLOUDFLARED" tunnel --url "http://localhost:${WEBSERVER_PORT}" --no-autoupdate \
+  >"$LOG_FILE" 2>&1 &
+echo $! > "$PID_FILE"
+
+URL=""
+for _ in $(seq 1 30); do
+  sleep 1
+  URL="$(extract_url)"
+  [ -n "$URL" ] && break
+done
+
+if [ -z "$URL" ]; then
+  echo "[tunnel] No tunnel URL after 30s. Last lines of ${LOG_FILE}:" >&2
+  tail -n 20 "$LOG_FILE" >&2 || true
+  stop_tunnel
+  exit 1
+fi
+
+# Cloudflare hands back the hostname before the edge is necessarily routing to
+# it, so wait for the URL to actually answer rather than reporting success on a
+# name alone.
+for _ in $(seq 1 30); do
+  if curl -sf -o /dev/null -m 5 "$URL"; then
+    env_write TUNNEL_URL "$URL"
+    echo "[tunnel] Ready: ${URL}"
+    exit 0
+  fi
+  sleep 2
+done
+
+echo "[tunnel] ${URL} was assigned but never answered." >&2
+tail -n 20 "$LOG_FILE" >&2 || true
+stop_tunnel
+exit 1
