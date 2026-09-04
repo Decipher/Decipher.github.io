@@ -42,7 +42,11 @@ env_clear() {
 }
 
 extract_url() {
-  grep -oE 'https://[a-zA-Z0-9-]+\.trycloudflare\.com' "$LOG_FILE" 2>/dev/null | head -n1
+  # `|| true` because no match yet is the normal case, not an error: this is
+  # called in a loop while cloudflared is still starting. Without it, `set -e`
+  # and `pipefail` turn grep's exit 1 into the whole script exiting, one second
+  # in and without printing why.
+  grep -oE 'https://[a-zA-Z0-9-]+\.trycloudflare\.com' "$LOG_FILE" 2>/dev/null | head -n1 || true
 }
 
 stop_tunnel() {
