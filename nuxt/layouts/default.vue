@@ -7,7 +7,8 @@
         </NuxtLink>
         <span class="eyebrow hidden sm:inline">Serverless Drupal</span>
         <!-- Pushed to the end rather than floated, so it keeps its baseline. -->
-        <div class="ml-auto">
+        <div class="ml-auto flex items-baseline gap-4">
+          <AuthoringEditToggle />
           <AuthoringLogin />
         </div>
       </div>
