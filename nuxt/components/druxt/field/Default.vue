@@ -22,8 +22,25 @@
         </span>
       </label>
 
-      <!-- Referenced entities get their own form, nested. -->
-      <div v-if="relationship" class="rounded border border-hairline p-3">
+      <!--
+        A reference is chosen, not authored. Drupal's widget here is an
+        autocomplete over the target entities, so this is one too, rather than a
+        nested form that would invite editing the referenced thing by accident.
+      -->
+      <AuthoringReference
+        v-if="isTypeReference"
+        :value="model"
+        :schema="schema"
+        :multiple="isMultiple"
+        @input="model = $event"
+      />
+
+      <!--
+        Every other relationship. An image or a media item is a relationship
+        too, but choosing one is a file browser, not a text search, so those
+        keep Druxt's nested form until there is a widget for them.
+      -->
+      <div v-else-if="relationship" class="rounded border border-hairline p-3">
         <DruxtEntityForm
           v-for="{ type, id } of relationships"
           :key="id"
@@ -31,6 +48,13 @@
         />
         <p v-if="!relationships.length" class="text-sm text-muted">Nothing referenced yet.</p>
       </div>
+
+      <!-- URL alias -->
+      <AuthoringPath
+        v-else-if="isTypePath"
+        :value="model || {}"
+        @input="model = $event"
+      />
 
       <!-- Boolean -->
       <label v-else-if="isTypeCheckbox" class="flex items-center gap-2">
@@ -191,6 +215,20 @@ export default {
     },
     isTypeInput() {
       return ['string_textfield', 'number', 'email_default'].includes(this.schema.type)
+    },
+    /**
+     * Reference widgets, by name rather than by "is this a relationship".
+     *
+     * An image field is a relationship as well, and searching the file
+     * collection by filename is not how anyone picks a picture.
+     */
+    isTypeReference() {
+      return ['entity_reference_autocomplete', 'entity_reference_autocomplete_tags'].includes(
+        this.schema.type
+      )
+    },
+    isTypePath() {
+      return ['path'].includes(this.schema.type)
     },
     isTypeSelect() {
       return ['options_select'].includes(this.schema.type)
