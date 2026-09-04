@@ -59,17 +59,24 @@ jobs:
           .devtools/provision
           .devtools/start
 
+      # Before the build, because the build reads `base_url` from it to decide
+      # whether the site is served from the domain root or a subdirectory.
+      - id: pages
+        uses: actions/configure-pages@v5
+
       - name: Install frontend dependencies
         working-directory: nuxt
         run: npm install
 
       - name: Generate the static site
         working-directory: nuxt
-        env:
-          # A user site serves from the domain root, so no base path. A project
-          # site would need ROUTER_BASE set to /<repo>/.
-          ROUTER_BASE: /
-        run: npm run generate
+        run: |
+          # Derived rather than assumed, so this workflow also works unchanged
+          # on a project site, which serves from /<repo>/ instead of the root.
+          ROUTER_BASE="$(../scripts/pages-base.sh "${{ steps.pages.outputs.base_url }}")"
+          export ROUTER_BASE
+          echo "Building for base $ROUTER_BASE"
+          npm run generate
 
       - name: Check the build produced something
         working-directory: nuxt
@@ -77,7 +84,6 @@ jobs:
           test -s dist/index.html
           ls dist/_nuxt/*.js > /dev/null
 
-      - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
           path: nuxt/dist

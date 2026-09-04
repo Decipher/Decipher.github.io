@@ -1,17 +1,40 @@
+# When a pipeline runs at all.
+#
+# Without this, a branch with an open merge request built two pipelines for the
+# same commit, and the merge request'''s own pipeline had no jobs in it at all,
+# so it showed as skipped while the real one ran on the branch. These rules give
+# a merge request its own pipeline and stop the duplicate branch one.
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    # A branch with no merge request open still gets a pipeline; once one is
+    # opened, the merge request pipeline covers it.
+    - if: $CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS == null
+
 stages:
   - lint
   - build
   - test
   - session
+  - deploy
 
 variables:
   PHP_APT_PACKAGES: 'git unzip libsqlite3-dev libzip-dev libicu-dev libpng-dev libjpeg62-turbo-dev libfreetype6-dev libonig-dev libxml2-dev'
   PHP_EXTENSIONS: 'mbstring pdo_sqlite intl gd xml zip opcache'
 
+# Keyed on the lockfiles, so a cache is only reused for the dependencies that
+# produced it. An unkeyed cache is worse than none: it is restored whatever the
+# lockfile says, and the mismatch surfaces as a confusing build failure.
 cache:
+  key:
+    files:
+      - drupal/composer.lock
+      - nuxt/package-lock.json
   paths:
     - drupal/vendor/
     - nuxt/node_modules/
+    - .npm/
 
 #
 # --- Lint Stage ---
@@ -437,3 +460,39 @@ test_visual:
   extends: .playwright
   script:
     - npm run test:visual
+
+#
+# --- Deploy Stage ---
+#
+# GitLab Pages. Serves whatever the `pages` job leaves in `public/`, from the
+# default branch only.
+#
+# The build needs a live Drupal, because Druxt reads the JSON:API index and the
+# entity display configuration at build time. One is provisioned here, used, and
+# thrown away with the job: nothing Drupal survives into what is published,
+# which is the whole point of the serverless model.
+pages:
+  extends: .php-node-setup
+  stage: deploy
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+  script:
+    - cd drupal
+    - .devtools/assemble
+    - .devtools/provision
+    - .devtools/start
+    - cd ../nuxt
+    - npm install
+    # GitLab Pages serves a project site from /<project>/ unless the project is
+    # named <group>.gitlab.io, so the base path comes from CI rather than being
+    # assumed. The path is read from what CI says it will publish to.
+    - ROUTER_BASE=$(../scripts/pages-base.sh "$CI_PAGES_URL")
+    - export ROUTER_BASE
+    - echo "Building for base $ROUTER_BASE"
+    - npm run generate
+    - cd ..
+    - rm -rf public && mv nuxt/dist public
+    - test -s public/index.html
+  artifacts:
+    paths:
+      - public
