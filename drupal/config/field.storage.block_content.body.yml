@@ -1,4 +1,4 @@
-uuid: 1ddc72d2-65a2-4911-a8d2-5a6a74d8b47b
+uuid: 2ee5062c-6db7-49a9-b950-113af8ae218a
 langcode: en
 status: true
 dependencies:
@@ -6,11 +6,11 @@ dependencies:
     - block_content
     - text
 _core:
-  default_config_hash: eS0snV_L3dx9shtWRTzm5eblwOJ7qKWC9IE-4GMTDFc
+  default_config_hash: 2WZSsjjllV5cVYJdmJ5ry7mMzjnILAowkJEeUymFslU
 id: block_content.body
 field_name: body
 entity_type: block_content
-type: text_with_summary
+type: text_long
 settings: {  }
 module: text
 locked: false

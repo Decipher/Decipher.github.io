@@ -1,11 +1,11 @@
-uuid: 1d256a89-281d-469f-bba6-d295b088bbfe
+uuid: d3cf6912-1ee1-4131-a7c8-b29158290e66
 langcode: en
 status: true
 dependencies:
   module:
     - user
 _core:
-  default_config_hash: njaZigMvB4ap21Fg_tQcJhWgYJCGNi49Z5rRL_N6RI0
+  default_config_hash: hZxrM4LiKjRy1g-zZSX1RExTVK8SKQAtMrsRER1420I
 id: user_admin_people
 label: People
 module: user
@@ -462,6 +462,7 @@ display:
         type: full
         options:
           offset: 0
+          pagination_heading_level: h4
           items_per_page: 50
           total_pages: 0
           id: 0
@@ -853,6 +854,7 @@ display:
           sticky: false
           summary: ''
           empty_table: true
+          class: ''
       row:
         type: fields
       query:

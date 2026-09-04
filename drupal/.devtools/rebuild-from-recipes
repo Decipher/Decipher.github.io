@@ -1,0 +1,126 @@
+#!/usr/bin/env php
+<?php
+
+/**
+ * @file
+ * Rebuild the site from core recipes, and export the result.
+ *
+ * `.devtools/provision` installs from the committed configuration, which is
+ * fast and deterministic and is what every session and CI job uses. This is the
+ * other direction: it throws that configuration away and regenerates it from
+ * the recipe list in `.devtools/recipes.txt`.
+ *
+ * Run it when the recipe list changes, or to move the site onto a newer Drupal,
+ * then commit what it exports. It is deliberately not part of provisioning:
+ * rebuilding on every session would make the site's configuration a moving
+ * target and every session's diff unreadable.
+ */
+
+declare(strict_types=1);
+
+namespace QuickstartServerlessDevTools;
+
+require_once __DIR__ . '/helpers.php';
+
+$db_file = resolve_env_value('DB_FILE', '/tmp/quickstart-serverless-drupal-site.sqlite')[0];
+
+echo '===============================' . PHP_EOL;
+echo '     REBUILD FROM RECIPES      ' . PHP_EOL;
+echo '===============================' . PHP_EOL;
+echo PHP_EOL;
+
+$recipes = [];
+foreach (file(__DIR__ . '/recipes.txt', FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {
+  $line = trim($line);
+  if ($line !== '' && !str_starts_with($line, '#')) {
+    $recipes[] = $line;
+  }
+}
+if ($recipes === []) {
+  FAIL('No recipes listed in .devtools/recipes.txt.');
+}
+NOTE('%s recipe(s) to apply.', (string) count($recipes));
+
+TASK('Preparing settings and a throwaway database.');
+$settings_php = 'web/sites/default/settings.php';
+$settings_contents = (string) file_get_contents($settings_php);
+$commented_include = "#\n# if (file_exists(\$app_root . '/' . \$site_path . '/settings.local.php')) {\n#   include \$app_root . '/' . \$site_path . '/settings.local.php';\n# }\n";
+$active_include = "\nif (file_exists(\$app_root . '/' . \$site_path . '/settings.local.php')) {\n  include \$app_root . '/' . \$site_path . '/settings.local.php';\n}\n";
+if (str_contains($settings_contents, $commented_include)) {
+  file_put_contents($settings_php, str_replace($commented_include, $active_include, $settings_contents));
+}
+if (file_exists($db_file)) {
+  unlink($db_file);
+}
+file_put_contents('web/sites/default/settings.local.php', sprintf(
+  "<?php\n\n/**\n * @file\n * Provision-only override, written fresh each run. Gitignored.\n */\n\n\$databases['default']['default'] = [\n  'driver' => 'sqlite',\n  'database' => %s,\n];\n",
+  var_export($db_file, TRUE)
+));
+PASS('Ready.');
+
+// `minimal`, not `standard`. The standard profile and the standard recipe
+// configure the same things, and applying the recipe over the profile makes
+// every recipe after it fight config that already exists. Minimal is the
+// documented base for a recipe-built site.
+// The site's own name is not this script's to decide: it belongs to whoever
+// builds on the starterkit. Neutral default, overridden per site.
+$site_name = resolve_env_value('SITE_NAME', 'Druxt Serverless')[0];
+
+TASK('Installing Drupal with the minimal profile as "%s".', $site_name);
+drush('site:install minimal --site-name=%s', $site_name);
+PASS('Installed.');
+
+foreach ($recipes as $recipe) {
+  TASK('Applying %s.', $recipe);
+  // Absolute: drush resolves a relative path against the docroot, so a path
+  // that already starts with `web/` would be looked for at `web/web/...`.
+  drush('recipe:apply %s', getcwd() . '/web/' . $recipe);
+  PASS('Applied.');
+}
+
+// A second pass over the first recipe. `standard` grants the content editor
+// role permissions that belong to modules the later recipes install: taxonomy
+// for the tags permissions, path for the alias ones. On the first pass those
+// modules do not exist yet, so Drupal drops the grants with a notice and the
+// role ends up missing four permissions nobody asked it to lose. Re-applying
+// once everything is installed puts them back, and is a no-op for the rest.
+//
+// Same shape as the double config import in druxt.js's docs/drupal provision,
+// and for the same reason: one pass cannot both install a module and use it.
+if ($recipes !== []) {
+  TASK('Re-applying %s, now the modules its grants refer to exist.', $recipes[0]);
+  drush('recipe:apply %s', getcwd() . '/web/' . $recipes[0]);
+  PASS('Re-applied.');
+}
+
+// Tome is what turns the running site back into the committed files. Without
+// it the rebuild would leave nothing behind.
+TASK('Enabling tome and jsonapi.');
+drush('pm:enable tome jsonapi jsonapi_views decoupled_router druxt');
+PASS('Enabled.');
+
+// Druxt reads entity display configuration over JSON:API to build its
+// component schemas, and it does that at build time as an anonymous request.
+// Without this the frontend build fails with "Some resources have been omitted
+// because of insufficient authorization" and a list of display permissions,
+// which does not obviously point at a single permission on the anonymous role.
+TASK('Granting anonymous access to Druxt resources.');
+drush('php-eval %s', <<<'PHP'
+$role = \Drupal\user\Entity\Role::load("anonymous");
+$role->grantPermission("access druxt resources");
+$role->save();
+PHP);
+PASS('Granted.');
+
+TASK('Exporting config, content and files.');
+drush('tome:export --yes');
+PASS('Exported.');
+
+echo PHP_EOL;
+echo '===============================' . PHP_EOL;
+echo '   REBUILD COMPLETE  ' . PHP_EOL;
+echo '===============================' . PHP_EOL;
+echo PHP_EOL;
+echo 'Review the export, then commit it:' . PHP_EOL;
+echo '  git add drupal/config drupal/content' . PHP_EOL;
+echo PHP_EOL;

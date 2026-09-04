@@ -1,8 +1,8 @@
 _core:
-  default_config_hash: VDJxTZtQR21qB4lvOq8zszJZLvLKrSPQpdn2E3T71Ww
+  default_config_hash: HlN7eAN2N4JIHsYv56V4E7sqC9bS609KwvGFjyD_mgk
 langcode: en
-uuid: cdd7e2d8-9dcd-46ea-ac8c-f189d7a5be88
-name: 'Drush Site-Install'
+uuid: 6bef65ed-a81a-4473-997c-d3a2ccb11944
+name: Druxt Serverless
 mail: admin@example.com
 slogan: ''
 page:
@@ -12,3 +12,4 @@ page:
 admin_compact_mode: false
 weight_select_max: 100
 default_langcode: en
+mail_notification: null

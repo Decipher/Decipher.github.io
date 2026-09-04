@@ -1,11 +1,11 @@
-uuid: 12a41230-966a-4c6e-975f-0c203a184595
+uuid: cba9880b-81f8-4c3c-95e5-0c122e425fb6
 langcode: en
 status: true
 dependencies:
   module:
     - editor
 _core:
-  default_config_hash: P8ddpAIKtawJDi5SzOwCzVnnNYqONewSTJ6Xn0dW_aQ
+  default_config_hash: eIDWIfsLsdl3jonHlltHlTqya40ny9Inb9QS9SuytlU
 name: 'Basic HTML'
 format: basic_html
 weight: 0
@@ -34,7 +34,7 @@ filters:
     status: true
     weight: -10
     settings:
-      allowed_html: '<a href hreflang> <em> <strong> <cite> <blockquote cite> <code> <ul type> <ol start type> <li> <dl> <dt> <dd> <h2 id> <h3 id> <h4 id> <h5 id> <h6 id> <p> <br> <span> <img src alt height width data-entity-type data-entity-uuid data-align data-caption>'
+      allowed_html: '<br> <p> <h2 id> <h3 id> <h4 id> <h5 id> <h6 id> <cite> <dl> <dt> <dd> <a hreflang href> <blockquote cite> <ul type> <ol start type> <strong> <em> <code> <li> <img src alt data-entity-uuid data-entity-type height width data-caption data-align>'
       filter_html_help: false
       filter_html_nofollow: false
   filter_html_image_secure:
@@ -42,4 +42,10 @@ filters:
     provider: filter
     status: true
     weight: 9
+    settings: {  }
+  filter_image_lazy_load:
+    id: filter_image_lazy_load
+    provider: filter
+    status: true
+    weight: 15
     settings: {  }

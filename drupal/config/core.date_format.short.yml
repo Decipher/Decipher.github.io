@@ -1,10 +1,10 @@
-uuid: 897dd2d7-7598-4503-b9d1-163a3a270c94
+uuid: ce43d9fc-c0d4-4e6c-aa0a-94d6391af56b
 langcode: en
 status: true
 dependencies: {  }
 _core:
-  default_config_hash: AlzeyytA8InBgxIG9H2UDJYs3CG98Zj6yRsDKmlbZwA
+  default_config_hash: SAeixlV7Djy_Ggv_1P95TiqD4KUihA5icvU521tA84Y
 id: short
 label: 'Default short date'
 locked: false
-pattern: 'm/d/Y - H:i'
+pattern: 'j M Y - H:i'

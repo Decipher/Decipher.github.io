@@ -1,15 +1,16 @@
-uuid: 729a4318-c6c8-445c-98d7-b38282537fcb
+uuid: fe69ab36-da58-4066-9428-16854a64e7ba
 langcode: en
 status: true
 dependencies:
   config:
+    - core.entity_view_mode.node.rss
     - core.entity_view_mode.node.teaser
   module:
     - node
     - taxonomy
     - user
 _core:
-  default_config_hash: YKgw0f77GEmCu6_6Om9Mbig0mON9JdfVuMxTtd0WQaI
+  default_config_hash: 3o-ZjKjvMBpgaHiS3k8RvejhwJB4yX81fbjQjWc-tC8
 id: taxonomy_term
 label: 'Taxonomy term'
 module: taxonomy
@@ -29,6 +30,7 @@ display:
         type: mini
         options:
           offset: 0
+          pagination_heading_level: h4
           items_per_page: 10
           total_pages: 0
           id: 0
@@ -130,7 +132,6 @@ display:
           add_table: false
           require_value: false
           reduce_duplicates: false
-          default_argument_skip_url: false
       filters:
         langcode:
           id: langcode
@@ -280,7 +281,7 @@ display:
         type: node_rss
         options:
           relationship: none
-          view_mode: default
+          view_mode: rss
       query:
         type: views_query
         options: {  }

@@ -93,7 +93,7 @@ export default {
     // Disable the router middleware (redirect support) in favour of serverless.
     router: { middleware: false },
     // Set the default theme to render Site regions.
-    site: { theme: 'bartik' },
+    site: { theme: 'olivero' },
   },
 
   // Build Configuration: https://go.nuxtjs.dev/config-build

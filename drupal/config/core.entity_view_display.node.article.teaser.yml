@@ -1,11 +1,10 @@
-uuid: 51e10e09-d3e1-40ad-88fd-d6ef94315391
+uuid: 4c1e41db-2e19-434a-b3a4-e9086392bbcb
 langcode: en
 status: true
 dependencies:
   config:
     - core.entity_view_mode.node.teaser
     - field.field.node.article.body
-    - field.field.node.article.comment
     - field.field.node.article.field_image
     - field.field.node.article.field_tags
     - image.style.medium
@@ -14,8 +13,6 @@ dependencies:
     - image
     - text
     - user
-_core:
-  default_config_hash: 0ur5-yZyR8pJ3lugC_Micbr6V_tpMWz-yHFhtuLcZo8
 id: node.article.teaser
 targetEntityType: node
 bundle: article
@@ -51,6 +48,4 @@ content:
   links:
     weight: 100
     region: content
-hidden:
-  comment: true
-  field_tags: true
+hidden: {  }

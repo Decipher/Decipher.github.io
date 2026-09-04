@@ -1,4 +1,4 @@
-uuid: c31df0bb-ddfa-4e45-adc9-64abe849bb0d
+uuid: ccfcf550-e448-4ef6-85f7-9b3fade9d1f1
 langcode: en
 status: false
 dependencies:
@@ -8,7 +8,7 @@ dependencies:
     - node
     - user
 _core:
-  default_config_hash: ko9GznzNBXHkuz09OCaBQ1YOSJYYjTY0TBpNV3WKnog
+  default_config_hash: exIF08PTvYSK6tJCsAzBqMEKUBKIptPorMn74SVhevc
 id: archive
 label: Archive
 module: node
@@ -29,6 +29,7 @@ display:
         type: mini
         options:
           offset: 0
+          pagination_heading_level: h4
           items_per_page: 10
           total_pages: 0
           id: 0

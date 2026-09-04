@@ -1,0 +1,18 @@
+uuid: 788a3328-087e-481a-89c1-a44f4579822a
+langcode: en
+status: true
+dependencies:
+  theme:
+    - claro
+id: claro_page_title
+theme: claro
+region: header
+weight: -30
+provider: null
+plugin: page_title_block
+settings:
+  id: page_title_block
+  label: 'Page title'
+  label_display: '0'
+  provider: core
+visibility: {  }

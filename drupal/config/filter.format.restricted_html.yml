@@ -1,9 +1,9 @@
-uuid: be6f7dbf-c744-4e37-a452-1fec20d63b8a
+uuid: 37031007-261e-47ea-bb0c-c87970ea133a
 langcode: en
 status: true
 dependencies: {  }
 _core:
-  default_config_hash: oz6NyPDAB4HB6N9hgH2LwNVtCd-sXbMG1fbn5KsRIDI
+  default_config_hash: AKImDEgqkqGj0nhCb0BQkYRbgymnRkbYfz8Z9EUl5o4
 name: 'Restricted HTML'
 format: restricted_html
 weight: 1

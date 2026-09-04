@@ -1,0 +1,60 @@
+{
+    "uid": [
+        {
+            "value": 1
+        }
+    ],
+    "uuid": [
+        {
+            "value": "4816a18c-e7e8-464a-96d0-675084ed414c"
+        }
+    ],
+    "langcode": [
+        {
+            "value": "en"
+        }
+    ],
+    "preferred_langcode": [
+        {
+            "value": "en"
+        }
+    ],
+    "preferred_admin_langcode": [],
+    "name": [
+        {
+            "value": "admin"
+        }
+    ],
+    "mail": [
+        {
+            "value": "admin@example.com"
+        }
+    ],
+    "timezone": [
+        {
+            "value": "UTC"
+        }
+    ],
+    "status": [
+        {
+            "value": true
+        }
+    ],
+    "created": [
+        {
+            "value": "2026-09-04T03:54:22+00:00"
+        }
+    ],
+    "changed": [
+        {
+            "value": "2026-09-04T03:54:22+00:00"
+        }
+    ],
+    "roles": [],
+    "default_langcode": [
+        {
+            "value": true
+        }
+    ],
+    "user_picture": []
+}

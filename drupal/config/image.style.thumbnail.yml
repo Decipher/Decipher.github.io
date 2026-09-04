@@ -1,9 +1,9 @@
-uuid: 50f4f78a-5f59-428b-b3b2-d944eba20dc8
+uuid: 0c5cf5c0-8784-45af-b79b-bae207eb6a27
 langcode: en
 status: true
 dependencies: {  }
 _core:
-  default_config_hash: cCiWdBHgLwj5omG35lsKc4LkW4MBdmcctkVop4ol5x0
+  default_config_hash: JXYDC3SLZUXSwnTjR9rBo6uZF3vDSZd8S7EA5ZOH7kM
 name: thumbnail
 label: 'Thumbnail (100×100)'
 effects:
@@ -15,3 +15,9 @@ effects:
       width: 100
       height: 100
       upscale: false
+  c4eb9942-2c9e-4a81-949f-6161a44b6559:
+    uuid: c4eb9942-2c9e-4a81-949f-6161a44b6559
+    id: image_convert_avif
+    weight: 2
+    data:
+      extension: webp

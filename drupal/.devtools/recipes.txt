@@ -1,0 +1,29 @@
+# Recipes applied to build this site, in order, by .devtools/rebuild-from-recipes.
+#
+# The site is defined by this list rather than by an inherited configuration
+# blob. Re-running the rebuild from a fresh Drupal reproduces it, so the
+# committed config is an artefact of these recipes and not the source of truth.
+#
+# Paths are relative to the docroot.
+
+# Olivero, Claro, the standard roles, text formats and performance defaults.
+core/recipes/standard
+
+# Content to actually write.
+core/recipes/page_content_type
+core/recipes/article_content_type
+core/recipes/article_tags
+
+# Media. A decoupled frontend still needs somewhere for images and video to
+# come from, and these are the core types with JSON:API support out of the box.
+core/recipes/image_media_type
+core/recipes/document_media_type
+core/recipes/remote_video_media_type
+
+# Deliberately not applied:
+#
+#   article_comment    a decoupled frontend renders no comment UI, and the
+#                      endpoints would be write surface with nothing behind them.
+#   editorial_workflow the review gate here is the content pull request. A
+#                      second draft/publish workflow would duplicate it, and
+#                      the two would disagree about what "published" means.
