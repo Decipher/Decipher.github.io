@@ -55,6 +55,10 @@ foreach ($baseline as $path) {
 }
 PASS('%s infrastructure path(s) restored.', (string) count($baseline));
 
+TASK('Removing exported OAuth tokens.');
+$tokens = discard_oauth_tokens();
+PASS('%s token file(s) removed.', (string) $tokens);
+
 // The content index lists every exported entity, infrastructure included, so
 // it is in the baseline and has just been restored. If the session actually
 // added or removed content the index has to move with it, so re-export just
@@ -81,6 +85,28 @@ echo '===============================' . PHP_EOL;
 echo PHP_EOL;
 echo $changes . PHP_EOL;
 echo PHP_EOL;
+
+/**
+ * Delete every exported OAuth token.
+ *
+ * Tome exports content entities as they are saved, and an OAuth token is a
+ * content entity, so every sign-in during a session writes one. The file holds
+ * the token's own value in plain text, and this repository is public.
+ *
+ * The infrastructure baseline cannot cover these: it records what existed when
+ * the session was provisioned, and these are created afterwards, one per
+ * sign-in. They are never content anyone wants in a pull request, so they go
+ * unconditionally rather than by comparison.
+ */
+function discard_oauth_tokens(): int {
+  $removed = 0;
+  foreach (glob('../drupal/content/oauth2_token.*.json') ?: [] as $file) {
+    if (unlink($file)) {
+      $removed++;
+    }
+  }
+  return $removed;
+}
 
 /**
  * Re-add index entries for content the session created or deleted.
