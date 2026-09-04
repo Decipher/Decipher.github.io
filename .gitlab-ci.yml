@@ -2,6 +2,7 @@ stages:
   - lint
   - build
   - test
+  - session
 
 variables:
   PHP_APT_PACKAGES: 'git unzip libsqlite3-dev libzip-dev libicu-dev libpng-dev libjpeg62-turbo-dev libfreetype6-dev libonig-dev libxml2-dev'
@@ -260,9 +261,12 @@ test_generate:
     - test -s dist/index.html
     - ls dist/_nuxt/*.js > /dev/null
   artifacts:
-    when: on_failure
+    # Always, not just on failure: the behaviour and visual suites run against
+    # this exact build rather than provisioning Drupal a second time.
+    when: always
     paths:
       - nuxt/dist
+    expire_in: 1 day
 
 # The documented consumer flow (`npx giget@1 gh:druxt/... my-site
 # --install`) consumes a tarball: no .git, no preinstalled dependencies,
@@ -315,3 +319,79 @@ test_install_guardrails:
       chmod +x "$SHIM/php" "$SHIM/composer"
       PATH="$SHIM:$PATH" env -u CI npm install > /tmp/old-php-install.log 2>&1
       grep -q 'The backend needs PHP' /tmp/old-php-install.log
+
+#
+# --- Session Stage ---
+#
+# An authoring session: stand the backend up, expose it, hold it open while
+# someone writes, and turn what they wrote into a merge request.
+#
+# Manual only, and manual in GitLab means a job that exists in the pipeline but
+# never starts itself. Only someone who can run jobs on this project can start
+# it, which is the access control the whole thing rests on.
+#
+# The work is in scripts/session.sh, shared with the GitHub Actions job and with
+# running a session on a laptop, so all three produce a backend the frontend
+# cannot tell apart.
+session:authoring:
+  extends: .php-node-setup
+  stage: session
+  # Long enough for the session plus its teardown export. The session itself
+  # stops at SESSION_MINUTES; this is the outer bound if something hangs.
+  timeout: 1h
+  rules:
+    # No `if:` at all, so no push, merge request or schedule can start it.
+    - when: manual
+      # A session nobody started is not a failed pipeline.
+      allow_failure: true
+  variables:
+    SESSION_MINUTES: '55'
+    WEBSERVER_PORT: '8888'
+  before_script:
+    - !reference [.php-node-setup, before_script]
+    # cloudflared is not in the image. A Quick Tunnel needs no account and no
+    # credential, so this is just the binary.
+    - curl -sSL -o /usr/local/bin/cloudflared
+      https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64
+    - chmod +x /usr/local/bin/cloudflared
+    - cloudflared --version
+  script:
+    - scripts/session.sh
+  artifacts:
+    when: always
+    paths:
+      - drupal/.logs/
+    expire_in: 1 day
+
+# Unit tests for the authoring layer's decisions: is this backend usable, has
+# this session expired, which source wins. No browser, no backend, no install
+# beyond the root dependencies.
+test_unit:
+  extends: .node-lint
+  stage: test
+  needs: []
+  script:
+    - npm run test:unit
+
+# The login flow against a stubbed backend. Stubbed on purpose: these assert
+# what the frontend does with each answer a backend can give, including the
+# awkward ones a real Drupal cannot be made to produce on demand.
+.playwright:
+  image: mcr.microsoft.com/playwright:v1.62.1-noble
+  stage: test
+  needs:
+    - job: test_generate
+      artifacts: true
+  before_script:
+    - npm install --no-audit --no-fund
+  artifacts:
+    when: on_failure
+    paths:
+      - test-results/
+      - playwright-report/
+    expire_in: 1 week
+
+test_e2e:
+  extends: .playwright
+  script:
+    - npm run test:e2e
