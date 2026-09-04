@@ -1,0 +1,96 @@
+name: Pages
+
+# Build the static site and publish it to GitHub Pages.
+#
+# The build needs a live Drupal: Druxt reads the JSON:API index and the entity
+# display configuration at build time. So this stands one up the same way the
+# tests do, through drupal/.devtools (PHP built-in server and SQLite, no
+# Docker), generates against it, and throws it away. Nothing Drupal survives
+# into what gets published, which is the point of the serverless model.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Least privilege: only the deploy job may touch Pages, and only through the
+# official actions.
+permissions:
+  contents: read
+
+concurrency:
+  group: pages
+  # Let a running deploy finish rather than publishing a half-built site.
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          # sodium: simple_oauth pulls in lcobucci/jwt, which needs it. The
+          # starterkit has neither, so its own workflows do not ask for it.
+          extensions: mbstring, pdo_sqlite, intl, gd, xml, zip, opcache, sodium
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            nuxt/package-lock.json
+
+      - name: Install Composer dependencies
+        working-directory: drupal
+        run: composer install --no-interaction --no-progress
+
+      - name: Provision Drupal
+        working-directory: drupal
+        run: |
+          .devtools/assemble
+          .devtools/provision
+          .devtools/start
+
+      - name: Install frontend dependencies
+        working-directory: nuxt
+        run: npm install
+
+      - name: Generate the static site
+        working-directory: nuxt
+        env:
+          # A user site serves from the domain root, so no base path. A project
+          # site would need ROUTER_BASE set to /<repo>/.
+          ROUTER_BASE: /
+        run: npm run generate
+
+      - name: Check the build produced something
+        working-directory: nuxt
+        run: |
+          test -s dist/index.html
+          ls dist/_nuxt/*.js > /dev/null
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: nuxt/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
