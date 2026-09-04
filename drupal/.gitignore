@@ -28,5 +28,11 @@ web/robots.txt
 
 # Authoring session artefacts, written by .devtools/provision-authoring.
 web/sites/*/authoring.services.yml
+
+# Tome exports content entities as they are saved, and an OAuth token is one,
+# so a sign-in writes its token value into content/. This repository is public.
+# .devtools/session-export deletes these; ignoring them as well means a stray
+# `tome:export` outside that flow cannot commit one either.
+content/oauth2_token.*.json
 .devtools/.session-infra
 keys/
