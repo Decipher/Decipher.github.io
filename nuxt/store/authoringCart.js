@@ -59,6 +59,8 @@ export const state = () => ({
    * the cart. It only decides whether the interface offers editing.
    */
   editing: false,
+  /** Whether the staged-changes drawer is open. */
+  drawerOpen: false,
   /** Staged resources, keyed `type:id`. */
   entries: {},
   /** False once a write to storage has failed, so the UI can stop promising. */
@@ -70,6 +72,7 @@ export const state = () => ({
 
 export const getters = {
   editing: (state) => state.editing,
+  drawerOpen: (state) => state.drawerOpen,
   count: (state) => Object.keys(state.entries).length,
   isEmpty: (state) => !Object.keys(state.entries).length,
   /** Everything staged, as JSON:API resource objects. */
@@ -81,6 +84,10 @@ export const getters = {
 export const mutations = {
   setEditing(state, editing) {
     state.editing = editing
+  },
+
+  setDrawerOpen(state, open) {
+    state.drawerOpen = open
   },
 
   stage(state, { key, resource }) {
@@ -131,6 +138,10 @@ export const actions = {
     }
   },
 
+  setDrawerOpen({ commit }, open) {
+    commit('setDrawerOpen', Boolean(open))
+  },
+
   /** Turn editing on or off, and remember which. */
   setEditing({ commit }, editing) {
     commit('setEditing', Boolean(editing))
@@ -161,6 +172,7 @@ export const actions = {
     }
     commit('stage', { key: cartKey(type, id), resource })
     commit('setPersistent', writeStored(state.entries))
+    if (Object.keys(state.entries).length === 1) commit('setDrawerOpen', true)
     return id
   },
 
@@ -188,6 +200,9 @@ export const actions = {
 
     commit('stage', { key: cartKey(type, id), resource })
     commit('setPersistent', writeStored(state.entries))
+    // Open on the first staged change, so it is visible that something was
+    // captured. Left alone after that, since closing it should stay closed.
+    if (Object.keys(state.entries).length === 1) commit('setDrawerOpen', true)
     return true
   },
 
