@@ -75,6 +75,18 @@ export default {
     },
   },
 
+  /**
+   * Fetch on mount, explicitly.
+   *
+   * Nuxt's `fetch()` hook does not run on a full static build: the result was
+   * baked at generate time, when there was no backend, so the list stayed empty
+   * and nothing was ever requested. Calling it once the component exists is the
+   * only reliable trigger here.
+   */
+  mounted() {
+    this.$fetch()
+  },
+
   watch: {
     // Connecting a backend mid-visit should fill the list in, not require a
     // reload to notice.

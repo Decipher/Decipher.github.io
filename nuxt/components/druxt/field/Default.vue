@@ -1,64 +1,239 @@
 <template>
-  <Draggable
-    :value="items"
-    :disabled="!inlineEdit || items.length < 2"
-    handle=".authoring-handle"
-    ghost-class="opacity-40"
-    @input="reorder"
-  >
-    <slot :inline-edit="inlineEdit" />
-  </Draggable>
+  <div class="authoring-field">
+    <!-- ===== View displays ===== -->
+    <template v-if="isSchemaView">
+      <div v-if="relationship">
+        <DruxtEntity
+          v-for="{ type, id } of relationships"
+          :key="id"
+          v-bind="{ type, uuid: id }"
+        />
+      </div>
+      <!-- eslint-disable-next-line vue/no-v-html -->
+      <div v-else class="prose-body" v-html="html" />
+    </template>
+
+    <!-- ===== Form displays ===== -->
+    <div v-else class="mb-5">
+      <label class="block" :for="fieldId">
+        <span class="eyebrow mb-1.5 block">
+          {{ label }}
+          <span v-if="schema.required" class="text-accent" aria-hidden="true">*</span>
+        </span>
+      </label>
+
+      <!-- Referenced entities get their own form, nested. -->
+      <div v-if="relationship" class="rounded border border-hairline p-3">
+        <DruxtEntityForm
+          v-for="{ type, id } of relationships"
+          :key="id"
+          v-bind="{ type, uuid: id }"
+        />
+        <p v-if="!relationships.length" class="text-sm text-muted">Nothing referenced yet.</p>
+      </div>
+
+      <!-- Boolean -->
+      <label v-else-if="isTypeCheckbox" class="flex items-center gap-2">
+        <input
+          :id="fieldId"
+          v-model="model"
+          type="checkbox"
+          class="h-4 w-4 rounded border-hairline text-accent focus:ring-accent"
+        />
+        <span class="text-sm text-body">{{ label }}</span>
+      </label>
+
+      <!-- Rich text -->
+      <AuthoringWysiwyg
+        v-else-if="isTypeWysiwyg"
+        v-model="model.value"
+        :format="model.format"
+      />
+
+      <!-- Select -->
+      <select
+        v-else-if="isTypeSelect"
+        :id="fieldId"
+        v-model="model"
+        :class="controlClass"
+        data-testid="field-select"
+      >
+        <option v-for="(text, key) of selectOptions" :key="key" :value="key">{{ text }}</option>
+      </select>
+
+      <!-- Single-value input -->
+      <input
+        v-else-if="isTypeInput && !isMultiple"
+        :id="fieldId"
+        v-model="model"
+        :type="inputType"
+        :placeholder="placeholder"
+        :required="schema.required || false"
+        :class="controlClass"
+        data-testid="field-input"
+      />
+
+      <!-- Multi-value input, reorderable -->
+      <Draggable
+        v-else-if="isTypeInput && isMultiple"
+        v-model="model"
+        handle=".authoring-grip"
+        ghost-class="opacity-40"
+      >
+        <div v-for="(item, key) of model" :key="key" class="mb-2 flex items-center gap-2">
+          <span
+            class="authoring-grip cursor-grab select-none px-1 font-mono text-muted"
+            aria-hidden="true"
+            title="Drag to reorder"
+            >⠿</span
+          >
+          <input
+            v-model="model[key]"
+            :type="inputType"
+            :placeholder="placeholder"
+            :class="controlClass"
+            data-testid="field-input"
+          />
+          <button
+            type="button"
+            class="rounded border border-hairline px-2 py-1 text-sm text-muted hover:border-accent hover:text-accent"
+            :aria-label="`Remove ${label} ${key + 1}`"
+            @click="model = model.filter((_, i) => i !== key)"
+          >
+            ×
+          </button>
+        </div>
+        <template #footer>
+          <button
+            type="button"
+            class="rounded border border-hairline px-3 py-1.5 text-sm text-body hover:border-ink"
+            data-testid="field-add-another"
+            @click="model = [...model, '']"
+          >
+            Add another
+          </button>
+        </template>
+      </Draggable>
+
+      <!-- Anything else -->
+      <textarea
+        v-else
+        :id="fieldId"
+        v-model="model"
+        :rows="rows"
+        :placeholder="placeholder"
+        :class="controlClass"
+        data-testid="field-textarea"
+      />
+
+      <p v-if="schema.description" class="mt-1.5 text-sm text-muted">{{ schema.description }}</p>
+      <p v-if="errorText" class="mt-1.5 text-sm text-accent" data-testid="field-error">
+        {{ errorText }}
+      </p>
+    </div>
+  </div>
 </template>
 
 <script>
 /**
- * The theming and editing hook for every Druxt field.
+ * Every Druxt field, themed, and readable or editable.
  *
  * Druxt resolves a field to the most specific component it can find and falls
- * back here, so this is the one place that applies to all of them. Two things
- * happen as a result:
+ * back here. Putting the whole dispatch in the fallback rather than in
+ * per-type components is deliberate: the specific names depend on the field
+ * type and its widget, so a component named for a guess at that never renders,
+ * and the field silently falls through to Druxt's own unthemed default. Which
+ * is exactly what happened before this.
  *
- * 1. `inline-edit` reaches every field through the slot, so each can render
- *    itself for reading or for editing rather than the page swapping a whole
- *    entity for a form.
- * 2. A multi-value field becomes reorderable, because ordering is a property of
- *    the field rather than of any one value in it.
+ * `schema.config.schemaType` decides read or edit, so the same component serves
+ * a rendered page and a form, and the site's theming applies to both.
  *
- * Dragging is off unless editing, and off for a single value, so a reader never
- * picks content up by accident.
- *
- * Follows the shape used in `Decipher/example-druxt-blog`.
+ * Ported from `druxt/umami.demo.druxtjs.org@feature/239-editbar`, which is the
+ * BootstrapVue version of this.
  */
-import { DruxtFieldMixin } from 'druxt-entity'
+import { DruxtEntity, DruxtFieldMixin } from 'druxt-entity'
 import Draggable from 'vuedraggable'
 
 export default {
-  components: { Draggable },
+  components: { Draggable, DruxtEntity },
 
   mixins: [DruxtFieldMixin],
 
-  props: {
-    inlineEdit: {
-      type: Boolean,
-      default: false,
-    },
-  },
-
   computed: {
-    /** The field's values, always as an array so ordering has something to sort. */
-    items() {
-      const value = this.model !== undefined ? this.model : this.value
-      if (Array.isArray(value)) return value
-      return value === undefined || value === null ? [] : [value]
+    /** Shared control styling, so every input looks like the same site. */
+    controlClass() {
+      return 'w-full rounded border border-hairline bg-paper px-3 py-2 font-sans text-sm text-ink focus:border-accent focus:outline-none'
     },
-  },
 
-  methods: {
-    reorder(items) {
-      // Emitted rather than written: the field does not know whether anything
-      // is listening, and staging is the cart's job.
-      this.model = items
-      this.$emit('reordered', items)
+    fieldId() {
+      return `field-${this.schema.id}`
+    },
+
+    /** One size fits all rendering for view displays. */
+    html() {
+      const model = this.model
+      if (typeof model === 'string') return model
+      return (model || {}).processed || (model || {}).value || ''
+    },
+
+    inputType() {
+      return { number: 'number', email: 'email' }[this.schema.type] || 'text'
+    },
+
+    isMultiple() {
+      return (this.schema.cardinality || 1) !== 1
+    },
+    isSchemaView() {
+      return this.schema.config.schemaType === 'view'
+    },
+    isTypeCheckbox() {
+      return ['boolean_checkbox'].includes(this.schema.type)
+    },
+    isTypeInput() {
+      return ['string_textfield', 'number', 'email_default'].includes(this.schema.type)
+    },
+    isTypeSelect() {
+      return ['options_select'].includes(this.schema.type)
+    },
+    isTypeWysiwyg() {
+      return ['text_textarea', 'text_textarea_with_summary'].includes(this.schema.type)
+    },
+
+    label() {
+      const text = (this.schema.label || {}).text || this.schema.id
+      return text.charAt(0).toUpperCase() + text.slice(1)
+    },
+
+    placeholder() {
+      return ((this.schema.settings || {}).display || {}).placeholder || undefined
+    },
+
+    relationships() {
+      const data = (this.model || {}).data
+      if (!data) return []
+      return Array.isArray(data) ? data : [data]
+    },
+
+    rows() {
+      return ((this.schema.settings || {}).display || {}).rows || 5
+    },
+
+    selectOptions() {
+      const allowed = ((this.schema.settings || {}).storage || {}).allowed_values
+      return allowed || {}
+    },
+
+    /**
+     * The backend's own validation message, minus its field prefix.
+     *
+     * Drupal reports "field_x: The thing is wrong.", and repeating the field
+     * name beneath the field's own label reads badly.
+     */
+    errorText() {
+      return (this.errors || [])
+        .map((error) => String(error.detail || '').split(': ').slice(1).join(': '))
+        .filter(Boolean)
+        .join('\n')
     },
   },
 }
