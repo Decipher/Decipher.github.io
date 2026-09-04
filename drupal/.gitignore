@@ -25,3 +25,8 @@ web/robots.txt
 .editorconfig
 .gitattributes
 .ddev/docker-compose.host-docker-internal.yaml
+
+# Authoring session artefacts, written by .devtools/provision-authoring.
+web/sites/*/authoring.services.yml
+.devtools/.session-infra
+keys/

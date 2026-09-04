@@ -1,0 +1,441 @@
+#!/usr/bin/env php
+<?php
+
+/**
+ * @file
+ * Make a provisioned backend conforming for authoring.
+ *
+ * The frontend is a pure client. It talks to whatever backend it is pointed
+ * at, and does not care whether that backend runs in GitLab CI, in GitHub
+ * Actions, or on a laptop. What makes a backend usable is four things, and
+ * they are the same everywhere:
+ *
+ *   1. JSON:API accepts writes.
+ *   2. The deployed site's origin is allowed for cross-origin requests.
+ *   3. An OAuth consumer exists whose redirect URI is that site's callback.
+ *   4. Drupal trusts the public hostname it is being served on.
+ *
+ * So all four live here, in one script every provider calls, rather than in
+ * any one workflow file. Run it after `.devtools/provision`.
+ *
+ * The OAuth sequence is ported from druxt/quickstart's own `.devtools/provision`,
+ * including its comments. Each of those gotchas cost someone a failed login to
+ * find, and none of them are obvious from the error message.
+ */
+
+declare(strict_types=1);
+
+namespace QuickstartServerlessDevTools;
+
+require_once __DIR__ . '/helpers.php';
+
+// -----------------------------------------------------------------------------
+// Variables.
+// -----------------------------------------------------------------------------
+
+// The origin the deployed static site is served from. Every cross-origin
+// allowance and the OAuth redirect URI are derived from it, so pointing a
+// backend at a different frontend is a one-variable change.
+$site_origin = rtrim(resolve_env_value('SITE_ORIGIN', 'https://decipher.github.io')[0], '/');
+$oauth_callback = resolve_env_value('OAUTH_CALLBACK', $site_origin . '/callback')[0];
+
+// -----------------------------------------------------------------------------
+
+echo '===============================' . PHP_EOL;
+echo '      AUTHORING PROVISION      ' . PHP_EOL;
+echo '===============================' . PHP_EOL;
+echo PHP_EOL;
+
+// The baseline below works by exporting once and recording whatever moved,
+// treating all of it as authoring infrastructure. That is only true if the
+// working tree matched the committed state to begin with. Run this over
+// uncommitted config or content and those files are recorded as infrastructure
+// too, then quietly reverted by the session export. Refuse instead: silently
+// discarding someone's work is far worse than stopping.
+$dirty = trim((string) shell_exec('git -C .. status --porcelain -- drupal/config drupal/content 2>/dev/null'));
+if ($dirty !== '') {
+  echo $dirty . PHP_EOL . PHP_EOL;
+  FAIL(
+    "Uncommitted changes in drupal/config or drupal/content.\n" .
+    "       This script records what provisioning exports so a session can subtract it,\n" .
+    "       which cannot tell your changes apart from its own. Commit or stash first."
+  );
+}
+
+NOTE('Frontend origin: %s', $site_origin);
+NOTE('OAuth callback:  %s', $oauth_callback);
+echo PHP_EOL;
+
+// -----------------------------------------------------------------------------
+// 1. JSON:API accepts writes.
+// -----------------------------------------------------------------------------
+
+TASK('Enabling authenticated editing via JSON:API.');
+drush('pm:enable jsonapi');
+drush('config:set jsonapi.settings read_only %s', '0');
+PASS('jsonapi.settings read_only disabled.');
+
+// -----------------------------------------------------------------------------
+// 2. Cross-origin requests from the deployed site.
+// -----------------------------------------------------------------------------
+
+TASK('Allowing cross-origin requests from %s.', $site_origin);
+write_cors_config($site_origin);
+PASS('cors.config written to web/sites/default/authoring.services.yml.');
+
+// -----------------------------------------------------------------------------
+// 3. Trust the public hostname the session is served on.
+// -----------------------------------------------------------------------------
+
+TASK('Trusting tunnel hostnames and the local webserver.');
+write_host_settings();
+PASS('Trusted host and reverse proxy settings written.');
+
+// -----------------------------------------------------------------------------
+// 4. OAuth: keys, a scope, and a consumer.
+// -----------------------------------------------------------------------------
+
+TASK('Enabling and configuring simple_oauth.');
+// consumers first, on its own. simple_oauth adds a `secret` field to the
+// consumer entity as part of its own install, and enabling both in one
+// command runs that field update before consumers has created its tables:
+// "Cannot add field 'consumer_field_data.secret': table doesn't exist",
+// which then leaves the entity schema half-built.
+drush('pm:enable consumers');
+drush('pm:enable simple_oauth');
+
+$keys_dir = getcwd() . '/keys';
+if (!is_dir($keys_dir) && !mkdir($keys_dir, 0755, TRUE) && !is_dir($keys_dir)) {
+  FAIL('Unable to create %s.', $keys_dir);
+}
+
+// Config values are relative to web/ (the docroot), matching the cwd
+// `.devtools/start` runs the webserver from - not this script's cwd.
+drush('config:set simple_oauth.settings public_key %s', '../keys/public.key');
+drush('config:set simple_oauth.settings private_key %s', '../keys/private.key');
+// The generate-keys command writes to disk immediately, so it gets an
+// absolute path rather than relying on this script's own cwd matching web/'s.
+drush('simple-oauth:generate-keys %s', $keys_dir);
+PASS('simple_oauth enabled; OAuth keys generated at %s.', $keys_dir);
+
+TASK('Creating the authoring OAuth Consumer.');
+// A stable client ID, not a fresh one per run. The consumer is a content
+// entity, so Tome exports it, and a random ID would mean a new committed file
+// every time anyone provisioned. It is also not a secret: it is a public
+// client (PKCE, no secret), the frontend sends it in every authorize request,
+// and a stable value means the frontend can hold it at build time instead of
+// being told at runtime.
+$client_id = resolve_env_value('OAUTH_CLIENT_ID', 'fbc6e835-b119-444d-9d67-3a5d0b120720')[0];
+putenv('OAUTH_CLIENT_ID=' . $client_id);
+putenv('OAUTH_CALLBACK=' . $oauth_callback);
+drush('php-eval %s', <<<'PHP'
+// Simple OAuth 6 rejects an authorize request when it cannot resolve a
+// scope, and its default provider is "Dynamic (entity)" with no scopes
+// shipped - so a fresh site has none and every login fails with
+// "Check the `scope` parameter", whether the frontend sends a scope or
+// not. Create one and make it the consumer default, which is what
+// ScopeRepository::finalizeScopes() falls back to.
+$scope_id = "authoring";
+if (!\Drupal::entityTypeManager()->getStorage("oauth2_scope")->load($scope_id)) {
+  \Drupal\simple_oauth\Entity\Oauth2Scope::create([
+    "id" => $scope_id,
+    "name" => $scope_id,
+    "description" => "Content authoring from the static frontend.",
+    "grant_types" => [
+      "authorization_code" => ["status" => TRUE, "description" => "Authorization code grant."],
+      "refresh_token" => ["status" => TRUE, "description" => "Refresh token grant."],
+    ],
+    "umbrella" => FALSE,
+    "granularity_id" => "role",
+    "granularity_configuration" => ["role" => "authenticated"],
+  ])->save();
+}
+
+$client_id = getenv("OAUTH_CLIENT_ID") ?: \Drupal::service("uuid")->generate();
+$callback = getenv("OAUTH_CALLBACK") ?: "http://localhost:3000/callback";
+// Update in place when it already exists, so re-provisioning an existing site
+// does not stack up duplicate consumers with the same client ID.
+$existing = \Drupal::service("entity.repository")->loadEntityByUuid("consumer", $client_id);
+$values = ([
+  "owner_id"     => 1,
+  // client_id, not just uuid: simple_oauth 6 looks consumers up by this
+  // field, and consumers only enforces it through form validation, so a
+  // programmatic save leaves it empty and every OAuth request fails with
+  // invalid_client. Same value as the uuid so one ID identifies the
+  // consumer everywhere.
+  "client_id"    => $client_id,
+  "uuid"         => $client_id,
+  "label"        => "Authoring",
+  "description"  => "In-place content authoring from the deployed static site.",
+  "confidential" => FALSE,
+  "pkce"         => TRUE,
+  // Required by simple_oauth 6 and, like client_id, enforced only in the
+  // form - a programmatic save leaves it empty and the token request
+  // fails with unsupported_grant_type. refresh_token lets the frontend
+  // renew a session without sending the user back through login.
+  "grant_types"  => ["authorization_code", "refresh_token"],
+  // The default scope for this grant: with it set, a request that sends
+  // no scope (or an empty one, as druxt-auth does) resolves to this
+  // rather than being rejected.
+  "authorization_code_scopes" => [$scope_id],
+  // The deployed site first, then the local dev ports. The browser builds
+  // redirect_uri from its own origin, and an IDE forwarding container port
+  // 3000 lands on the next free HOST port when 3000 is taken - league then
+  // rejects the unregistered redirect_uri as, confusingly, invalid_client.
+  "redirect"     => array_values(array_unique(array_merge(
+    [$callback],
+    array_map(fn ($port) => "http://localhost:{$port}/callback", range(3000, 3009)),
+  ))),
+]);
+$consumer = $existing ?: \Drupal\consumers\Entity\Consumer::create($values);
+if ($existing) {
+  foreach ($values as $field => $value) {
+    if ($field !== "uuid") {
+      $consumer->set($field, $value);
+    }
+  }
+}
+// Validate before saving: these fields are required, but only the entity
+// form enforces that, so a programmatic save silently produces a consumer
+// that cannot authenticate. Two separate bugs shipped that way (empty
+// client_id, empty grant_types), each surfacing only as a failed login.
+$violations = $consumer->validate();
+if ($violations->count() > 0) {
+  $messages = [];
+  foreach ($violations as $violation) {
+    $messages[] = $violation->getPropertyPath() . ": " . strip_tags((string) $violation->getMessage());
+  }
+  throw new \RuntimeException("Refusing to save an invalid Consumer - " . implode("; ", $messages));
+}
+$consumer->save();
+PHP);
+// The consumers module's hook_install() creates a 'Default Consumer' with a
+// random UUID every time it runs, which Tome then exports as a new file on
+// every provision. Delete it rather than filter it out later, so exactly one
+// consumer exists and it is the one the frontend uses.
+// Same approach as druxt.js's docs/drupal/.devtools/consumer-cleanup.php.
+drush('php-eval %s', <<<'PHP'
+$client_id = getenv("OAUTH_CLIENT_ID");
+$storage = \Drupal::entityTypeManager()->getStorage("consumer");
+foreach ($storage->loadMultiple() as $consumer) {
+  if ($consumer->get("client_id")->value !== $client_id) {
+    print "Deleted consumer: " . $consumer->label() . "\n";
+    $consumer->delete();
+  }
+}
+$count = $storage->getQuery()->accessCheck(FALSE)->count()->execute();
+if ($count !== 1) {
+  throw new \RuntimeException(sprintf("Expected exactly 1 consumer after cleanup, found %d.", $count));
+}
+PHP);
+
+dotenv_write_var('OAUTH_CLIENT_ID', $client_id);
+PASS('Consumer created (client ID %s).', $client_id);
+
+// -----------------------------------------------------------------------------
+// 5. No standing credential.
+// -----------------------------------------------------------------------------
+
+TASK('Setting a session-only administrator password.');
+// `site-install` generates a password and drush prints it, so on a public CI
+// log that credential is readable by anyone. Replace it with one that is never
+// printed and never written down: the session's one-time login link becomes the
+// only way in.
+//
+// Written straight to the database rather than through the entity API. Saving
+// the account would bump its `changed` timestamp, and Tome exports user
+// entities on save, so every provision would dirty a committed file with a
+// timestamp nobody edited.
+drush('php-eval %s', <<<'PHP'
+$password = bin2hex(random_bytes(24));
+$hash = \Drupal::service("password")->hash($password);
+unset($password);
+\Drupal::database()->update("users_field_data")
+  ->fields(["pass" => $hash])
+  ->condition("uid", 1)
+  ->execute();
+\Drupal::entityTypeManager()->getStorage("user")->resetCache([1]);
+PHP);
+PASS('Administrator password randomised for this session only.');
+
+// -----------------------------------------------------------------------------
+// 6. Record what the authoring setup itself exported, so a session's export
+//    can subtract it.
+// -----------------------------------------------------------------------------
+
+TASK('Recording the authoring infrastructure export baseline.');
+record_infrastructure_baseline();
+PASS('Baseline recorded at .devtools/.session-infra.');
+
+echo PHP_EOL;
+echo '===============================' . PHP_EOL;
+echo '   AUTHORING PROVISION DONE    ' . PHP_EOL;
+echo '===============================' . PHP_EOL;
+echo PHP_EOL;
+echo 'Frontend origin : ' . $site_origin . PHP_EOL;
+echo 'OAuth client ID : ' . $client_id . PHP_EOL;
+echo PHP_EOL;
+echo '> Next steps:' . PHP_EOL;
+echo '  .devtools/start           # Start the webserver' . PHP_EOL;
+echo '  .devtools/tunnel          # Expose it, and trust the hostname' . PHP_EOL;
+echo PHP_EOL;
+
+/**
+ * Trust the hostnames a session can be served on.
+ *
+ * Drupal refuses a request whose Host header matches no trusted pattern, and a
+ * tunnel gives the site a hostname it has never seen. The tunnel also terminates
+ * TLS at Cloudflare's edge and forwards plain HTTP to the local server, so
+ * without the reverse proxy settings Drupal builds `http://` absolute URLs for a
+ * site being viewed over `https://` and the browser blocks them as mixed content.
+ *
+ * The pattern is the shape of the hostname, not one specific tunnel, so this is
+ * provisioning rather than something the tunnel script rewrites each time it
+ * gets a new URL.
+ */
+function write_host_settings(): void {
+  $settings_local = 'web/sites/default/settings.local.php';
+  $contents = file_exists($settings_local) ? (string) file_get_contents($settings_local) : "<?php\n";
+  if (str_contains($contents, 'trusted_host_patterns')) {
+    return;
+  }
+  $contents .= <<<'PHP'
+
+// Authoring: a session is served over a tunnel, on a hostname assigned at
+// runtime and terminated as HTTPS at the tunnel's edge.
+$settings['reverse_proxy'] = TRUE;
+$settings['reverse_proxy_addresses'] = ['127.0.0.1', '::1'];
+$settings['trusted_host_patterns'] = [
+  '^localhost$',
+  '^127\.0\.0\.1$',
+  '^\[?::1\]?$',
+  '^[a-z0-9-]+\.trycloudflare\.com$',
+];
+
+PHP;
+  file_put_contents($settings_local, $contents);
+}
+
+/**
+ * Write the CORS configuration as an additional container YAML.
+ *
+ * Drupal reads CORS from a container parameter, not from config, so it cannot
+ * be exported with Tome and has to be written per environment.
+ *
+ * This writes its own file and registers it through `$settings['container_yamls']`
+ * rather than editing `sites/default/services.yml`. Appending to that file means
+ * appending a second `parameters:` key, which is invalid YAML and stops Drupal
+ * booting at all; rewriting it properly would mean parsing and re-dumping the
+ * scaffolded file, losing its comments. A separate file avoids both, and leaves
+ * a single place to look for what authoring changed.
+ *
+ * supportsCredentials stays FALSE on purpose. The frontend authenticates with a
+ * bearer token in the Authorization header, not a cookie, so it needs no
+ * credentialed requests, and leaving this off means a stolen session cookie
+ * cannot be replayed cross-origin.
+ */
+function write_cors_config(string $origin): void {
+  $services_yml = 'web/sites/default/authoring.services.yml';
+  file_put_contents($services_yml, <<<YAML
+# Written fresh each run by .devtools/provision-authoring. Gitignored.
+parameters:
+  cors.config:
+    enabled: true
+    # Authorization for the bearer token; Content-Type for JSON:API's
+    # application/vnd.api+json, which is not a CORS-safelisted value and so
+    # makes every write a preflighted request.
+    allowedHeaders: ['authorization', 'content-type', 'x-csrf-token']
+    # Explicit, not ['*']: an empty list rejects the preflight outright, and a
+    # wildcard is not honoured by every browser.
+    allowedMethods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS']
+    allowedOrigins: ['$origin']
+    exposedHeaders: false
+    maxAge: 600
+    supportsCredentials: false
+
+YAML);
+
+  // Register it. `provision` rewrites settings.local.php from scratch on every
+  // run and this script always runs after it, so appending is safe, but guard
+  // anyway so running this twice does not register the file twice.
+  $settings_local = 'web/sites/default/settings.local.php';
+  $line = "\$settings['container_yamls'][] = \$app_root . '/' . \$site_path . '/authoring.services.yml';";
+  $contents = file_exists($settings_local) ? (string) file_get_contents($settings_local) : "<?php\n";
+  if (!str_contains($contents, 'authoring.services.yml')) {
+    $contents .= "\n// Authoring: CORS for the deployed frontend's origin.\n" . $line . "\n";
+    file_put_contents($settings_local, $contents);
+  }
+}
+
+/**
+ * Record which exported paths belong to the authoring setup, not to content.
+ *
+ * Enabling simple_oauth and consumers creates entities the site did not have:
+ * a default consumer, an OAuth scope, token bundles, a JWKS path alias. Tome
+ * exports on save, so all of them land in `config/` and `content/`.
+ *
+ * They must not reach a content pull request. They are session infrastructure,
+ * they are recreated on every provision, and `consumers` and `simple_oauth`
+ * both give their entities a fresh random UUID each time, so committing them
+ * would add new files on every single session.
+ *
+ * `drupal/files` is watched too, because provisioning deletes the committed
+ * `files/public/.htaccess`. That is upstream starterkit behaviour, not
+ * something authoring causes, but it would show up as a deletion in every
+ * session's pull request all the same.
+ *
+ * Rather than hardcode a list of what to ignore, which would silently rot the
+ * first time either module adds an entity, this exports once now and records
+ * whatever moved. A session's own export subtracts exactly that set, so what
+ * remains is only what a person changed.
+ */
+function record_infrastructure_baseline(): void {
+  drush('tome:export --yes');
+
+  $status = shell_exec('git -C .. status --porcelain -- drupal/config drupal/content drupal/files 2>/dev/null');
+  $paths = [];
+  foreach (explode("\n", (string) $status) as $line) {
+    $line = trim($line);
+    if ($line === '') {
+      continue;
+    }
+    // "XY path" - take everything after the two-character status and space.
+    $paths[] = substr($line, strpos($line, ' ') + 1);
+  }
+
+  file_put_contents(__DIR__ . '/.session-infra', implode("\n", $paths) . (($paths === []) ? '' : "\n"));
+
+  // Put the working tree back. The database is the running site; these files
+  // are only the export of it, so discarding them changes nothing that is
+  // serving, and it leaves a clean tree for the session to diff against.
+  restore_paths($paths);
+}
+
+/**
+ * Restore a set of exported paths to their committed state.
+ */
+function restore_paths(array $paths): void {
+  foreach ($paths as $path) {
+    $escaped = escapeshellarg($path);
+    // Untracked files have nothing to restore to, so remove them instead.
+    exec('git -C .. ls-files --error-unmatch ' . $escaped . ' 2>/dev/null', $out, $tracked);
+    if ($tracked === 0) {
+      exec('git -C .. checkout -- ' . $escaped . ' 2>/dev/null');
+    }
+    else {
+      @unlink('../' . $path);
+    }
+    $out = [];
+  }
+}
+
+/**
+ * Generate a random UUID (v4).
+ */
+function generate_uuid(): string {
+  $data = random_bytes(16);
+  $data[6] = chr((ord($data[6]) & 0x0f) | 0x40);
+  $data[8] = chr((ord($data[8]) & 0x3f) | 0x80);
+
+  return vsprintf('%s%s-%s-%s-%s-%s%s%s', str_split(bin2hex($data), 4));
+}

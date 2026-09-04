@@ -1,0 +1,123 @@
+#!/usr/bin/env php
+<?php
+
+/**
+ * @file
+ * Export a session's content, leaving only what a person changed.
+ *
+ * `tome:export` writes everything: the content, and also the OAuth scope,
+ * consumers, token bundles and JWKS alias that `provision-authoring` created to
+ * make the backend usable at all. Only the first of those belongs in a pull
+ * request.
+ *
+ * `.devtools/provision-authoring` already exported once and recorded what moved
+ * (`.devtools/.session-infra`). This exports again and restores exactly that
+ * set, so what remains in the working tree is the session's actual edits.
+ *
+ * Run from the session's teardown, not as its last step. A manual session
+ * usually ends by being cancelled rather than by finishing, so this needs to
+ * run from a trap.
+ */
+
+declare(strict_types=1);
+
+namespace QuickstartServerlessDevTools;
+
+require_once __DIR__ . '/helpers.php';
+
+$baseline_file = __DIR__ . '/.session-infra';
+
+echo '===============================' . PHP_EOL;
+echo '        SESSION EXPORT         ' . PHP_EOL;
+echo '===============================' . PHP_EOL;
+echo PHP_EOL;
+
+if (!file_exists($baseline_file)) {
+  FAIL('No infrastructure baseline at %s. Run .devtools/provision-authoring first, or this export would commit the OAuth setup along with the content.', $baseline_file);
+}
+
+TASK('Exporting config, content and files.');
+drush('tome:export --yes');
+PASS('Exported.');
+
+TASK('Restoring the authoring infrastructure paths.');
+$baseline = array_values(array_filter(array_map('trim', explode("\n", (string) file_get_contents($baseline_file)))));
+foreach ($baseline as $path) {
+  $escaped = escapeshellarg($path);
+  $out = [];
+  exec('git -C .. ls-files --error-unmatch ' . $escaped . ' 2>/dev/null', $out, $tracked);
+  if ($tracked === 0) {
+    exec('git -C .. checkout -- ' . $escaped . ' 2>/dev/null');
+  }
+  elseif (file_exists('../' . $path)) {
+    unlink('../' . $path);
+  }
+}
+PASS('%s infrastructure path(s) restored.', (string) count($baseline));
+
+// The content index lists every exported entity, infrastructure included, so
+// it is in the baseline and has just been restored. If the session actually
+// added or removed content the index has to move with it, so re-export just
+// that one file by asking Tome for it again after the restore.
+TASK('Reconciling the content index.');
+reconcile_index($baseline);
+PASS('Content index reconciled.');
+
+$changes = trim((string) shell_exec('git -C .. status --porcelain -- drupal/config drupal/content drupal/files 2>/dev/null'));
+
+echo PHP_EOL;
+echo '===============================' . PHP_EOL;
+if ($changes === '') {
+  echo '   NO CONTENT CHANGES  ' . PHP_EOL;
+  echo '===============================' . PHP_EOL;
+  echo PHP_EOL;
+  echo 'Nothing was edited this session. No pull request is needed.' . PHP_EOL;
+  echo PHP_EOL;
+  exit(0);
+}
+
+echo '   SESSION CHANGES READY  ' . PHP_EOL;
+echo '===============================' . PHP_EOL;
+echo PHP_EOL;
+echo $changes . PHP_EOL;
+echo PHP_EOL;
+
+/**
+ * Re-add index entries for content the session created or deleted.
+ *
+ * `content/meta/index.json` is one file listing every exported entity, so it
+ * moves whenever infrastructure appears and whenever real content does. It is
+ * in the baseline for the first reason, which would also throw away the second.
+ * This rebuilds it from the committed version plus whatever content files are
+ * actually present now.
+ */
+function reconcile_index(array $baseline): void {
+  $index_path = '../drupal/content/meta/index.json';
+  if (!file_exists($index_path)) {
+    return;
+  }
+  $index = json_decode((string) file_get_contents($index_path), TRUE);
+  if (!is_array($index)) {
+    return;
+  }
+
+  // Entities whose export files the restore removed are infrastructure, so
+  // drop them from the index too.
+  foreach (array_keys($index) as $name) {
+    if (!file_exists('../drupal/content/' . $name . '.json')) {
+      unset($index[$name]);
+    }
+  }
+
+  // Anything present on disk but missing from the index is content this
+  // session added.
+  foreach (glob('../drupal/content/*.json') ?: [] as $file) {
+    $name = basename($file, '.json');
+    if (!array_key_exists($name, $index)) {
+      $index[$name] = [];
+    }
+  }
+
+  ksort($index);
+  file_put_contents($index_path, json_encode($index, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+}
