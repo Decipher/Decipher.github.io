@@ -1,6 +1,9 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
-  "entry": ["scripts/*.mjs"],
-  "project": ["scripts/**/*.mjs"],
+  "entry": ["scripts/*.mjs", "playwright.config.js", "tests/**/*.{js,mjs}"],
+  "project": ["scripts/**/*.mjs", "playwright.config.js", "tests/**/*.{js,mjs}"],
   "ignore": ["nuxt/**", "drupal/**"],
+  // `serve` is spawned by Playwright's `webServer` command, which is a string
+  // knip cannot follow. Removing it would break every browser test.
+  "ignoreDependencies": ["serve"],
 }
