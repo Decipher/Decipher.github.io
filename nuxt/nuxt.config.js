@@ -17,6 +17,14 @@ export default {
   // Target full static build.
   target: 'static',
 
+  // Serving path. A `<user>.github.io` user site serves from the domain root
+  // and needs nothing here, which is why the PoC targets one. A project site at
+  // `/<repo>/`, or any other subpath, needs its base set at build time because
+  // a static build bakes asset paths in.
+  router: {
+    base: process.env.ROUTER_BASE || '/',
+  },
+
   // Ensure the root route is generated and crawled.
   generate: {
     routes: ['/']
@@ -56,7 +64,25 @@ export default {
 
   // Plugins to run before rendering page: https://go.nuxtjs.dev/config-plugins
   plugins: [
+    // Client only: the backend this site is edited against is resolved in the
+    // browser at runtime, and must not be baked into the generated HTML.
+    '~/plugins/authoring.client.js',
+    { src: '~/plugins/authoring-auth.js', mode: 'client' },
   ],
+
+  // Values the authoring layer needs at runtime. For a static target these are
+  // baked in at generate time, which is fine: they are stable. The backend URL
+  // is deliberately NOT here - that is discovered in the browser, because the
+  // backend does not exist when the site is built.
+  publicRuntimeConfig: {
+    authoring: {
+      // Where a session provider publishes the live backend, if anywhere.
+      sessionRecordUrl: process.env.SESSION_RECORD_URL || '',
+      // The OAuth consumer, which provisioning pins so it is stable across
+      // sessions and can be known at build time.
+      clientId: process.env.OAUTH_CLIENT_ID || '',
+    },
+  },
 
   // Auto import components: https://go.nuxtjs.dev/config-components
   components: true,
@@ -86,8 +112,13 @@ export default {
   // DruxtJS: https://druxtjs.org
   druxt: {
     baseUrl,
-    // Enable the API proxy.
-    proxy: { api: true },
+    // No API proxy. It rewrites Druxt's requests to be origin-relative and
+    // relies on a serverMiddleware to forward them, which a full static build
+    // deployed to a static host does not have. With it on, `/jsonapi` honoured
+    // the runtime backend but `/router/translate-path` was still requested from
+    // the site's own origin, where nothing answers. Absolute requests to the
+    // connected backend are what CORS is configured for.
+    proxy: { api: false },
     // Disable deprecated Entity fields.
     entity: { components: { fields: false }},
     // Disable the router middleware (redirect support) in favour of serverless.
