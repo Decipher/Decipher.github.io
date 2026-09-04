@@ -52,7 +52,13 @@ echo PHP_EOL;
 // uncommitted config or content and those files are recorded as infrastructure
 // too, then quietly reverted by the session export. Refuse instead: silently
 // discarding someone's work is far worse than stopping.
-$dirty = trim((string) shell_exec('git -C .. status --porcelain -- drupal/config drupal/content 2>/dev/null'));
+// Skipped when the caller has already checked, which a session does before it
+// provisions anything. By this point `provision` has run, and installing writes
+// `system.site` through the configure form, which Tome exports: the tree is
+// dirty from provisioning's own work rather than from anyone's edits, and this
+// guard cannot tell the difference that late.
+$verified = getenv('AUTHORING_TREE_VERIFIED') === '1';
+$dirty = $verified ? '' : trim((string) shell_exec('git -C .. status --porcelain -- drupal/config drupal/content 2>/dev/null'));
 if ($dirty !== '') {
   echo $dirty . PHP_EOL . PHP_EOL;
   FAIL(

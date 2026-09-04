@@ -1,0 +1,1 @@
+__NUXT_JSONP__("/callback", {data:[{_img:{}}],fetch:{},mutations:[]});

@@ -54,6 +54,19 @@ else
 fi
 log "Session provider: $PROVIDER"
 
+# Before provisioning, not after. The session's export works by subtracting
+# whatever provisioning itself wrote, which it cannot separate from an author's
+# uncommitted edits. Once `provision` has run the tree is dirty from its own
+# work (installing saves `system.site`, and Tome exports it), so this is the
+# last moment the question can be answered.
+dirty="$(git status --porcelain -- drupal/config drupal/content 2>/dev/null || true)"
+if [ -n "$dirty" ]; then
+  echo "$dirty" >&2
+  echo "Uncommitted changes in drupal/config or drupal/content. Commit or stash first." >&2
+  exit 1
+fi
+export AUTHORING_TREE_VERIFIED=1
+
 # --- Teardown ---------------------------------------------------------------
 # From a trap, not as a final step. A manual session is normally ended by being
 # cancelled rather than by running to completion, and the export has to happen
@@ -61,6 +74,10 @@ log "Session provider: $PROVIDER"
 teardown() {
   local status=$?
   log "Teardown (exit $status)"
+
+  # Back to a known directory first. A failure part way through leaves the shell
+  # wherever it happened to be, and every path below is relative to the root.
+  cd "$REPO_ROOT" || return
 
   ( cd drupal && ./.devtools/session-export ) || echo "Session export failed." >&2
   propose_changes || echo "Could not open a change request." >&2

@@ -1,0 +1,1 @@
+(window.webpackJsonp=window.webpackJsonp||[]).push([[65],{498:function(e){e.exports=JSON.parse('{"id":"media--remote_video--media_library--form","resourceType":"media--remote_video","fields":[],"groups":[],"config":{"entityType":"media","bundle":"remote_video","mode":"media_library","schemaType":"form","href":"/jsonapi/media/remote_video"}}')}}]);

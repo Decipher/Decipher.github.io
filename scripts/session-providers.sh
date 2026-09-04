@@ -27,6 +27,12 @@ JSON
 }
 
 publish_session() {
+  if ! can_push; then
+    echo "No token for $PROVIDER, so the session record is not published."
+    echo "Point the frontend at the backend URL by hand instead."
+    return 0
+  fi
+
   case "$PROVIDER" in
     gitlab|github)
       local tmp
@@ -56,6 +62,12 @@ publish_session() {
 }
 
 unpublish_session() {
+  if ! can_push; then
+    echo "No token for $PROVIDER, so the session record is not published."
+    echo "Point the frontend at the backend URL by hand instead."
+    return 0
+  fi
+
   case "$PROVIDER" in
     gitlab|github)
       # Delete the branch, so a dead backend is not advertised. The frontend
@@ -72,10 +84,23 @@ unpublish_session() {
 }
 
 push_url() {
+  # Defaulted rather than assumed: the caller runs under `set -u`, so an unset
+  # token would abort the whole teardown instead of skipping one optional step.
   case "$PROVIDER" in
-    gitlab) echo "https://oauth2:${GITLAB_API_TOKEN}@${CI_SERVER_HOST}/${CI_PROJECT_PATH}.git" ;;
-    github) echo "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" ;;
+    gitlab) echo "https://oauth2:${GITLAB_API_TOKEN:-}@${CI_SERVER_HOST:-gitlab.com}/${CI_PROJECT_PATH:-}.git" ;;
+    github) echo "https://x-access-token:${GITHUB_TOKEN:-}@github.com/${GITHUB_REPOSITORY:-}.git" ;;
     *)      git remote get-url origin ;;
+  esac
+}
+
+# True when this provider has what it needs to push. Without it a session with
+# no token fails in teardown, which reads as "the session broke" rather than
+# "nothing was configured to receive the changes".
+can_push() {
+  case "$PROVIDER" in
+    gitlab) [ -n "${GITLAB_API_TOKEN:-}" ] ;;
+    github) [ -n "${GITHUB_TOKEN:-}" ] ;;
+    *)      return 0 ;;
   esac
 }
 
@@ -118,6 +143,12 @@ propose_changes() {
   local paths="drupal/config drupal/content"
   if [ -z "$(git status --porcelain -- $paths)" ]; then
     echo "No content changed this session. No change request needed."
+    return 0
+  fi
+
+  if ! can_push; then
+    echo "Content changed, but there is no token to open a change request with." >&2
+    echo "The export is in the working tree; commit it by hand." >&2
     return 0
   fi
 

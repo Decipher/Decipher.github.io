@@ -355,6 +355,9 @@ session:authoring:
       https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64
     - chmod +x /usr/local/bin/cloudflared
     - cloudflared --version
+    # Created up front: a session that fails before the tunnel starts would
+    # otherwise have no artifact path, and the upload error masks the real one.
+    - mkdir -p drupal/.logs && touch drupal/.logs/.keep
   script:
     - scripts/session.sh
   artifacts:
@@ -395,3 +398,34 @@ test_e2e:
   extends: .playwright
   script:
     - npm run test:e2e
+
+# Serve the built static site behind its own tunnel, so a frontend can be
+# opened from anywhere without a backend at all.
+#
+# Separate from session:authoring on purpose. The two are independent: this
+# publishes a frontend, that publishes a backend, and either is useful alone.
+# Run both and the frontend can be pointed at the backend, which is the whole
+# loop over two tunnels rather than one origin.
+preview:frontend:
+  extends: .php-node-setup
+  stage: session
+  timeout: 1h
+  rules:
+    # No `if:`, so nothing automatic starts it.
+    - when: manual
+      allow_failure: true
+  variables:
+    PREVIEW_MINUTES: '55'
+  before_script:
+    - !reference [.php-node-setup, before_script]
+    - curl -sSL -o /usr/local/bin/cloudflared
+      https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64
+    - chmod +x /usr/local/bin/cloudflared
+    - mkdir -p .logs && touch .logs/.keep
+  script:
+    - scripts/preview-frontend.sh
+  artifacts:
+    when: always
+    paths:
+      - .logs/
+    expire_in: 1 day
