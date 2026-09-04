@@ -1,37 +1,6 @@
 <template>
   <div class="authoring-entity-form">
-    <DruxtEntityForm ref="form" :type="type" :uuid="uuid" :mode="mode" @error="onError">
-      <!--
-        Replace the form's own buttons. DruxtEntityForm wires its submit
-        straight to `$druxt.updateResource`, which needs a reachable backend and
-        writes immediately. Staging instead is the whole point: an author can
-        edit with nothing behind the site, and what they staged is committed
-        later, or turned into a change request without a backend at all.
-      -->
-      <template #buttons>
-        <div class="mt-4 flex flex-wrap gap-2">
-          <button
-            type="button"
-            class="rounded bg-accent px-3 py-1.5 text-sm text-accent-contrast hover:opacity-90"
-            data-testid="authoring-stage"
-            @click="stage"
-          >
-            Stage change
-          </button>
-          <button
-            type="button"
-            class="rounded border border-hairline px-3 py-1.5 text-sm text-body hover:border-ink"
-            data-testid="authoring-reset"
-            @click="reset"
-          >
-            Reset
-          </button>
-          <p v-if="message" class="basis-full text-sm text-muted" data-testid="authoring-stage-message">
-            {{ message }}
-          </p>
-        </div>
-      </template>
-    </DruxtEntityForm>
+    <DruxtEntityForm ref="form" :type="type" :uuid="uuid" :mode="mode" @error="onError" />
   </div>
 </template>
 
@@ -39,25 +8,48 @@
 export default {
   name: 'AuthoringEntityForm',
 
+  /**
+   * Reach the staging methods from inside the form.
+   *
+   * `DruxtEntityFormDefault` renders the buttons, because Druxt will not take a
+   * `buttons` slot from here, and Druxt gives that wrapper no way to emit back.
+   * `this` rather than a plain object, so `message` stays reactive.
+   */
+  provide() {
+    return { authoringForm: this }
+  },
+
   props: {
     type: { type: String, required: true },
     uuid: { type: String, required: true },
     mode: { type: String, default: 'default' },
   },
 
-  data: () => ({ message: null }),
+  data: () => ({ message: null, original: null }),
 
   methods: {
     /**
+     * Keep what the form fetched, before anything is typed into it.
+     *
+     * DruxtEntityForm has no pristine copy to diff against: its `entity` is a
+     * computed spread of `model`, so it tracks every edit and comparing the two
+     * always says nothing changed. The wrapper hands this the entity as first
+     * rendered, which is the last moment the fetched values are still intact.
+     */
+    captureOriginal(entity) {
+      this.original = JSON.parse(JSON.stringify(entity || {}))
+    },
+
+    /**
      * Stage the difference between the entity as loaded and as edited.
      *
-     * The comparison is against `entity`, the form's own copy of what it
-     * fetched, so only fields the author touched are staged. Sending the whole
-     * model would overwrite anything changed elsewhere since the form loaded.
+     * The comparison is against the snapshot taken when the form loaded, so
+     * only fields the author touched are staged. Sending the whole model would
+     * overwrite anything changed elsewhere since.
      */
     async stage() {
       const form = this.$refs.form
-      if (!form || !form.model) {
+      if (!form || !form.model || !this.original) {
         this.message = 'The form has not finished loading.'
         return
       }
@@ -65,7 +57,7 @@ export default {
       const staged = await this.$store.dispatch('authoringCart/stage', {
         type: this.type,
         id: form.model.id,
-        original: (form.entity || {}).attributes || {},
+        original: (this.original || {}).attributes || {},
         edited: form.model.attributes || {},
         relationships: this.changedRelationships(form),
       })
@@ -84,7 +76,7 @@ export default {
      * never existed.
      */
     changedRelationships(form) {
-      const original = (form.entity || {}).relationships || {}
+      const original = (this.original || {}).relationships || {}
       const edited = (form.model || {}).relationships || {}
       const changed = {}
       for (const [field, value] of Object.entries(edited)) {
@@ -97,7 +89,9 @@ export default {
 
     reset() {
       const form = this.$refs.form
-      if (form && typeof form.onReset === 'function') form.onReset()
+      // DruxtEntityForm's own reset sets the model back to `entity`, which is
+      // the model, so it does nothing. Restore the snapshot instead.
+      if (form && this.original) form.model = JSON.parse(JSON.stringify(this.original))
       this.message = null
     },
 

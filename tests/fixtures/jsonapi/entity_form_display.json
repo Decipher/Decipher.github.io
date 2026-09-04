@@ -1,0 +1,123 @@
+{
+  "jsonapi": {
+    "version": "1.1",
+    "meta": { "links": { "self": { "href": "https:\/\/jsonapi.org\/format\/1.1\/" } } }
+  },
+  "data": [
+    {
+      "type": "entity_form_display--entity_form_display",
+      "id": "75a92419-c101-4eae-8c2e-50e8f8d6ebad",
+      "links": {
+        "self": {
+          "href": "http:\/\/backend.test\/jsonapi\/entity_form_display\/entity_form_display\/75a92419-c101-4eae-8c2e-50e8f8d6ebad"
+        }
+      },
+      "attributes": {
+        "langcode": "en",
+        "status": true,
+        "dependencies": {
+          "config": [
+            "field.field.node.article.body",
+            "field.field.node.article.field_image",
+            "field.field.node.article.field_tags",
+            "image.style.thumbnail",
+            "node.type.article"
+          ],
+          "module": ["image", "path", "text"]
+        },
+        "drupal_internal__id": "node.article.default",
+        "targetEntityType": "node",
+        "bundle": "article",
+        "mode": "default",
+        "content": {
+          "body": {
+            "type": "text_textarea_with_summary",
+            "weight": 2,
+            "region": "content",
+            "settings": { "rows": 9, "summary_rows": 3, "placeholder": "", "show_summary": false },
+            "third_party_settings": []
+          },
+          "created": {
+            "type": "datetime_timestamp",
+            "weight": 10,
+            "region": "content",
+            "settings": [],
+            "third_party_settings": []
+          },
+          "field_image": {
+            "type": "image_image",
+            "weight": 1,
+            "region": "content",
+            "settings": { "progress_indicator": "throbber", "preview_image_style": "thumbnail" },
+            "third_party_settings": []
+          },
+          "field_tags": {
+            "type": "entity_reference_autocomplete_tags",
+            "weight": 3,
+            "region": "content",
+            "settings": {
+              "match_operator": "CONTAINS",
+              "match_limit": 10,
+              "size": 60,
+              "placeholder": ""
+            },
+            "third_party_settings": []
+          },
+          "path": {
+            "type": "path",
+            "weight": 30,
+            "region": "content",
+            "settings": [],
+            "third_party_settings": []
+          },
+          "promote": {
+            "type": "boolean_checkbox",
+            "weight": 15,
+            "region": "content",
+            "settings": { "display_label": true },
+            "third_party_settings": []
+          },
+          "status": {
+            "type": "boolean_checkbox",
+            "weight": 120,
+            "region": "content",
+            "settings": { "display_label": true },
+            "third_party_settings": []
+          },
+          "sticky": {
+            "type": "boolean_checkbox",
+            "weight": 16,
+            "region": "content",
+            "settings": { "display_label": true },
+            "third_party_settings": []
+          },
+          "title": {
+            "type": "string_textfield",
+            "weight": 0,
+            "region": "content",
+            "settings": { "size": 60, "placeholder": "" },
+            "third_party_settings": []
+          },
+          "uid": {
+            "type": "entity_reference_autocomplete",
+            "weight": 5,
+            "region": "content",
+            "settings": {
+              "match_operator": "CONTAINS",
+              "match_limit": 10,
+              "size": 60,
+              "placeholder": ""
+            },
+            "third_party_settings": []
+          }
+        },
+        "hidden": []
+      }
+    }
+  ],
+  "links": {
+    "self": {
+      "href": "http:\/\/backend.test\/jsonapi\/entity_form_display\/entity_form_display?filter%5Bdrupal_internal__id%5D=node.article.default"
+    }
+  }
+}

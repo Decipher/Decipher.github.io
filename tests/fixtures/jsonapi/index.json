@@ -1,0 +1,83 @@
+{
+  "jsonapi": {
+    "version": "1.1",
+    "meta": { "links": { "self": { "href": "https:\/\/jsonapi.org\/format\/1.1\/" } } }
+  },
+  "data": [],
+  "links": {
+    "action--action": { "href": "http:\/\/backend.test\/jsonapi\/action\/action" },
+    "base_field_override--base_field_override": {
+      "href": "http:\/\/backend.test\/jsonapi\/base_field_override\/base_field_override"
+    },
+    "block--block": { "href": "http:\/\/backend.test\/jsonapi\/block\/block" },
+    "block_content--basic": { "href": "http:\/\/backend.test\/jsonapi\/block_content\/basic" },
+    "block_content_type--block_content_type": {
+      "href": "http:\/\/backend.test\/jsonapi\/block_content_type\/block_content_type"
+    },
+    "consumer--consumer": { "href": "http:\/\/backend.test\/jsonapi\/consumer\/consumer" },
+    "date_format--date_format": {
+      "href": "http:\/\/backend.test\/jsonapi\/date_format\/date_format"
+    },
+    "editor--editor": { "href": "http:\/\/backend.test\/jsonapi\/editor\/editor" },
+    "entity_form_display--entity_form_display": {
+      "href": "http:\/\/backend.test\/jsonapi\/entity_form_display\/entity_form_display"
+    },
+    "entity_form_mode--entity_form_mode": {
+      "href": "http:\/\/backend.test\/jsonapi\/entity_form_mode\/entity_form_mode"
+    },
+    "entity_view_display--entity_view_display": {
+      "href": "http:\/\/backend.test\/jsonapi\/entity_view_display\/entity_view_display"
+    },
+    "entity_view_mode--entity_view_mode": {
+      "href": "http:\/\/backend.test\/jsonapi\/entity_view_mode\/entity_view_mode"
+    },
+    "field_config--field_config": {
+      "href": "http:\/\/backend.test\/jsonapi\/field_config\/field_config"
+    },
+    "field_storage_config--field_storage_config": {
+      "href": "http:\/\/backend.test\/jsonapi\/field_storage_config\/field_storage_config"
+    },
+    "file--file": { "href": "http:\/\/backend.test\/jsonapi\/file\/file" },
+    "filter_format--filter_format": {
+      "href": "http:\/\/backend.test\/jsonapi\/filter_format\/filter_format"
+    },
+    "image_style--image_style": {
+      "href": "http:\/\/backend.test\/jsonapi\/image_style\/image_style"
+    },
+    "media--document": { "href": "http:\/\/backend.test\/jsonapi\/media\/document" },
+    "media--image": { "href": "http:\/\/backend.test\/jsonapi\/media\/image" },
+    "media--remote_video": { "href": "http:\/\/backend.test\/jsonapi\/media\/remote_video" },
+    "media_type--media_type": { "href": "http:\/\/backend.test\/jsonapi\/media_type\/media_type" },
+    "menu--menu": { "href": "http:\/\/backend.test\/jsonapi\/menu\/menu" },
+    "menu_link_content--menu_link_content": {
+      "href": "http:\/\/backend.test\/jsonapi\/menu_link_content\/menu_link_content"
+    },
+    "node--article": { "href": "http:\/\/backend.test\/jsonapi\/node\/article" },
+    "node--page": { "href": "http:\/\/backend.test\/jsonapi\/node\/page" },
+    "node_type--node_type": { "href": "http:\/\/backend.test\/jsonapi\/node_type\/node_type" },
+    "oauth2_scope--oauth2_scope": {
+      "href": "http:\/\/backend.test\/jsonapi\/oauth2_scope\/oauth2_scope"
+    },
+    "oauth2_token--access_token": {
+      "href": "http:\/\/backend.test\/jsonapi\/oauth2_token\/access_token"
+    },
+    "oauth2_token--auth_code": {
+      "href": "http:\/\/backend.test\/jsonapi\/oauth2_token\/auth_code"
+    },
+    "oauth2_token--refresh_token": {
+      "href": "http:\/\/backend.test\/jsonapi\/oauth2_token\/refresh_token"
+    },
+    "oauth2_token_type--oauth2_token_type": {
+      "href": "http:\/\/backend.test\/jsonapi\/oauth2_token_type\/oauth2_token_type"
+    },
+    "path_alias--path_alias": { "href": "http:\/\/backend.test\/jsonapi\/path_alias\/path_alias" },
+    "self": { "href": "http:\/\/backend.test\/jsonapi" },
+    "taxonomy_term--tags": { "href": "http:\/\/backend.test\/jsonapi\/taxonomy_term\/tags" },
+    "taxonomy_vocabulary--taxonomy_vocabulary": {
+      "href": "http:\/\/backend.test\/jsonapi\/taxonomy_vocabulary\/taxonomy_vocabulary"
+    },
+    "user--user": { "href": "http:\/\/backend.test\/jsonapi\/user\/user" },
+    "user_role--user_role": { "href": "http:\/\/backend.test\/jsonapi\/user_role\/user_role" },
+    "view--view": { "href": "http:\/\/backend.test\/jsonapi\/view\/view" }
+  }
+}
