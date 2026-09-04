@@ -47,7 +47,7 @@ test.describe('live content', () => {
     })
   })
 
-  test('requests go to the connected backend, not the site\'s own origin', async ({ page }) => {
+  test("requests go to the connected backend, not the site's own origin", async ({ page }) => {
     const elsewhere = []
     page.on('request', (r) => {
       const url = r.url()

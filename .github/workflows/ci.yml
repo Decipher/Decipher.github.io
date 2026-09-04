@@ -1,5 +1,13 @@
 name: CI
 
+# This is a site built on the serverless starterkit, not the starterkit itself,
+# so the jobs that prove the template works *as a template* are gone: installing
+# it through giget, the no-PHP and old-PHP install guardrails, and the DDEV,
+# Lando and dev container setup paths. They test a product this repository is a
+# consumer of, take a long time, and can only ever fail for reasons nobody here
+# can act on. What is left is what a site needs: it lints, it builds, and the
+# authoring layer behaves.
+
 on:
   push:
   pull_request:
@@ -230,8 +238,10 @@ jobs:
           test -s dist/index.html
           ls dist/_nuxt/*.js > /dev/null
 
-      - name: Upload static output on failure
-        if: failure()
+      # Always, not just on failure: the browser suite runs against this exact
+      # build rather than provisioning Drupal a second time.
+      - name: Upload the static output
+        if: always()
         uses: actions/upload-artifact@v7
         with:
           name: nuxt-dist
@@ -253,58 +263,8 @@ jobs:
       - name: Run the script tests
         run: npm run test:scripts
 
-  # The documented consumer flow (README: `npx giget@1 ... --install`) is
-  # not what the jobs above exercise - they work from the git checkout
-  # and call .devtools/ directly. This job consumes the same artifact a
-  # giget user gets: a tarball of this exact commit, no .git, no
-  # preinstalled dependencies - and lets the root postinstall stand the
-  # whole site up.
-  #
-  # `git archive` produces that tarball from the commit under test, which
-  # giget cannot do - it only fetches refs already pushed to GitHub.
-  test_consumer_install:
-    runs-on: ubuntu-latest
-    steps:
-      # The documented minimum, so a pass means the lock and the
-      # provisioning actually work there - not just on a newer PHP.
-      - name: Setup PHP
-        uses: shivammathur/setup-php@v2
-        with:
-          php-version: '8.3'
-          extensions: mbstring, pdo_sqlite, intl, gd, xml, zip, opcache
-
-      - uses: actions/checkout@v7
-        with:
-          persist-credentials: false
-
-      - name: Setup Node
-        uses: actions/setup-node@v7
-        with:
-          node-version-file: .nvmrc
-
-      - name: Build the tarball a giget consumer gets
-        run: git archive --prefix=site/ HEAD | tar -x -C /tmp
-
-      # `env -u CI`: postinstall deliberately steps aside on CI machines
-      # - this job's whole point is to behave like a consumer machine.
-      - name: Root npm install (giget's --install step)
-        working-directory: /tmp/site
-        run: env -u CI npm install
-
-      - name: Backend is up and provisioned
-        working-directory: /tmp/site
-        run: |
-          . ./.env
-          curl -sf "${BASE_URL}/jsonapi" | grep -q '"jsonapi"'
-
-      - name: Full static output generates against the live backend
-        working-directory: /tmp/site/nuxt
-        run: npm run generate
-
-  # What the root install promises on machines without a working PHP: a
-  # consumer's `npm install` must never fail, `npm run setup` must
-  # fail loudly, and a too-old PHP must be rejected by the preflight.
-  test_install_guardrails:
+  # The authoring layer's decisions, with no browser and no backend.
+  test_unit:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -314,37 +274,37 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v7
         with:
-          node-version-file: .nvmrc
+          node-version: '22'
 
-      - name: Hide the runner's preinstalled PHP
-        run: while command -v php >/dev/null 2>&1; do sudo mv "$(command -v php)" "$(command -v php).hidden"; done
+      - run: npm install
+      - run: npm run test:unit
 
-      - name: npm install without PHP succeeds with guidance
-        run: |
-          env -u CI npm install > /tmp/install.log 2>&1
-          grep -q 'The backend needs PHP' /tmp/install.log
+  # The login flow against a stubbed backend. Stubbed on purpose: these assert
+  # what the frontend does with each answer a backend can give, including the
+  # awkward ones a real Drupal cannot be made to produce on demand.
+  test_e2e:
+    needs: test_generate
+    runs-on: ubuntu-latest
+    container:
+      image: mcr.microsoft.com/playwright:v1.62.1-noble
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
 
-      - name: npm run setup without PHP fails with guidance
-        run: |
-          if npm run setup > /tmp/setup.log 2>&1; then echo "setup should have failed"; exit 1; fi
-          grep -q 'Missing required tools' /tmp/setup.log
+      - name: Fetch the static build the generate job produced
+        uses: actions/download-artifact@v7
+        with:
+          name: nuxt-dist
+          path: nuxt/dist
 
-      - name: Old PHP is rejected by the version preflight
-        run: |
-          SHIM=$(mktemp -d)
-          printf '#!/bin/sh\necho 8.2.29\n' > "$SHIM/php"
-          printf '#!/bin/sh\nexit 0\n' > "$SHIM/composer"
-          chmod +x "$SHIM/php" "$SHIM/composer"
-          if PATH="$SHIM:$PATH" npm run setup > /tmp/old-php.log 2>&1; then echo "setup should have failed"; exit 1; fi
-          grep -q 'too old' /tmp/old-php.log
+      - run: npm install
+      - run: npm run test:e2e
 
-      # The preflight exits the process, so without postinstall screening
-      # the version first this is what would fail `npm install` outright.
-      - name: Old PHP still leaves npm install green
-        run: |
-          SHIM=$(mktemp -d)
-          printf '#!/bin/sh\necho 8.2.29\n' > "$SHIM/php"
-          printf '#!/bin/sh\nexit 0\n' > "$SHIM/composer"
-          chmod +x "$SHIM/php" "$SHIM/composer"
-          PATH="$SHIM:$PATH" env -u CI npm install > /tmp/old-php-install.log 2>&1
-          grep -q 'The backend needs PHP' /tmp/old-php-install.log
+      - uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: playwright-report
+          path: |
+            test-results/
+            playwright-report/

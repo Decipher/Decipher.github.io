@@ -155,11 +155,20 @@ test('base64Url produces no padding or URL-unsafe characters', () => {
 })
 
 test('callbackUrl handles a root and a subpath base', () => {
-  assert.equal(callbackUrl('https://decipher.github.io', '/'), 'https://decipher.github.io/callback')
+  assert.equal(
+    callbackUrl('https://decipher.github.io', '/'),
+    'https://decipher.github.io/callback'
+  )
   // A project site serves from a subpath, and the redirect has to match the
   // page's real origin plus that base or the backend rejects it.
-  assert.equal(callbackUrl('https://example.test', '/frontend/'), 'https://example.test/frontend/callback')
-  assert.equal(callbackUrl('https://example.test', '/frontend'), 'https://example.test/frontend/callback')
+  assert.equal(
+    callbackUrl('https://example.test', '/frontend/'),
+    'https://example.test/frontend/callback'
+  )
+  assert.equal(
+    callbackUrl('https://example.test', '/frontend'),
+    'https://example.test/frontend/callback'
+  )
 })
 
 test('an explicit URL beats a remembered one, which beats a published one', () => {
