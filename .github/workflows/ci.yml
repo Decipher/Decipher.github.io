@@ -9,8 +9,18 @@ name: CI
 # authoring layer behaves.
 
 on:
+  # Only main on push. A branch with an open pull request used to run the whole
+  # suite twice, once for the push and once for the pull request, on identical
+  # code. Branches are covered by their pull request; main is covered here.
   push:
+    branches: [main]
   pull_request:
+
+# One run per branch. A second push supersedes the first, and there is no value
+# in finishing a suite for code nobody will merge.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 # Least-privilege: nothing here needs write access to the repo.
 permissions:
@@ -204,6 +214,12 @@ jobs:
             package-lock.json
             nuxt/package-lock.json
 
+      - name: Cache Composer downloads
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/composer
+          key: composer-${{ runner.os }}-${{ hashFiles('drupal/composer.lock') }}
+
       - name: Install Composer dependencies
         working-directory: drupal
         run: composer install --no-interaction --no-progress
@@ -298,6 +314,12 @@ jobs:
           name: nuxt-dist
           path: nuxt/dist
 
+      - name: Cache root dependencies
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: node-modules-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('package-lock.json') }}
+
       - run: npm install
       - run: npm run test:e2e
 
@@ -305,6 +327,46 @@ jobs:
         if: failure()
         with:
           name: playwright-report
+          path: |
+            test-results/
+            playwright-report/
+
+  # This site's design, so this site's baselines.
+  #
+  # arm64 on purpose. Chromium renders text differently on arm64 and x86_64, so
+  # a baseline set only matches the architecture that produced it. The committed
+  # set is arm64, which is what the GitLab runner and the development containers
+  # here are, so this matches them rather than demanding a second set that would
+  # have to be regenerated, reviewed and kept in step for the life of the site.
+  test_visual:
+    needs: test_generate
+    runs-on: ubuntu-24.04-arm
+    container:
+      image: mcr.microsoft.com/playwright:v1.62.1-noble
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Fetch the static build the generate job produced
+        uses: actions/download-artifact@v7
+        with:
+          name: nuxt-dist
+          path: nuxt/dist
+
+      - name: Cache root dependencies
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: node-modules-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('package-lock.json') }}
+
+      - run: npm install
+      - run: npm run test:visual
+
+      - uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: visual-diff
           path: |
             test-results/
             playwright-report/

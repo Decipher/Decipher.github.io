@@ -60,6 +60,19 @@ export default {
 
   // Global CSS: https://go.nuxtjs.dev/config-css
   css: [
+    // Self-hosted, per the design system: no Google Fonts link tags, and no
+    // dependency on what a given machine happens to have installed. That
+    // matters beyond preference here, because the visual baselines compare
+    // rendered text: with a fallback stack, the same page renders differently
+    // on a developer's machine and on a CI runner, and the diff is the fonts
+    // rather than anything anyone changed.
+    //
+    // Only the weights actually used, so this stays a few files rather than
+    // the whole family.
+    '@fontsource/archivo/400.css',
+    '@fontsource/archivo/600.css',
+    '@fontsource/jetbrains-mono/400.css',
+    '~/assets/css/main.css',
   ],
 
   // Plugins to run before rendering page: https://go.nuxtjs.dev/config-plugins
@@ -75,6 +88,11 @@ export default {
   // is deliberately NOT here - that is discovered in the browser, because the
   // backend does not exist when the site is built.
   publicRuntimeConfig: {
+    // Resolved once, when the site is generated. The footer shows when the
+    // site was built, which is a fact about the build; reading the browser's
+    // clock instead made it change after deployment, and moved the visual
+    // baseline every time the date rolled over in UTC.
+    builtAt: new Date().toISOString(),
     authoring: {
       // Where a session provider publishes the live backend, if anywhere.
       sessionRecordUrl: process.env.SESSION_RECORD_URL || '',
@@ -96,7 +114,17 @@ export default {
   // buildModules) - it stays here.
   buildModules: [
     ['@nuxt/image', { domains: [baseUrl] }],
+    // Tailwind. The design tokens live in tailwind.config.js and
+    // assets/css/main.css, following the stuar.tc design system.
+    '@nuxtjs/tailwindcss',
   ],
+
+  tailwindcss: {
+    // main.css is listed in `css` above, so the module must not inject its own
+    // copy as well: two copies of the base layer double every reset rule.
+    cssPath: false,
+    viewer: false,
+  },
 
   // Modules: https://go.nuxtjs.dev/config-modules
   //

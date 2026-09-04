@@ -2,7 +2,7 @@
   <div class="authoring-login">
     <button
       type="button"
-      class="authoring-login__trigger"
+      class="font-mono text-xs uppercase tracking-eyebrow text-muted hover:text-accent underline transition-colors"
       data-testid="authoring-login-trigger"
       @click="open"
     >
@@ -11,60 +11,73 @@
 
     <div
       v-if="dialog"
-      class="authoring-login__backdrop"
+      class="fixed inset-0 z-50 flex items-center justify-center bg-ink bg-opacity-50 p-4"
       data-testid="authoring-login-dialog"
       @click.self="close"
     >
-      <div class="authoring-login__panel" role="dialog" aria-modal="true" aria-labelledby="al-title">
-        <h2 id="al-title" class="authoring-login__title">{{ title }}</h2>
+      <div
+        class="w-full max-w-md rounded-lg bg-surface border border-hairline shadow-xl p-6"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="al-title"
+      >
+        <p class="eyebrow mb-2">Authoring</p>
+        <h2 id="al-title" class="text-xl mb-3">{{ title }}</h2>
 
         <!-- Step one: no backend, so there is nothing to log in to yet. -->
         <template v-if="!connected">
-          <p class="authoring-login__blurb">
+          <p class="text-sm text-body mb-4">
             This site is static. Point it at a Drupal backend to sign in and edit.
           </p>
-          <label class="authoring-login__label" for="al-url">Backend URL</label>
+          <label class="eyebrow block mb-1.5" for="al-url">Backend URL</label>
           <input
             id="al-url"
             v-model="url"
             type="url"
+            class="w-full rounded border border-hairline bg-paper px-3 py-2 font-mono text-sm text-ink focus:border-accent focus:outline-none"
             data-testid="authoring-backend-url"
             placeholder="https://something.trycloudflare.com"
             :disabled="checking"
             @keyup.enter="verify"
           />
-          <p v-if="error" class="authoring-login__error" data-testid="authoring-error">
+          <p v-if="error" class="text-sm text-accent mt-3" data-testid="authoring-error">
             {{ error }}
           </p>
-          <div class="authoring-login__actions">
-            <button type="button" :disabled="checking" data-testid="authoring-verify" @click="verify">
+          <div class="mt-5 flex flex-wrap gap-2">
+            <button
+              type="button"
+              class="rounded bg-accent px-3 py-1.5 text-sm text-accent-contrast hover:opacity-90 disabled:opacity-60 transition-opacity"
+              :disabled="checking"
+              data-testid="authoring-verify"
+              @click="verify"
+            >
               {{ checking ? 'Verifying...' : 'Verify' }}
             </button>
-            <button type="button" class="is-quiet" @click="close">Cancel</button>
+            <button type="button" class="rounded border border-hairline px-3 py-1.5 text-sm text-body hover:border-ink hover:text-ink transition-colors" @click="close">Cancel</button>
           </div>
         </template>
 
         <!-- Step two: a verified backend, so offer the actual login. -->
         <template v-else-if="!authenticated">
-          <p class="authoring-login__blurb">
+          <p class="text-sm text-body mb-4">
             Connected to
-            <code data-testid="authoring-backend-host">{{ host }}</code>.
+            <code class="font-mono text-ink" data-testid="authoring-backend-host">{{ host }}</code>.
           </p>
-          <p v-if="error" class="authoring-login__error" data-testid="authoring-error">
+          <p v-if="error" class="text-sm text-accent mt-3" data-testid="authoring-error">
             {{ error }}
           </p>
-          <p class="authoring-login__note">
+          <p class="text-sm text-muted mt-3">
             The page still shows content from when the site was built. Reload to
             read it from this backend instead.
           </p>
-          <div class="authoring-login__actions">
-            <button type="button" data-testid="authoring-continue" @click="login">
+          <div class="mt-5 flex flex-wrap gap-2">
+            <button type="button" class="rounded bg-accent px-3 py-1.5 text-sm text-accent-contrast hover:opacity-90 transition-opacity" data-testid="authoring-continue" @click="login">
               Log in with Drupal
             </button>
-            <button type="button" class="is-quiet" data-testid="authoring-reload" @click="reload">
+            <button type="button" class="rounded border border-hairline px-3 py-1.5 text-sm text-body hover:border-ink hover:text-ink transition-colors" data-testid="authoring-reload" @click="reload">
               Reload
             </button>
-            <button type="button" class="is-quiet" data-testid="authoring-disconnect" @click="disconnect">
+            <button type="button" class="rounded border border-hairline px-3 py-1.5 text-sm text-body hover:border-ink hover:text-ink transition-colors" data-testid="authoring-disconnect" @click="disconnect">
               Disconnect
             </button>
           </div>
@@ -72,16 +85,16 @@
 
         <!-- Step three: signed in. -->
         <template v-else>
-          <p class="authoring-login__blurb">
-            Signed in as <strong data-testid="authoring-account">{{ accountName }}</strong>
+          <p class="text-sm text-body mb-4">
+            Signed in as <strong class="text-ink" data-testid="authoring-account">{{ accountName }}</strong>
             on <code>{{ host }}</code>.
           </p>
-          <div class="authoring-login__actions">
-            <button type="button" data-testid="authoring-logout" @click="logout">Log out</button>
-            <button type="button" class="is-quiet" data-testid="authoring-disconnect" @click="disconnect">
+          <div class="mt-5 flex flex-wrap gap-2">
+            <button type="button" class="rounded bg-accent px-3 py-1.5 text-sm text-accent-contrast hover:opacity-90 transition-opacity" data-testid="authoring-logout" @click="logout">Log out</button>
+            <button type="button" class="rounded border border-hairline px-3 py-1.5 text-sm text-body hover:border-ink hover:text-ink transition-colors" data-testid="authoring-disconnect" @click="disconnect">
               Disconnect
             </button>
-            <button type="button" class="is-quiet" @click="close">Close</button>
+            <button type="button" class="rounded border border-hairline px-3 py-1.5 text-sm text-body hover:border-ink hover:text-ink transition-colors" @click="close">Close</button>
           </div>
         </template>
       </div>
@@ -224,104 +237,3 @@ export default {
   },
 }
 </script>
-
-<style scoped>
-.authoring-login__trigger {
-  background: none;
-  border: 0;
-  padding: 0.25rem 0.5rem;
-  color: inherit;
-  font: inherit;
-  cursor: pointer;
-  text-decoration: underline;
-}
-
-.authoring-login__backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 9999;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(0, 0, 0, 0.45);
-  padding: 1rem;
-}
-
-.authoring-login__panel {
-  width: min(28rem, 100%);
-  background: #fff;
-  color: #1b1b1d;
-  border-radius: 6px;
-  padding: 1.25rem;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
-  font:
-    15px/1.5 -apple-system,
-    BlinkMacSystemFont,
-    'Segoe UI',
-    sans-serif;
-}
-
-.authoring-login__title {
-  margin: 0 0 0.5rem;
-  font-size: 1.15rem;
-}
-
-.authoring-login__blurb {
-  margin: 0 0 0.9rem;
-}
-
-.authoring-login__label {
-  display: block;
-  margin-bottom: 0.3rem;
-  font-weight: 600;
-  font-size: 0.9rem;
-}
-
-.authoring-login__panel input {
-  width: 100%;
-  box-sizing: border-box;
-  padding: 0.45rem 0.6rem;
-  border: 1px solid #b7b7b7;
-  border-radius: 4px;
-  font: inherit;
-}
-
-.authoring-login__note {
-  margin: 0.6rem 0 0;
-  color: #555;
-  font-size: 0.9rem;
-}
-
-.authoring-login__error {
-  margin: 0.6rem 0 0;
-  color: #a4232a;
-  font-size: 0.9rem;
-}
-
-.authoring-login__actions {
-  display: flex;
-  gap: 0.5rem;
-  margin-top: 1rem;
-}
-
-.authoring-login__actions button {
-  padding: 0.45rem 0.9rem;
-  border: 1px solid #1b1b1d;
-  border-radius: 4px;
-  background: #1b1b1d;
-  color: #fff;
-  font: inherit;
-  cursor: pointer;
-}
-
-.authoring-login__actions button.is-quiet {
-  background: transparent;
-  color: #1b1b1d;
-  border-color: #b7b7b7;
-}
-
-.authoring-login__actions button[disabled] {
-  opacity: 0.6;
-  cursor: default;
-}
-</style>

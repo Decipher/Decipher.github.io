@@ -20,8 +20,8 @@ instantiator
 intelephense
 interruptible
 knip
-Lando
 lando
+Lando
 Landofile
 lcobucci
 libasound
@@ -66,4 +66,5 @@ trixie
 unparseable
 valeryan
 vfox
+viewports
 xauth
