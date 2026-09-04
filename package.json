@@ -31,18 +31,22 @@
     "lint:commit": "commitlint",
     "lint:audit": "npm audit --omit=dev --audit-level=high",
     "lint:renovate": "npx --yes --package renovate renovate-config-validator",
-    "lint:private": "node scripts/lint-private-refs.mjs"
+    "lint:private": "node scripts/lint-private-refs.mjs",
+    "test:unit": "node --test \"tests/unit/**/*.test.mjs\"",
+    "test:e2e": "playwright test --project=behaviour"
   },
   "devDependencies": {
     "@commitlint/cli": "^21.2.2",
     "@commitlint/config-conventional": "^21.2.2",
     "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.50.0",
     "cspell": "^10.0.1",
     "eslint": "^10.1.8",
     "eslint-config-prettier": "^10.1.8",
     "globals": "^17.11.0",
     "knip": "^6.32.2",
     "markdownlint-cli2": "^0.23.2",
-    "prettier": "^3.9.6"
+    "prettier": "^3.9.6",
+    "serve": "^14.2.6"
   }
 }
