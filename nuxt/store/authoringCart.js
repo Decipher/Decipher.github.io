@@ -16,9 +16,12 @@ import {
   cartKey,
   changedFields,
   isEmptyResource,
+  isNew,
   mergeEntry,
+  newResourceId,
   patchBody,
-  patchUrl,
+  requestMethod,
+  requestUrl,
   tidyResource,
 } from '../lib/cart.mjs'
 
@@ -48,6 +51,14 @@ function writeStored(entries) {
 }
 
 export const state = () => ({
+  /**
+   * Whether the site is in edit mode.
+   *
+   * Deliberately separate from being connected or signed in: an author can turn
+   * editing on with no backend at all and stage changes, which is the point of
+   * the cart. It only decides whether the interface offers editing.
+   */
+  editing: false,
   /** Staged resources, keyed `type:id`. */
   entries: {},
   /** False once a write to storage has failed, so the UI can stop promising. */
@@ -58,6 +69,7 @@ export const state = () => ({
 })
 
 export const getters = {
+  editing: (state) => state.editing,
   count: (state) => Object.keys(state.entries).length,
   isEmpty: (state) => !Object.keys(state.entries).length,
   /** Everything staged, as JSON:API resource objects. */
@@ -67,6 +79,10 @@ export const getters = {
 }
 
 export const mutations = {
+  setEditing(state, editing) {
+    state.editing = editing
+  },
+
   stage(state, { key, resource }) {
     // Vue 2 cannot see a new key on a plain object, so the whole map is
     // replaced rather than mutated in place.
@@ -105,9 +121,47 @@ export const mutations = {
 }
 
 export const actions = {
-  /** Bring back whatever the last visit staged. */
+  /** Bring back whatever the last visit staged, and whether editing was on. */
   restore({ commit }) {
     commit('restore', readStored())
+    try {
+      commit('setEditing', window.localStorage.getItem('authoring.editing') === '1')
+    } catch {
+      // No storage: editing simply starts off.
+    }
+  },
+
+  /** Turn editing on or off, and remember which. */
+  setEditing({ commit }, editing) {
+    commit('setEditing', Boolean(editing))
+    try {
+      if (editing) window.localStorage.setItem('authoring.editing', '1')
+      else window.localStorage.removeItem('authoring.editing')
+    } catch {
+      // The mode simply does not survive a reload.
+    }
+  },
+
+  /**
+   * Stage a new entity, which does not exist in the backend yet.
+   *
+   * Given a client-generated id up front, because the cart is keyed by id and
+   * the interface has to be able to name the thing being written before Drupal
+   * has seen it. JSON:API accepts a client-supplied id on create, so the
+   * placeholder becomes the real id rather than being swapped for one.
+   */
+  stageNew({ state, commit }, { type, attributes, relationships }) {
+    const id = newResourceId()
+    const resource = {
+      type,
+      id,
+      isNew: true,
+      attributes: attributes || {},
+      relationships: relationships || {},
+    }
+    commit('stage', { key: cartKey(type, id), resource })
+    commit('setPersistent', writeStored(state.entries))
+    return id
   },
 
   /**
@@ -118,10 +172,14 @@ export const actions = {
    * empty resource, so the count means what it says.
    */
   stage({ state, commit }, { type, id, original, edited, relationships }) {
-    const attributes = changedFields(original, edited)
-    const resource = mergeEntry(state.entries[cartKey(type, id)], {
+    const existing = state.entries[cartKey(type, id)]
+    // Something staged as new keeps every field, not just what changed since
+    // the form loaded: there is no saved version to differ from.
+    const attributes = isNew(existing) ? { ...edited } : changedFields(original, edited)
+    const resource = mergeEntry(existing, {
       type,
       id,
+      isNew: isNew(existing),
       attributes,
       relationships: relationships || {},
     })
@@ -162,8 +220,8 @@ export const actions = {
     const results = { sent: 0, failed: 0 }
     for (const [key, resource] of Object.entries({ ...state.entries })) {
       try {
-        const response = await request(patchUrl(backendUrl, resource.type, resource.id), {
-          method: 'PATCH',
+        const response = await request(requestUrl(backendUrl, resource), {
+          method: requestMethod(resource),
           headers: {
             // JSON:API's own media type, not application/json. Drupal answers
             // 415 for anything else.
