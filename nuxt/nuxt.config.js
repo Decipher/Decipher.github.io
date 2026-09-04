@@ -78,9 +78,13 @@ export default {
     authoring: {
       // Where a session provider publishes the live backend, if anywhere.
       sessionRecordUrl: process.env.SESSION_RECORD_URL || '',
-      // The OAuth consumer, which provisioning pins so it is stable across
-      // sessions and can be known at build time.
-      clientId: process.env.OAUTH_CLIENT_ID || '',
+      // The OAuth consumer. Provisioning pins this so it is stable across
+      // sessions, which is the whole reason the frontend can hold it at build
+      // time. The default matches `.devtools/provision-authoring`, so a build
+      // that never saw a provisioned backend (CI, a fresh clone) still sends
+      // the right client id rather than an empty one, which fails login with a
+      // confusing `invalid_client`.
+      clientId: process.env.OAUTH_CLIENT_ID || 'dfdd3969-6fe2-4a6f-92bb-82b6f59013ed',
     },
   },
 
