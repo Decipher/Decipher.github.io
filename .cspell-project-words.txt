@@ -55,6 +55,7 @@ phpsab
 phpstan
 phpunit
 PKCE
+recognised
 repository
 setuptools
 shivammathur
