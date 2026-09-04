@@ -60,8 +60,14 @@ test.describe('authoring cart', () => {
     // networkidle, not the default: the cart is restored by a plugin during
     // startup, so asserting before that settles reads the pre-hydration page.
     await page.reload({ waitUntil: 'networkidle' })
-    await expect(page.getByTestId('authoring-cart-count')).toContainText('1 change')
+
+    // The drawer starts closed on a fresh load: whether a panel is open is a
+    // property of this visit, not of the work. The header says what is held.
+    await expect(page.getByTestId('authoring-cart-toggle')).toContainText('Staged 1')
     expect(await count(page)).toBe(1)
+
+    await page.getByTestId('authoring-cart-toggle').click()
+    await expect(page.getByTestId('authoring-cart-count')).toContainText('1 change')
   })
 
   test('two edits to one entity are one staged change', async ({ page }) => {
@@ -85,7 +91,7 @@ test.describe('authoring cart', () => {
       edited: { title: 'Same' },
     })
     expect(staged).toBe(false)
-    await expect(page.getByTestId('authoring-cart')).toHaveCount(0)
+    await expect(page.getByTestId('authoring-drawer')).toHaveCount(0)
   })
 
   test('discarding empties the cart and does not come back', async ({ page }) => {
@@ -93,8 +99,8 @@ test.describe('authoring cart', () => {
     await stage(page, { type: 'node--article', id: 'abc', original: {}, edited: { title: 'A' } })
     await page.getByTestId('authoring-cart-discard').click()
 
-    await expect(page.getByTestId('authoring-cart')).toHaveCount(0)
+    await expect(page.getByTestId('authoring-cart-empty')).toBeVisible()
     await page.reload({ waitUntil: 'networkidle' })
-    await expect(page.getByTestId('authoring-cart')).toHaveCount(0)
+    await expect(page.getByTestId('authoring-drawer')).toHaveCount(0)
   })
 })

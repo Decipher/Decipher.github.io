@@ -1,7 +1,21 @@
 <template>
-  <div v-if="count" class="authoring-cart" data-testid="authoring-cart">
-    <p class="eyebrow mb-2">Staged</p>
-    <p class="text-sm text-body mb-3" data-testid="authoring-cart-count">
+  <div class="authoring-cart p-5" data-testid="authoring-cart">
+    <div class="mb-3 flex items-baseline justify-between">
+      <p class="eyebrow">Staged</p>
+      <button
+        type="button"
+        class="font-mono text-xs text-muted underline hover:text-accent"
+        data-testid="authoring-cart-close"
+        @click="close"
+      >
+        Close
+      </button>
+    </div>
+
+    <p v-if="!count" class="text-sm text-muted" data-testid="authoring-cart-empty">
+      Nothing staged yet. Turn on Edit and change something.
+    </p>
+    <p v-if="count" class="mb-3 text-sm text-body" data-testid="authoring-cart-count">
       {{ count }} {{ count === 1 ? 'change' : 'changes' }}, not yet sent anywhere.
     </p>
 
@@ -9,7 +23,7 @@
       This browser will not keep them past a reload.
     </p>
 
-    <ul class="mb-3 space-y-1">
+    <ul v-if="count" class="mb-3 space-y-1">
       <li v-for="resource in resources" :key="resource.type + resource.id" class="text-sm">
         <code class="font-mono text-ink">{{ resource.type }}</code>
         <span class="text-muted"> {{ fieldNames(resource) }}</span>
@@ -23,7 +37,7 @@
       </li>
     </ul>
 
-    <div class="flex flex-wrap gap-2">
+    <div v-if="count" class="flex flex-wrap gap-2">
       <button
         type="button"
         class="rounded bg-accent px-3 py-1.5 text-sm text-accent-contrast hover:opacity-90 disabled:opacity-60"
@@ -100,6 +114,10 @@ export default {
   },
 
   methods: {
+    close() {
+      this.$store.dispatch('authoringCart/setDrawerOpen', false)
+    },
+
     fieldNames(resource) {
       return Object.keys({ ...resource.attributes, ...resource.relationships }).join(', ')
     },
