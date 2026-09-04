@@ -1,0 +1,97 @@
+{
+  "jsonapi": {
+    "version": "1.1",
+    "meta": { "links": { "self": { "href": "https:\/\/jsonapi.org\/format\/1.1\/" } } }
+  },
+  "data": [
+    {
+      "type": "field_storage_config--field_storage_config",
+      "id": "d62b2d6d-7cbd-4fc3-8519-f5eedfffac99",
+      "links": {
+        "self": {
+          "href": "http:\/\/backend.test\/jsonapi\/field_storage_config\/field_storage_config\/d62b2d6d-7cbd-4fc3-8519-f5eedfffac99"
+        }
+      },
+      "attributes": {
+        "langcode": "en",
+        "status": true,
+        "dependencies": { "module": ["node", "text"] },
+        "drupal_internal__id": "node.body",
+        "field_name": "body",
+        "entity_type": "node",
+        "field_storage_config_type": "text_with_summary",
+        "settings": [],
+        "module": "text",
+        "locked": false,
+        "cardinality": 1,
+        "translatable": true,
+        "indexes": [],
+        "persist_with_no_fields": true,
+        "custom_storage": false
+      }
+    },
+    {
+      "type": "field_storage_config--field_storage_config",
+      "id": "ceabce00-e6fc-4888-bf98-f911f4bd4fd1",
+      "links": {
+        "self": {
+          "href": "http:\/\/backend.test\/jsonapi\/field_storage_config\/field_storage_config\/ceabce00-e6fc-4888-bf98-f911f4bd4fd1"
+        }
+      },
+      "attributes": {
+        "langcode": "en",
+        "status": true,
+        "dependencies": { "module": ["file", "image", "node"] },
+        "drupal_internal__id": "node.field_image",
+        "field_name": "field_image",
+        "entity_type": "node",
+        "field_storage_config_type": "image",
+        "settings": {
+          "target_type": "file",
+          "display_field": false,
+          "display_default": false,
+          "uri_scheme": "public",
+          "default_image": { "uuid": null, "alt": "", "title": "", "width": null, "height": null }
+        },
+        "module": "image",
+        "locked": false,
+        "cardinality": 1,
+        "translatable": true,
+        "indexes": { "target_id": ["target_id"] },
+        "persist_with_no_fields": false,
+        "custom_storage": false
+      }
+    },
+    {
+      "type": "field_storage_config--field_storage_config",
+      "id": "d2314460-7b90-4e58-89c5-520ae8bf64cf",
+      "links": {
+        "self": {
+          "href": "http:\/\/backend.test\/jsonapi\/field_storage_config\/field_storage_config\/d2314460-7b90-4e58-89c5-520ae8bf64cf"
+        }
+      },
+      "attributes": {
+        "langcode": "en",
+        "status": true,
+        "dependencies": { "module": ["node", "taxonomy"] },
+        "drupal_internal__id": "node.field_tags",
+        "field_name": "field_tags",
+        "entity_type": "node",
+        "field_storage_config_type": "entity_reference",
+        "settings": { "target_type": "taxonomy_term" },
+        "module": "core",
+        "locked": false,
+        "cardinality": -1,
+        "translatable": true,
+        "indexes": [],
+        "persist_with_no_fields": false,
+        "custom_storage": false
+      }
+    }
+  ],
+  "links": {
+    "self": {
+      "href": "http:\/\/backend.test\/jsonapi\/field_storage_config\/field_storage_config?filter%5Bentity_type%5D=node"
+    }
+  }
+}
