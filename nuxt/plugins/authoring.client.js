@@ -182,6 +182,21 @@ export default async function (context, inject) {
   holdClientUntilConnected(context, state)
   inject('authoring', authoring)
 
+  // Bring back whatever the last visit staged. Deliberately independent of any
+  // backend: the cart is not a property of a session, and an author whose
+  // session expired mid-edit should find their work still there.
+  //
+  // After the app is ready, not here. Nuxt replays the Vuex state baked into
+  // `window.__NUXT__` while it mounts, which happens after plugins run, so a
+  // restore done now is silently overwritten by the empty cart from build time.
+  // The store ended up holding the right entries while the page rendered as
+  // though it held none.
+  if (context.store) {
+    const restore = () => context.store.dispatch('authoringCart/restore')
+    if (typeof window.onNuxtReady === 'function') window.onNuxtReady(restore)
+    else restore()
+  }
+
   const params = new URLSearchParams(window.location.search)
   const chosen = resolveSource({
     query: params.get('backend'),

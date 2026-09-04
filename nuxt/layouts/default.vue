@@ -13,6 +13,9 @@
       </div>
     </header>
 
+    <!-- Renders nothing until something is staged, so a visitor never sees it. -->
+    <AuthoringCart />
+
     <main class="flex-1">
       <div class="mx-auto w-full max-w-5xl px-6 py-12">
         <Nuxt />
