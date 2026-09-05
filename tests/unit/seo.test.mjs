@@ -9,6 +9,7 @@ import test from 'node:test'
 
 import { pagesByPath } from '../../nuxt/lib/content-routes.mjs'
 import { clampDescription, seoHead, textFrom } from '../../nuxt/lib/seo.mjs'
+import { escapeXml, llmsTxt, robotsTxt, sitemapXml } from '../../nuxt/lib/sitemap.mjs'
 import {
   SITE_NAME,
   canonicalUrl,
@@ -104,4 +105,61 @@ test('pages are keyed by the route they are served at', () => {
   ])
   assert.equal(keyed['/a-new-alias'].title, 'Theming check')
   assert.equal(keyed['/node/5'].title, 'Another')
+})
+
+test('the sitemap lists what a crawler should fetch, and nothing else', () => {
+  const xml = sitemapXml([
+    { path: '/a-new-alias', title: 'Theming check', changed: '2026-09-05T02:11:15+00:00' },
+    { path: '/callback', title: 'Signing in' },
+    { path: '/elsewhere', title: 'Copy', canonical: 'https://stuar.tc/x' },
+  ])
+
+  assert.match(xml, /<loc>https:\/\/decipher\.github\.io\/<\/loc>/)
+  assert.match(xml, /<loc>https:\/\/decipher\.github\.io\/a-new-alias<\/loc>/)
+  // Machinery, and a page that disclaims itself in favour of the original.
+  assert.ok(!xml.includes('/callback'))
+  assert.ok(!xml.includes('/elsewhere'))
+})
+
+test('lastmod is what Drupal changed, not when the build ran', () => {
+  const xml = sitemapXml([{ path: '/a', changed: '2026-09-05T02:11:15+00:00' }])
+  assert.match(xml, /<lastmod>2026-09-05<\/lastmod>/)
+  // No date at all beats a date that means "this build ran today".
+  assert.ok(!sitemapXml([{ path: '/a' }]).includes('lastmod'))
+})
+
+test('one apostrophe cannot invalidate the whole sitemap', () => {
+  // A malformed sitemap is rejected whole, not in part, so a single unescaped
+  // character in one title would cost the site every URL in the file.
+  const loc = sitemapXml([{ path: "/tom-&-jerry's" }])
+    .split('\n')
+    .find((line) => line.includes('tom-'))
+  assert.equal(loc, '    <loc>https://decipher.github.io/tom-&amp;-jerry&apos;s</loc>')
+  assert.equal(escapeXml('<a href="x">'), '&lt;a href=&quot;x&quot;&gt;')
+})
+
+test('robots points at the sitemap and keeps crawlers off the machinery', () => {
+  const robots = robotsTxt()
+  assert.match(robots, /^User-agent: \*$/m)
+  assert.match(robots, /^Sitemap: https:\/\/decipher\.github\.io\/sitemap\.xml$/m)
+  assert.match(robots, /^Disallow: \/authoring$/m)
+  assert.match(robots, /^Disallow: \/_nuxt\/$/m)
+})
+
+test('llms.txt says what each page is, which is what a sitemap does not', () => {
+  const txt = llmsTxt([
+    { path: '/a-new-alias', title: 'Theming check', description: 'Some body text.' },
+    { path: '/callback', title: 'Signing in' },
+  ])
+  assert.match(txt, /^# Deciphered$/m)
+  assert.match(txt, /^> A statically generated/m)
+  assert.match(
+    txt,
+    /^- \[Theming check\]\(https:\/\/decipher\.github\.io\/a-new-alias\): Some body text\.$/m
+  )
+  assert.ok(!txt.includes('/callback'))
+})
+
+test('an empty site still produces a valid llms.txt', () => {
+  assert.match(llmsTxt([]), /^- No content published yet\.$/m)
 })

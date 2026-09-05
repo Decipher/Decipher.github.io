@@ -1,4 +1,5 @@
 import { contentRoutesOrNone, pagesByPath } from './lib/content-routes.mjs'
+import { llmsTxt, robotsTxt, sitemapXml } from './lib/sitemap.mjs'
 import { SITE_NAME, SITE_DESCRIPTION } from './lib/site.mjs'
 
 require('dotenv').config({ path: '../.env' })
@@ -205,6 +206,26 @@ export default {
     router: { middleware: false },
     // Set the default theme to render Site regions.
     site: { theme: 'olivero' },
+  },
+
+  hooks: {
+    // Written after the export rather than kept in `static/`, because all three
+    // list the pages the build actually produced and name the origin it was
+    // built for. A checked-in copy would be a guess that goes stale silently.
+    'generate:done'(generator) {
+      const { writeFileSync } = require('fs')
+      const { join } = require('path')
+      const dir = generator.nuxt.options.generate.dir
+      const files = {
+        'sitemap.xml': sitemapXml(pages),
+        'robots.txt': robotsTxt(),
+        'llms.txt': llmsTxt(pages),
+      }
+      for (const [name, contents] of Object.entries(files)) {
+        writeFileSync(join(dir, name), contents)
+      }
+      console.log(`Wrote ${Object.keys(files).join(', ')} for ${pages.length} pages.`)
+    }
   },
 
   // Build Configuration: https://go.nuxtjs.dev/config-build
