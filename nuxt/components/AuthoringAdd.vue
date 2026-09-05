@@ -97,20 +97,16 @@ export default {
   },
 
   data() {
-    return { chosen: this.types[0] && this.types[0].type, message: null, stagedId: null }
+    return {
+      chosen: this.types[0] && this.types[0].type,
+      message: null,
+      stagedId: null,
+      // The resource the form edits. Data, not computed: see `add()`.
+      blank: null,
+    }
   },
 
   computed: {
-    /** An empty resource of the staged type, for the form to fill in. */
-    blank() {
-      if (!this.staged) return undefined
-      return {
-        type: this.staged.type,
-        id: this.staged.id,
-        attributes: { ...(this.staged.attributes || {}) },
-        relationships: { ...(this.staged.relationships || {}) },
-      }
-    },
 
     editing() {
       return this.$store.getters['authoringCart/editing']
@@ -129,6 +125,15 @@ export default {
         // a placeholder title would be indistinguishable from one somebody meant.
         attributes: {},
       })
+      // Built once, and never again. As a computed it changed identity every
+      // time the cart did, and Druxt syncs a form's model from its `value`
+      // prop, so creating a tag mid-form silently wiped everything typed.
+      this.blank = {
+        type: this.chosen,
+        id: this.stagedId,
+        attributes: {},
+        relationships: {},
+      }
       this.message = 'Staged as new. Fill it in below; nothing is sent yet.'
       this.$emit('added', this.stagedId)
     },
@@ -149,6 +154,7 @@ export default {
       const form = this.$refs.form
       if (form && typeof form.stage === 'function') await form.stage()
       this.stagedId = null
+      this.blank = null
       this.message = 'Staged. Find it in the drawer.'
     },
 
@@ -165,6 +171,7 @@ export default {
         id: this.staged.id,
       })
       this.stagedId = null
+      this.blank = null
       this.message = null
     },
   },

@@ -2,3 +2,6 @@ nuxt/
 drupal/
 package-lock.json
 styles/
+
+# Scratch space: working files, never committed.
+.artifacts/

@@ -455,3 +455,30 @@ test('an exported change request says what is being deleted', () => {
   )
   assert.deepEqual(exported.deletions, [{ type: 'node--article', id: 'a' }])
 })
+
+test('an exported document is already in an order that can be applied', () => {
+  // Whatever applies it has to create the tag before the article referencing
+  // it. Working the graph out again on the other side is computing it twice.
+  const exported = exportCart(
+    {
+      'node--article:article': {
+        type: 'node--article',
+        id: 'article',
+        attributes: { title: 'Tagged' },
+        relationships: { field_tags: { data: [{ type: 'taxonomy_term--tags', id: 'tag' }] } },
+      },
+      'taxonomy_term--tags:tag': {
+        type: 'taxonomy_term--tags',
+        id: 'tag',
+        isNew: true,
+        attributes: { name: 'Rye' },
+      },
+    },
+    { generatedAt: 'now' }
+  )
+
+  assert.deepEqual(
+    exported.resources.map((r) => r.id),
+    ['tag', 'article']
+  )
+})

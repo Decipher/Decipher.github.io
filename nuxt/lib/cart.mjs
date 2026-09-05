@@ -243,7 +243,10 @@ export function requestUrl(backendUrl, resource) {
  */
 export function exportCart(entries, { generatedAt } = {}) {
   const keys = Object.keys(entries).sort()
-  const resources = keys.map((key) => tidyResource(entries[key]))
+  // Dependency order, not key order: whatever applies this document has to
+  // create a tag before the article that references it, and working that out
+  // again on the other side is the same graph computed twice.
+  const resources = commitOrder(keys.map((key) => entries[key])).map(tidyResource)
 
   return {
     // Versioned from the start: whatever consumes this on the Drupal side has
