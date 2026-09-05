@@ -12,6 +12,12 @@
       </button>
     </div>
 
+    <!--
+      Adding lives here rather than on one page, because editing does. It moved
+      when everything else did and was left reachable from a single route.
+    -->
+    <AuthoringAdd class="mb-4" />
+
     <p
       v-if="!count && !unstaged.length"
       class="text-sm text-muted"
@@ -93,7 +99,8 @@
           <!-- What is actually going to be sent, rather than a summary of it. -->
           <AuthoringJsonTree
             v-if="isExpanded(resource)"
-            :value="resource"
+            :value="wireShape(resource)"
+            :before="{ attributes: resource.before || {}, relationships: resource.before || {} }"
             class="ml-6 mt-1 border-l border-hairline pl-2"
           />
 
@@ -210,7 +217,13 @@
 </template>
 
 <script>
-import { dependencyMap, exportCart, exportSummary, requiredBy } from '../lib/cart.mjs'
+import {
+  dependencyMap,
+  exportCart,
+  exportSummary,
+  requiredBy,
+  tidyResource,
+} from '../lib/cart.mjs'
 
 export default {
   name: 'AuthoringCart',
@@ -286,6 +299,11 @@ export default {
         this.labelOnPage(resource.type, resource.id) ||
         resource.type
       )
+    },
+
+    /** The document that will be sent, without the cart's own bookkeeping. */
+    wireShape(resource) {
+      return tidyResource(resource)
     },
 
     /** What the page is calling this, when the change itself does not say. */

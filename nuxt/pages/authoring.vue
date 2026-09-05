@@ -6,12 +6,10 @@
     <p class="mb-6 max-w-prose text-body">
       Turn on <strong>Edit</strong> in the header. Every article below gains an
       edit control, and so does anything else on the site: this page is only a
-      list of what exists. Changes are staged rather than saved, so this works
-      whether or not a backend is connected. Commit them from the cart once one
-      is.
+      list of what exists. Add new content from the drawer, alongside everything
+      you have staged. Changes are staged rather than saved, so this works
+      whether or not a backend is connected.
     </p>
-
-    <AuthoringAdd class="mb-8" />
 
     <p v-if="$fetchState.pending" class="text-muted">Loading content...</p>
 

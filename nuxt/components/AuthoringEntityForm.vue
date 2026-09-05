@@ -80,29 +80,42 @@ export default {
      */
     captureOriginal(entity) {
       this.original = JSON.parse(JSON.stringify(entity || {}))
-      this.applyDraft()
+      // Bytes already staged for this entity, so reopening its form shows the
+      // picture rather than a field pointing at an id nothing can resolve.
+      const staged = this.$store.getters['authoringCart/entryFor'](
+        this.type,
+        (this.original || {}).id
+      )
+      this.pendingFiles = { ...((staged || {}).files || {}) }
+      this.applyEdits()
     },
 
     /**
-     * Put an unstaged edit back into the form.
+     * Put the edits already made back into the form.
+     *
+     * Staged first, then unstaged on top, the same order the page renders them
+     * in. Without this, reopening a form shows the backend's values and an
+     * author is quietly looking at the version they already changed.
      *
      * The snapshot stays as the backend had it, so the diff still measures the
      * whole change rather than what has happened since the form reopened.
      */
-    applyDraft() {
+    applyEdits() {
       const form = this.$refs.form
-      const draft = this.$store.getters['authoringCart/draftFor'](
-        this.type,
-        (this.original || {}).id
-      )
-      if (!form || !form.model || !draft) return
-      // Bytes chosen last time, so reopening the form shows the picture rather
-      // than a field pointing at an id nothing can resolve.
-      this.pendingFiles = { ...(draft.files || {}) }
-      form.model = {
-        ...form.model,
-        attributes: { ...(form.model.attributes || {}), ...(draft.attributes || {}) },
-        relationships: { ...(form.model.relationships || {}), ...(draft.relationships || {}) },
+      if (!form || !form.model) return
+
+      const id = (this.original || {}).id
+      const staged = this.$store.getters['authoringCart/entryFor'](this.type, id)
+      const draft = this.$store.getters['authoringCart/draftFor'](this.type, id)
+
+      for (const layer of [staged, draft]) {
+        if (!layer) continue
+        this.pendingFiles = { ...this.pendingFiles, ...(layer.files || {}) }
+        form.model = {
+          ...form.model,
+          attributes: { ...(form.model.attributes || {}), ...(layer.attributes || {}) },
+          relationships: { ...(form.model.relationships || {}), ...(layer.relationships || {}) },
+        }
       }
     },
 

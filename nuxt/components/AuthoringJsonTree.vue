@@ -16,15 +16,29 @@
         <AuthoringJsonTree
           v-if="isOpen(entry.key)"
           :value="entry.value"
+          :before="entry.before"
           :depth="depth + 1"
           class="ml-3 border-l border-hairline pl-2"
         />
       </template>
 
-      <div v-else class="flex items-baseline gap-1">
-        <span class="w-3 shrink-0" aria-hidden="true"></span>
-        <span class="text-ink">{{ entry.key }}</span>
-        <span class="break-all text-muted" data-testid="json-leaf">{{ entry.summary }}</span>
+      <div v-else>
+        <div class="flex items-baseline gap-1">
+          <span class="w-3 shrink-0" aria-hidden="true"></span>
+          <span class="text-ink">{{ entry.key }}</span>
+          <span
+            class="break-all"
+            :class="entry.changed ? 'text-accent' : 'text-muted'"
+            data-testid="json-leaf"
+            >{{ entry.changed ? '+ ' : '' }}{{ entry.summary }}</span
+          >
+        </div>
+        <!-- What it was, when this is replacing something. -->
+        <div v-if="entry.changed" class="flex items-baseline gap-1" data-testid="json-was">
+          <span class="w-3 shrink-0" aria-hidden="true"></span>
+          <span class="text-muted">{{ entry.key }}</span>
+          <span class="break-all text-muted line-through">- {{ entry.was }}</span>
+        </div>
       </div>
     </li>
   </ul>
@@ -48,6 +62,13 @@ export default {
 
   props: {
     value: { type: [Object, Array], default: () => ({}) },
+    /**
+     * What the backend held for the same keys, where it is known.
+     *
+     * A staged resource is a delta: on its own it says what a field will be
+     * without saying what it was, which is the half a reviewer needs.
+     */
+    before: { type: [Object, Array], default: null },
     depth: { type: Number, default: 0 },
     /** How many levels start open. Two shows a resource's fields and no more. */
     openTo: { type: Number, default: 1 },
@@ -61,10 +82,21 @@ export default {
     entries() {
       const value = this.value || {}
       const keys = Array.isArray(value) ? value.map((_, i) => String(i)) : Object.keys(value)
+      const before = this.before || {}
       return keys.map((key) => {
         const item = value[key]
         const branch = item !== null && typeof item === 'object'
-        return { key, value: item, branch, summary: this.summarise(item) }
+        const had = Object.prototype.hasOwnProperty.call(before, key)
+        return {
+          key,
+          value: item,
+          before: had ? before[key] : null,
+          branch,
+          summary: this.summarise(item),
+          // Only a leaf says "changed": a branch says it about its own leaves.
+          changed: !branch && had && this.summarise(before[key]) !== this.summarise(item),
+          was: had ? this.summarise(before[key]) : '',
+        }
       })
     },
   },

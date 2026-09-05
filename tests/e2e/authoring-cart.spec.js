@@ -143,9 +143,12 @@ test.describe('adding content', () => {
     await page.goto('/', { waitUntil: 'networkidle' })
     await page.getByTestId('authoring-edit-toggle').click()
 
-    // Counting staged changes alone left an author who had edited things and
-    // staged none of them with a drawer full of work and no way to open it.
-    await expect(page.getByTestId('authoring-cart-toggle')).toBeVisible()
+    // Edit mode opens its own surface, and the toggle is there to shut it and
+    // bring it back. Counting staged changes alone left an author who had
+    // edited things and staged none of them with no way in at all.
+    await expect(page.getByTestId('authoring-cart')).toBeVisible()
+    await page.getByTestId('authoring-cart-toggle').click()
+    await expect(page.getByTestId('authoring-cart')).toHaveCount(0)
     await page.getByTestId('authoring-cart-toggle').click()
     await expect(page.getByTestId('authoring-cart')).toBeVisible()
   })
@@ -186,6 +189,30 @@ test.describe('adding content', () => {
     await page.getByTestId('cart-stage-gone').click()
     expect(await count(page)).toBe(1)
     await expect(page.getByTestId('cart-delete-tag')).toBeVisible()
+  })
+
+  test('the staged json reads as a change, not just its result', async ({ page }) => {
+    await page.goto('/', { waitUntil: 'networkidle' })
+    await stage(page, {
+      type: 'node--article',
+      id: 'abc',
+      original: { title: 'The old title' },
+      edited: { title: 'The new title' },
+    })
+    await page.evaluate(() => window.$nuxt.$store.dispatch('authoringCart/setDrawerOpen', true))
+    await page.getByTestId('authoring-cart-expand').first().click()
+
+    // A staged resource is a delta: on its own it says what a field will be
+    // without saying what it was, which is the half a reviewer needs.
+    await expect(page.getByTestId('json-was')).toContainText('The old title')
+    await expect(page.getByTestId('json-leaf').filter({ hasText: 'The new title' })).toBeVisible()
+  })
+
+  test('adding content is reachable from any page', async ({ page }) => {
+    // Editing became site-wide and adding was left on one route.
+    await page.goto('/', { waitUntil: 'networkidle' })
+    await page.getByTestId('authoring-edit-toggle').click()
+    await expect(page.getByTestId('authoring-add')).toBeVisible()
   })
 
   test('a visitor is offered no drawer at all', async ({ page }) => {

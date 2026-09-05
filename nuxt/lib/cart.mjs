@@ -104,6 +104,10 @@ export function mergeEntry(existing, incoming, considered = {}) {
     // sent as a PATCH against an entity the backend has never seen.
     isNew: Boolean(existing.isNew || incoming.isNew),
     files: { ...(existing.files || {}), ...(incoming.files || {}) },
+    // What the backend had, kept from the first edit onwards so the drawer can
+    // show a change rather than only its result. Existing wins: the first one
+    // recorded is the one the backend actually holds.
+    before: { ...(incoming.before || {}), ...(existing.before || {}) },
     attributes: {
       ...withoutReverted(existing.attributes, incoming.attributes, considered.attributes),
       ...(incoming.attributes || {}),
@@ -379,4 +383,19 @@ export function withDependencies(selected = [], resources = []) {
 export function requiredBy(id, selected = [], resources = []) {
   const map = dependencyMap(resources)
   return selected.filter((other) => other !== id && (map.get(other) || []).includes(id))
+}
+
+/**
+ * What the backend held for the fields a change touches.
+ *
+ * Kept so the drawer can show a change rather than only its outcome: a staged
+ * resource is a delta, and a delta on its own says what a field will be without
+ * saying what it was.
+ */
+export function valuesBefore(original = {}, changed = {}) {
+  const before = {}
+  for (const field of Object.keys(changed)) {
+    before[field] = withoutComputed(original[field])
+  }
+  return before
 }
