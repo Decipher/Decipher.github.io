@@ -859,6 +859,35 @@ test.describe('the drawer as a review surface', () => {
     await expect(page.getByTestId(`cart-select-${tagId}`)).toBeChecked()
   })
 
+  test('the first article written shows up on an empty front page', async ({ page }) => {
+    // The listing takes its rows from the backend, so something written in the
+    // browser appears nowhere and an author reasonably concludes it was lost.
+    // An empty listing was the case that could not work at all: with no rows
+    // there is no type to infer, so the view was asked what it lists instead.
+    await page.goto('/', { waitUntil: 'networkidle' })
+    const main = page.locator('main')
+    await expect(main).toContainText('No front page content has been created yet')
+
+    const id = await page.evaluate(() =>
+      window.$nuxt.$store.dispatch('authoringCart/stageNew', {
+        type: 'node--article',
+        attributes: { title: 'Written in the browser' },
+      })
+    )
+
+    await expect(main).toContainText('Written in the browser')
+    await expect(main).not.toContainText('No front page content has been created yet')
+
+    // And taking it back off again, because a preview that cannot be undone is
+    // a page an author cannot get back.
+    await page.evaluate(
+      (id) =>
+        window.$nuxt.$store.dispatch('authoringCart/discardOne', { type: 'node--article', id }),
+      id
+    )
+    await expect(main).toContainText('No front page content has been created yet')
+  })
+
   test('a reference cannot be thrown away while something still needs it', async ({ page }) => {
     // Unstaging was already refused. Discarding was not, and it is the worse of
     // the two: unstaging leaves the tag in the cart to be found again, and
