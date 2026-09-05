@@ -20,11 +20,32 @@
       add new content above, and commit it later.
     </p>
 
-    <p v-else-if="!articles.length" class="text-muted" data-testid="authoring-page-empty">
+    <p
+      v-else-if="!articles.length && !stagedNew.length"
+      class="text-muted"
+      data-testid="authoring-page-empty"
+    >
       This backend has no articles yet. Add one above.
     </p>
 
-    <ul v-else class="space-y-6">
+    <!--
+      Content that exists only in the cart. It cannot come back from the
+      backend, so a listing built from one shows nothing an author has just
+      written, and the work looks lost.
+    -->
+    <ul v-if="stagedNew.length" class="mb-6 space-y-6">
+      <li
+        v-for="resource in stagedNew"
+        :key="resource.id"
+        class="rounded border border-dashed border-accent p-4"
+        data-testid="authoring-new-item"
+      >
+        <p class="eyebrow mb-2 text-accent">Not published yet</p>
+        <DruxtEntity :type="resource.type" :uuid="resource.id" :value="resource" mode="teaser" />
+      </li>
+    </ul>
+
+    <ul v-if="articles.length" class="space-y-6">
       <li v-for="article in articles" :key="article.id" class="rounded border border-hairline p-4">
         <!--
           Rendered by Druxt rather than by hand, so this listing goes through
@@ -71,6 +92,13 @@ export default {
   },
 
   computed: {
+    /** New content held in the cart, which no backend can list. */
+    stagedNew() {
+      return this.$store.getters['authoringCart/stagedNew'].filter(
+        (resource) => !resource.deleted && resource.type === 'node--article'
+      )
+    },
+
     backendUrl() {
       return this.$authoring && this.$authoring.state.url
     },

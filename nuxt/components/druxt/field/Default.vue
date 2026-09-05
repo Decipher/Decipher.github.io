@@ -1,5 +1,5 @@
 <template>
-  <div class="authoring-field">
+  <div class="authoring-field" :data-authoring-field="schema.id">
     <!-- ===== View displays ===== -->
     <template v-if="isSchemaView">
       <div v-if="relationship">

@@ -96,6 +96,9 @@ export default {
         (this.original || {}).id
       )
       if (!form || !form.model || !draft) return
+      // Bytes chosen last time, so reopening the form shows the picture rather
+      // than a field pointing at an id nothing can resolve.
+      this.pendingFiles = { ...(draft.files || {}) }
       form.model = {
         ...form.model,
         attributes: { ...(form.model.attributes || {}), ...(draft.attributes || {}) },
@@ -149,6 +152,7 @@ export default {
         type: this.type,
         id: (this.$refs.form.model || {}).id,
         ...delta,
+        files: this.pendingFiles,
       })
     },
 

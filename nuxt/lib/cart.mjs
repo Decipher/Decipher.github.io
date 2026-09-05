@@ -238,9 +238,8 @@ export function requestUrl(backendUrl, resource) {
  * reordered itself would show as a change in every diff.
  */
 export function exportCart(entries, { generatedAt } = {}) {
-  const resources = Object.keys(entries)
-    .sort()
-    .map((key) => tidyResource(entries[key]))
+  const keys = Object.keys(entries).sort()
+  const resources = keys.map((key) => tidyResource(entries[key]))
 
   return {
     // Versioned from the start: whatever consumes this on the Drupal side has
@@ -248,6 +247,23 @@ export function exportCart(entries, { generatedAt } = {}) {
     version: 1,
     generatedAt: generatedAt || new Date().toISOString(),
     resources,
+    // Deletions carry no fields, so without this they are indistinguishable
+    // from an edit that changed nothing.
+    deletions: keys
+      .filter((key) => isDeletion(entries[key]))
+      .map((key) => ({ type: entries[key].type, id: entries[key].id })),
+    // The bytes, so the document stands on its own. A change request naming a
+    // file id with the file nowhere in it cannot be applied by anything.
+    files: keys.flatMap((key) =>
+      Object.entries(entries[key].files || {}).map(([field, file]) => ({
+        resource: { type: entries[key].type, id: entries[key].id },
+        field,
+        id: file.id,
+        name: file.name,
+        contentType: file.type,
+        data: file.dataUrl,
+      }))
+    ),
   }
 }
 

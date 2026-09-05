@@ -100,10 +100,15 @@ test.describe('authoring login', () => {
     await page.goto(`/?backend=${encodeURIComponent(BACKEND)}`)
     await page.getByTestId('authoring-login-trigger').click()
     await expect(page.getByTestId('authoring-disconnect')).toBeVisible()
-    await page.getByTestId('authoring-disconnect').click()
-
     // Disconnecting reloads, so the dialog closes with it: the built content
-    // only comes back on a fresh load. Reopen to see the state it left behind.
+    // only comes back on a fresh load. Wait for that load rather than racing
+    // it, or the click below lands on the page that is on its way out.
+    await Promise.all([
+      page.waitForLoadState('networkidle'),
+      page.getByTestId('authoring-disconnect').click(),
+    ])
+
+    // Reopen to see the state it left behind.
     await page.getByTestId('authoring-login-trigger').click()
     await expect(page.getByTestId('authoring-backend-url')).toBeVisible()
 

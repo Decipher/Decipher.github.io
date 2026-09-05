@@ -415,3 +415,43 @@ test('the cart bookkeeping never reaches the wire', () => {
   }
   assert.deepEqual(Object.keys(tidyResource(resource)), ['type', 'id', 'attributes'])
 })
+
+test('an exported change request carries its own files', () => {
+  // A document naming a file id with the file nowhere in it cannot be applied
+  // by anything: the bytes only exist in the browser that chose them.
+  const exported = exportCart(
+    {
+      'node--article:a': {
+        type: 'node--article',
+        id: 'a',
+        relationships: { field_image: { data: { type: 'file--file', id: 'f1' } } },
+        files: {
+          field_image: {
+            id: 'f1',
+            name: 'red.png',
+            type: 'image/png',
+            dataUrl: 'data:image/png;base64,AAA',
+          },
+        },
+      },
+    },
+    { generatedAt: 'now' }
+  )
+
+  assert.equal(exported.files.length, 1)
+  assert.deepEqual(exported.files[0].resource, { type: 'node--article', id: 'a' })
+  assert.equal(exported.files[0].field, 'field_image')
+  assert.equal(exported.files[0].id, 'f1')
+  assert.equal(exported.files[0].data, 'data:image/png;base64,AAA')
+  // And the bytes are not smuggled into the resource itself, which has to stay
+  // a JSON:API document.
+  assert.equal(exported.resources[0].files, undefined)
+})
+
+test('an exported change request says what is being deleted', () => {
+  const exported = exportCart(
+    { 'node--article:a': { type: 'node--article', id: 'a', deleted: true } },
+    { generatedAt: 'now' }
+  )
+  assert.deepEqual(exported.deletions, [{ type: 'node--article', id: 'a' }])
+})

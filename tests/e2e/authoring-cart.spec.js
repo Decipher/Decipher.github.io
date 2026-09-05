@@ -150,6 +150,44 @@ test.describe('adding content', () => {
     await expect(page.getByTestId('authoring-cart')).toBeVisible()
   })
 
+  test('a deletion reads as a deletion, not as an edit', async ({ page }) => {
+    await page.goto('/', { waitUntil: 'networkidle' })
+    await page.evaluate(() =>
+      window.$nuxt.$store.dispatch('authoringCart/stageDeletion', {
+        type: 'node--article',
+        id: 'gone',
+      })
+    )
+    await page.evaluate(() => window.$nuxt.$store.dispatch('authoringCart/setDrawerOpen', true))
+
+    // Tidied for the wire, a deletion is indistinguishable from an edit that
+    // changed nothing, so the drawer reads the cart's own copy.
+    await expect(page.getByTestId('cart-delete-tag')).toBeVisible()
+  })
+
+  test('unticking a deletion holds it back rather than calling it off', async ({ page }) => {
+    await page.goto('/', { waitUntil: 'networkidle' })
+    await page.evaluate(() =>
+      window.$nuxt.$store.dispatch('authoringCart/stageDeletion', {
+        type: 'node--article',
+        id: 'gone',
+      })
+    )
+    await page.evaluate(() => window.$nuxt.$store.dispatch('authoringCart/setDrawerOpen', true))
+
+    await page.getByTestId('cart-select-gone').click()
+
+    // Unticking means "not in this commit", not "forget I said it". It
+    // disappearing entirely read as a discard nobody asked for.
+    expect(await count(page)).toBe(0)
+    await expect(page.getByTestId('cart-delete-tag-draft')).toBeVisible()
+
+    // And it can be put back.
+    await page.getByTestId('cart-stage-gone').click()
+    expect(await count(page)).toBe(1)
+    await expect(page.getByTestId('cart-delete-tag')).toBeVisible()
+  })
+
   test('a visitor is offered no drawer at all', async ({ page }) => {
     await page.goto('/', { waitUntil: 'networkidle' })
     await expect(page.getByTestId('authoring-cart-toggle')).toHaveCount(0)

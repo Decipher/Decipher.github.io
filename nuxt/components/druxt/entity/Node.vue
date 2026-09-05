@@ -29,7 +29,7 @@
           :class="drafted ? 'border border-accent text-accent' : 'bg-accent text-accent-contrast'"
           :data-testid="drafted ? 'unstaged-badge' : 'staged-badge'"
         >
-          {{ deleted ? 'Deleting' : drafted ? 'Unstaged' : 'Staged' }}
+          {{ deleted ? (drafted ? 'Delete, unstaged' : 'Deleting') : drafted ? 'Unstaged' : 'Staged' }}
         </span>
         <span v-else aria-hidden="true"></span>
 
@@ -76,7 +76,12 @@
           A listing of articles with no titles is not a listing, and an author
           editing a title could not see it change.
         -->
-        <h2 v-if="showLabel" class="mb-2 text-lg" data-testid="entity-label">
+        <h2
+          v-if="showLabel"
+          class="mb-2 text-lg"
+          data-authoring-field="title"
+          data-testid="entity-label"
+        >
           <!--
             A teaser with no way through to the thing it is teasing is a dead
             end. On the full view there is nowhere to go, so it stays plain.
@@ -218,8 +223,9 @@ export default {
       return Boolean(this.draft)
     },
 
+    /** Staged for removal, or marked for it and not staged. */
     deleted() {
-      return Boolean((this.entry || {}).deleted)
+      return Boolean((this.entry || {}).deleted || (this.draft || {}).deleted)
     },
   },
 
@@ -313,10 +319,16 @@ export default {
 </script>
 
 <style>
-/* Briefly marked when the drawer points at it, so "Show" lands somewhere. */
-.authoring-entity.is-revealed {
-  outline: 2px solid rgb(var(--c-accent));
-  outline-offset: 4px;
+/*
+ * Briefly marked when the drawer points at it, so "Show" lands somewhere.
+ *
+ * Dashed, and on the field rather than the whole node wherever the field can be
+ * found: outlining an entire article to say "the image changed" is pointing at
+ * the room rather than the thing in it.
+ */
+.is-revealed {
+  outline: 2px dashed rgb(var(--c-accent));
+  outline-offset: 3px;
 }
 
 /*
