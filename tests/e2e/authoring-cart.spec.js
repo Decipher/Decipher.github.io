@@ -441,8 +441,9 @@ test.describe('adding content', () => {
     })
     await page.getByTestId('cart-preview-abc').click()
 
-    // A real width rather than a scale, so the site's own media queries decide
-    // the layout. A wide render zoomed down looks like a phone and is not one.
+    // The width is real, so the site's own media queries decide the layout. A
+    // narrow window scales the result down (see below) but never narrows it: a
+    // desktop render squeezed to 900px is a 900px layout, not a desktop one.
     await page.getByTestId('preview-width').selectOption({ label: 'Phone' })
     await expect(page.getByTestId('preview-width-note')).toContainText('375px')
     const frame = page.getByTestId('preview-frame')
@@ -451,6 +452,51 @@ test.describe('adding content', () => {
     // Free is the default, and returning to it is not a fixed size at all.
     await page.getByTestId('preview-width').selectOption({ label: 'Free' })
     await expect(page.getByTestId('preview-width-note')).toHaveCount(0)
+  })
+
+  test('a page wider than the window is scaled down to fit, not cut off', async ({ page }) => {
+    await page.setViewportSize({ width: 1000, height: 800 })
+    await page.goto('/', { waitUntil: 'networkidle' })
+    await page.getByTestId('authoring-edit-toggle').click()
+    await stage(page, {
+      type: 'node--article',
+      id: 'abc',
+      original: { title: 'Was' },
+      edited: { title: 'Is' },
+    })
+    await page.getByTestId('cart-preview-abc').click()
+    await page.getByTestId('preview-width').selectOption({ label: 'Desktop' })
+
+    // Laid out at 1440 and drawn smaller. Both halves matter: the first is what
+    // makes it a desktop preview, the second is what makes it visible.
+    const frame = page.getByTestId('preview-frame')
+    const size = () =>
+      frame.evaluate((el) => {
+        const canvas = el.closest('.overflow-auto')
+        return {
+          layout: el.offsetWidth,
+          drawn: Math.round(el.getBoundingClientRect().width),
+          room: canvas.clientWidth,
+          scrolls: canvas.scrollWidth > canvas.clientWidth + 2,
+        }
+      })
+    const fitted = await size()
+    expect(fitted.layout).toBe(1440)
+    expect(fitted.drawn).toBeLessThan(fitted.layout)
+    expect(fitted.drawn).toBeLessThanOrEqual(fitted.room)
+    expect(fitted.scrolls).toBe(false)
+
+    // And the amount it shrank by is a control, not just a consequence. Read
+    // rather than asserted, because it follows from whatever room the modal has.
+    const percent = Math.round((fitted.drawn / fitted.layout) * 100)
+    await expect(page.getByTestId('preview-zoom')).toContainText(`Fit (${percent}%)`)
+
+    await page.getByTestId('preview-zoom').selectOption('0.5')
+    expect(await size()).toMatchObject({ layout: 1440, drawn: 720, scrolls: false })
+
+    // Asking for full size is allowed, and then it does scroll.
+    await page.getByTestId('preview-zoom').selectOption('1')
+    expect(await size()).toMatchObject({ layout: 1440, drawn: 1440, scrolls: true })
   })
 
   test('the controls keep their own width whatever the page is set to', async ({ page }) => {
