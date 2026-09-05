@@ -88,12 +88,18 @@
               <span class="w-3 shrink-0 font-mono text-xs text-muted" aria-hidden="true">
                 {{ isExpanded(resource) ? '-' : '+' }}
               </span>
-              <!-- A deletion is not an edit, and must not read like one. -->
+              <!--
+                What will actually happen to this, taken from the request the
+                commit will make rather than described alongside it. Creating,
+                changing and removing read very differently to someone deciding
+                what to send.
+              -->
               <span
-                v-if="resource.deleted"
-                class="shrink-0 rounded bg-accent px-1.5 py-0.5 font-mono text-[0.625rem] uppercase tracking-eyebrow text-accent-contrast"
-                data-testid="cart-delete-tag"
-                >Delete</span
+                class="shrink-0 rounded px-1.5 py-0.5 font-mono text-[0.625rem] uppercase tracking-eyebrow"
+                :class="methodClass(resource)"
+                :title="`${requestMethod(resource)} request`"
+                :data-testid="`cart-method-${resource.id}`"
+                >{{ methodLabel(resource) }}</span
               >
               <span
                 class="truncate"
@@ -187,10 +193,10 @@
           />
           <span class="flex min-w-0 flex-1 items-baseline gap-2 truncate">
             <span
-              v-if="item.deleted"
-              class="shrink-0 rounded border border-accent px-1.5 py-0.5 font-mono text-[0.625rem] uppercase tracking-eyebrow text-accent"
-              data-testid="cart-delete-tag-draft"
-              >Delete</span
+              class="shrink-0 rounded border px-1.5 py-0.5 font-mono text-[0.625rem] uppercase tracking-eyebrow"
+              :class="item.deleted ? 'border-accent text-accent' : 'border-hairline text-muted'"
+              :data-testid="`cart-method-draft-${item.id}`"
+              >{{ methodLabel(item) }}</span
             >
             <span :class="item.deleted ? 'text-muted line-through' : 'text-ink'">
               {{ item.label }}
@@ -307,6 +313,7 @@ import {
   dependencyMap,
   exportCart,
   exportSummary,
+  requestMethod,
   requiredBy,
   tidyResource,
 } from '../lib/cart.mjs'
@@ -585,8 +592,23 @@ export default {
       this.$store.dispatch('authoringCart/setDrawerOpen', false)
     },
 
+    /** The verb the commit will use, and a word for it. */
+    methodLabel(resource) {
+      return { POST: 'New', DELETE: 'Delete', PATCH: 'Update' }[this.requestMethod(resource)]
+    },
+
+    requestMethod(resource) {
+      return requestMethod(resource)
+    },
+
+    methodClass(resource) {
+      if (resource.deleted) return 'bg-accent text-accent-contrast'
+      if (resource.isNew) return 'border border-accent text-accent'
+      return 'border border-hairline text-muted'
+    },
+
     fieldNames(resource) {
-      if (resource.deleted) return 'will be deleted'
+      if (resource.deleted) return ''
       const fields = Object.keys({ ...resource.attributes, ...resource.relationships })
       return fields.length ? fields.join(', ') : 'new'
     },
