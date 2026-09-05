@@ -34,6 +34,16 @@ concurrency:
 jobs:
   session:
     runs-on: ubuntu-latest
+    # Where the secrets below live, and the only thing keeping them off an
+    # arbitrary ref. A dispatch can name any branch or tag, and the workflow
+    # file is read from that ref too, so nothing written here can stop a
+    # modified copy of this job running: pinning the checkout to the default
+    # branch would not, because the pin would be the attacker's to remove.
+    #
+    # An environment is enforced by GitHub instead. Its deployment branch rules
+    # decide which refs may read its secrets, and a branch that simply drops
+    # this line gets nothing, because the secrets are not repository-wide.
+    environment: authoring
     # Above the longest session, so the job's own limit is a backstop for a
     # hang rather than the thing that ends a session.
     timeout-minutes: 90
@@ -63,12 +73,9 @@ jobs:
       - name: Install cloudflared
         # A Quick Tunnel needs no Cloudflare account and no stored credential,
         # which is why a fork of this repository can start a session without
-        # setting anything up.
-        run: |
-          curl -sSL -o /usr/local/bin/cloudflared \
-            https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64
-          sudo chmod +x /usr/local/bin/cloudflared
-          cloudflared --version
+        # setting anything up. Pinned and digest-checked by the script, because
+        # this binary runs in the same job as the secrets below.
+        run: scripts/install-cloudflared.sh
 
       - name: Run the session
         env:
