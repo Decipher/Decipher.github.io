@@ -41,19 +41,35 @@ drush('tome:export --yes');
 PASS('Exported.');
 
 TASK('Restoring the authoring infrastructure paths.');
-$baseline = array_values(array_filter(array_map('trim', explode("\n", (string) file_get_contents($baseline_file)))));
-foreach ($baseline as $path) {
+$baseline = read_baseline($baseline_file);
+$restored = 0;
+$kept = 0;
+foreach ($baseline as $path => $hash) {
+  // Only subtract a file that still looks the way it did when the baseline was
+  // taken. Provisioning moves real content as well as infrastructure, so the
+  // list alone cannot tell the two apart: what tells them apart is whether the
+  // session changed the file. One that changed is somebody's edit, and removing
+  // it would leave a pull request with nothing in it and no error to explain it.
+  $current = is_file('../' . $path) ? (string) sha1_file('../' . $path) : '-';
+  if ($hash !== NULL && $current !== $hash) {
+    $kept++;
+    continue;
+  }
+
   $escaped = escapeshellarg($path);
   $out = [];
   exec('git -C .. ls-files --error-unmatch ' . $escaped . ' 2>/dev/null', $out, $tracked);
   if ($tracked === 0) {
     exec('git -C .. checkout -- ' . $escaped . ' 2>/dev/null');
   }
-  elseif (file_exists('../' . $path)) {
+  elseif (is_file('../' . $path)) {
+    // `is_file`, not `file_exists`: a baseline written before
+    // `--untracked-files=all` can name a directory, and unlink refuses one.
     unlink('../' . $path);
   }
+  $restored++;
 }
-PASS('%s infrastructure path(s) restored.', (string) count($baseline));
+PASS('%s infrastructure path(s) restored, %s left as session changes.', (string) $restored, (string) $kept);
 
 TASK('Removing exported OAuth tokens.');
 $tokens = discard_oauth_tokens();
@@ -64,7 +80,7 @@ PASS('%s token file(s) removed.', (string) $tokens);
 // added or removed content the index has to move with it, so re-export just
 // that one file by asking Tome for it again after the restore.
 TASK('Reconciling the content index.');
-reconcile_index($baseline);
+reconcile_index(array_keys($baseline));
 PASS('Content index reconciled.');
 
 $changes = trim((string) shell_exec('git -C .. status --porcelain -- drupal/config drupal/content drupal/files 2>/dev/null'));
@@ -106,6 +122,32 @@ function discard_oauth_tokens(): int {
     }
   }
   return $removed;
+}
+
+/**
+ * The baseline, as `path => hash`.
+ *
+ * The hash is what the file looked like when the baseline was taken, so the
+ * export can tell a file the session changed from one it did not.
+ */
+function read_baseline(string $file): array {
+  $baseline = [];
+  foreach (explode("\n", (string) file_get_contents($file)) as $line) {
+    $line = trim($line);
+    if ($line === '') {
+      continue;
+    }
+    // `hash<TAB>path`. A line with no tab is a baseline written before hashes
+    // were recorded: no hash means subtract it unconditionally, which is what
+    // that baseline meant when it was written.
+    if (!str_contains($line, "\t")) {
+      $baseline[$line] = NULL;
+      continue;
+    }
+    [$hash, $path] = explode("\t", $line, 2);
+    $baseline[$path] = $hash;
+  }
+  return $baseline;
 }
 
 /**
