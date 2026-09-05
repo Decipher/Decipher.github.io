@@ -132,3 +132,32 @@ export function pullRequestBody(exported) {
     'and commits the exported content here, so the diff below is what changes.',
   ].join('\n')
 }
+
+/**
+ * Where a GitHub sign-in is kept.
+ *
+ * `sessionStorage`, like the Drupal token: closing the tab ends it. A
+ * repository-scoped token in a browser is a real thing to be careful with, so it
+ * does not outlive the session that asked for it.
+ *
+ * Here rather than in the plugin that writes it, because the plugin that reads
+ * the session record loads first and cannot ask it.
+ */
+export const TOKEN_KEY = 'authoring.github'
+
+export function readStoredToken(storage) {
+  try {
+    return JSON.parse(storage.getItem(TOKEN_KEY)) || null
+  } catch {
+    return null
+  }
+}
+
+export function writeStoredToken(storage, value) {
+  try {
+    if (value) storage.setItem(TOKEN_KEY, JSON.stringify(value))
+    else storage.removeItem(TOKEN_KEY)
+  } catch {
+    // Not fatal: the sign-in simply does not survive a reload.
+  }
+}

@@ -96,7 +96,19 @@ export default {
     builtAt: new Date().toISOString(),
     authoring: {
       // Where a session provider publishes the live backend, if anywhere.
-      sessionRecordUrl: process.env.SESSION_RECORD_URL || '',
+      //
+      // Derived from the repository when nothing sets it, because a build that
+      // does not know where sessions publish cannot ever find one: it returns
+      // early before fetching anything, and the interface sits on "Building..."
+      // about a backend that came up minutes ago. The deploy workflow set no
+      // such variable, so that was every deployed build.
+      sessionRecordUrl:
+        process.env.SESSION_RECORD_URL ||
+        (process.env.CONTENT_REPOSITORY || process.env.GITHUB_REPOSITORY
+          ? `https://raw.githubusercontent.com/${
+              process.env.CONTENT_REPOSITORY || process.env.GITHUB_REPOSITORY
+            }/${process.env.SESSION_BRANCH || 'session'}/session.json`
+          : ''),
       // The OAuth consumer. Provisioning pins this so it is stable across
       // sessions, which is the whole reason the frontend can hold it at build
       // time. The default matches `.devtools/provision-authoring`, so a build

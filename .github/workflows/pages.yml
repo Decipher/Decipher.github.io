@@ -69,6 +69,12 @@ jobs:
           # A user site serves from the domain root, so no base path. A project
           # site would need ROUTER_BASE set to /<repo>/.
           ROUTER_BASE: /
+          # Which repository the deployed site belongs to, so it knows where a
+          # session publishes itself and where a change request goes. Without it
+          # the build has no session record address at all, gives up before
+          # fetching anything, and no deployed site could ever find a backend
+          # however long it waited.
+          CONTENT_REPOSITORY: ${{ github.repository }}
         run: npm run generate
 
       - name: Check the build produced something

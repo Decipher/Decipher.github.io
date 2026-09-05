@@ -15,25 +15,10 @@
 import Vue from 'vue'
 
 import { checkAccess, findRun, runIsFinished, startBackend } from '../lib/github-client.mjs'
+import { readStoredToken, writeStoredToken } from '../lib/github.mjs'
 
-const TOKEN_KEY = 'authoring.github'
-
-function readStored() {
-  try {
-    return JSON.parse(window.sessionStorage.getItem(TOKEN_KEY)) || null
-  } catch {
-    return null
-  }
-}
-
-function writeStored(value) {
-  try {
-    if (value) window.sessionStorage.setItem(TOKEN_KEY, JSON.stringify(value))
-    else window.sessionStorage.removeItem(TOKEN_KEY)
-  } catch {
-    // Not fatal: the sign-in simply does not survive a reload.
-  }
-}
+const readStored = () => readStoredToken(window.sessionStorage)
+const writeStored = (value) => writeStoredToken(window.sessionStorage, value)
 
 export default function (context, inject) {
   const config = (context.$config && context.$config.authoring) || {}
