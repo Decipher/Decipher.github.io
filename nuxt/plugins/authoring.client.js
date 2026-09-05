@@ -13,6 +13,8 @@
 
 import Vue from 'vue'
 
+import { asResource, previewsFor } from '../lib/preview.mjs'
+
 import {
   checkConformance,
   normaliseUrl,
@@ -157,6 +159,69 @@ function whenReady(fn) {
   else flush()
 }
 
+/**
+ * Put content that exists only in the cart into the listings that would show it.
+ *
+ * Two steps, because Druxt renders a listing's rows by uuid: the resource is
+ * seeded into Druxt's own store so `DruxtEntity` finds it in cache and never
+ * asks the backend for a uuid it has never heard of, and then added to the
+ * results of any view already showing that type. From there it renders through
+ * the same wrapper as everything else and gets its label, badges and controls
+ * for nothing.
+ *
+ * What this does not do is decide whether a view would really return it. That
+ * means evaluating the view's filters against the entity, which is Drupal's
+ * job. Matching the type a listing is already showing is right for the common
+ * case and wrong for a filtered view, so new content is marked unpublished
+ * wherever it appears: it reads as an intention, not as a claim about what is
+ * live.
+ */
+function previewStagedContent(store) {
+  const app = window.$nuxt
+  if (!app || !store) return
+
+  const staged = store.getters['authoringCart/stagedNew'] || []
+  const druxt = store.state.druxt
+  if (druxt) {
+    for (const resource of staged) {
+      if (!druxt.resources[resource.type]) Vue.set(druxt.resources, resource.type, {})
+      // Keyed by language prefix, which is `undefined` for a site with one
+      // language: the same key `getResource` looks under.
+      Vue.set(druxt.resources[resource.type], resource.id, { undefined: asResource(resource) })
+    }
+  }
+
+  const visit = (vm) => {
+    // `results` is a computed over `resource.data`, so the rows have to be put
+    // where they are read from rather than where they are read.
+    if (vm.$options.name === 'DruxtView' && vm.resource && Array.isArray(vm.resource.data)) {
+      const rows = vm.resource.data
+      const previews = previewsFor(rows, staged)
+      const already = new Set(rows.map((row) => row.id))
+      const missing = previews.filter((resource) => !already.has(resource.id))
+      // Removed as well as added: discarding new content has to take it back
+      // off the page it was put on.
+      const kept = rows.filter((row) => !row.__staged || staged.some((s) => s.id === row.id))
+
+      if (missing.length || kept.length !== rows.length) {
+        vm.resource = {
+          ...vm.resource,
+          data: [
+            ...missing.map((resource) => ({
+              type: resource.type,
+              id: resource.id,
+              __staged: true,
+            })),
+            ...kept,
+          ],
+        }
+      }
+    }
+    vm.$children.forEach(visit)
+  }
+  visit(app)
+}
+
 function refreshFromBackend() {
   // `window.$nuxt`, not the plugin's `context.app`: the refresh walks mounted
   // components, and the context's app is the root options object rather than
@@ -264,6 +329,15 @@ export default async function (context, inject) {
   // though it held none.
   if (context.store) {
     whenReady(() => context.store.dispatch('authoringCart/restore'))
+
+    // Whenever the cart changes, and once the app is up. Cheap: it walks the
+    // mounted components and only writes when something is actually missing.
+    context.store.subscribe((mutation) => {
+      if (String(mutation.type).startsWith('authoringCart/')) {
+        whenReady(() => previewStagedContent(context.store))
+      }
+    })
+    whenReady(() => previewStagedContent(context.store))
   }
 
   const params = new URLSearchParams(window.location.search)

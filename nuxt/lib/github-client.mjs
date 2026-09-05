@@ -211,3 +211,37 @@ export async function startBackend({ repository, token, workflow, ref, minutes, 
     return { ok: false, reason: error.message }
   }
 }
+
+/**
+ * Find the run a dispatch started.
+ *
+ * `workflow_dispatch` answers 204 with no body, so there is no run id to
+ * follow: the only way to find it is to ask what has started since. Matched on
+ * creation time rather than on being the newest, so a run somebody else started
+ * a minute earlier is not mistaken for this one.
+ */
+export async function findRun({ repository, token, workflow, since, fetch: request }) {
+  try {
+    const url =
+      `${apiUrl(repository)}/actions/workflows/${encodeURIComponent(workflow)}/runs` +
+      '?event=workflow_dispatch&per_page=5'
+    const body = await call(request, url, token)
+    const runs = (body.workflow_runs || []).filter(
+      (run) => !since || new Date(run.created_at).getTime() >= new Date(since).getTime() - 60000
+    )
+    if (!runs.length) return { ok: true, run: null }
+
+    const run = runs[0]
+    return {
+      ok: true,
+      run: { id: run.id, url: run.html_url, status: run.status, conclusion: run.conclusion },
+    }
+  } catch (error) {
+    return { ok: false, reason: error.message }
+  }
+}
+
+/** Whether a run is still going, and so still worth waiting for. */
+export function runIsFinished(run) {
+  return Boolean(run) && run.status !== 'queued' && run.status !== 'in_progress'
+}

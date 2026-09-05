@@ -86,6 +86,23 @@
             >
               Show
             </button>
+            <button
+              type="button"
+              class="shrink-0 font-mono text-[0.6875rem] uppercase tracking-eyebrow text-muted underline hover:text-accent"
+              :data-testid="`cart-preview-${resource.id}`"
+              @click="preview(resource)"
+            >
+              Preview
+            </button>
+            <button
+              v-if="routeFor(resource)"
+              type="button"
+              class="shrink-0 font-mono text-[0.6875rem] uppercase tracking-eyebrow text-muted underline hover:text-accent"
+              :data-testid="`cart-go-${resource.id}`"
+              @click="go(resource)"
+            >
+              Go
+            </button>
           </div>
 
           <p
@@ -220,6 +237,13 @@
       {{ blockedReason }}
     </p>
 
+    <AuthoringPreview
+      v-if="previewing"
+      :type="previewing.type"
+      :uuid="previewing.id"
+      @close="previewing = null"
+    />
+
     <!--
       The second destination. A backend is for validating against a real site;
       this is for getting the work reviewed and published, and needs neither a
@@ -256,7 +280,15 @@ export default {
   name: 'AuthoringCart',
 
   data() {
-    return { result: null, expanded: {}, refusal: null, opening: false, pullRequest: null, prError: null }
+    return {
+      result: null,
+      expanded: {},
+      refusal: null,
+      opening: false,
+      pullRequest: null,
+      prError: null,
+      previewing: null,
+    }
   },
 
   computed: {
@@ -410,6 +442,34 @@ export default {
 
     discardDraft(item) {
       this.$store.dispatch('authoringCart/clearDraft', { type: item.type, id: item.id })
+    },
+
+    /** As the site will render it, in whichever display is asked for. */
+    preview(resource) {
+      this.refusal = null
+      this.previewing = { type: resource.type, id: resource.id }
+    },
+
+    /**
+     * Where this content lives, if it has somewhere.
+     *
+     * New content has no route until it exists, so the control is not offered
+     * for it rather than offered and broken.
+     */
+    routeFor(resource) {
+      if (resource.isNew) return null
+      const attributes = resource.attributes || {}
+      const alias = ((attributes.path || {}).alias || '').trim()
+      if (alias) return alias
+      const onPage = document.querySelector(
+        `[data-authoring-entity="${resource.type}:${resource.id}"] [data-testid="entity-link"]`
+      )
+      return onPage ? onPage.getAttribute('href') : null
+    },
+
+    go(resource) {
+      const route = this.routeFor(resource)
+      if (route) this.$router.push(route)
     },
 
     /**
