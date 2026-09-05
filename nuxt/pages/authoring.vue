@@ -4,9 +4,11 @@
     <h1 class="mb-6 text-2xl">Edit this site</h1>
 
     <p class="mb-6 max-w-prose text-body">
-      Turn on <strong>Edit</strong> in the header. Every article below gains an edit
-      control, and changes are staged rather than saved, so this works whether or
-      not a backend is connected. Commit them from the cart once one is.
+      Turn on <strong>Edit</strong> in the header. Every article below gains an
+      edit control, and so does anything else on the site: this page is only a
+      list of what exists. Changes are staged rather than saved, so this works
+      whether or not a backend is connected. Commit them from the cart once one
+      is.
     </p>
 
     <AuthoringAdd class="mb-8" />
@@ -23,13 +25,16 @@
     </p>
 
     <ul v-else class="space-y-6">
-      <li v-for="article in articles" :key="article.id">
-        <AuthoringEditable type="node--article" :uuid="article.id">
-          <article class="rounded border border-hairline p-4">
-            <h2 class="mb-2 text-lg">{{ article.attributes.title }}</h2>
-            <p class="text-body">{{ summarise(article) }}</p>
-          </article>
-        </AuthoringEditable>
+      <li v-for="article in articles" :key="article.id" class="rounded border border-hairline p-4">
+        <h2 class="mb-2 text-lg">{{ article.attributes.title }}</h2>
+        <!--
+          Rendered by Druxt rather than by hand, so this listing goes through
+          the same wrapper the rest of the site does and gets the edit control,
+          the staged and unstaged badges and the preview of both for free. The
+          hand-written version had none of that, and quietly showed the backend
+          copy of content the author had already changed.
+        -->
+        <DruxtEntity type="node--article" :uuid="article.id" mode="teaser" />
       </li>
     </ul>
   </div>
@@ -92,14 +97,6 @@ export default {
     // reload to notice.
     backendUrl() {
       this.$fetch()
-    },
-  },
-
-  methods: {
-    summarise(article) {
-      const body = (article.attributes.body || {}).value || ''
-      const text = body.replace(/<[^>]+>/g, '').trim()
-      return text.length > 160 ? `${text.slice(0, 160)}...` : text || 'No body yet.'
     },
   },
 }
