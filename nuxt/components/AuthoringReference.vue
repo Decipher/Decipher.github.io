@@ -8,7 +8,13 @@
         class="flex items-center gap-1 rounded border border-hairline bg-elevated px-2 py-1 text-sm"
         data-testid="reference-selected"
       >
-        <span>{{ item.label }}</span>
+        <span v-if="item.label !== item.id">{{ item.label }}</span>
+        <span
+          v-else
+          class="text-muted"
+          :title="`Could not look up ${item.id}. It may need signing in to read.`"
+          >Unnamed {{ item.type.split('--')[0].replace('_', ' ') }}</span
+        >
         <button
           type="button"
           class="text-muted hover:text-accent"
@@ -32,11 +38,12 @@
         :aria-expanded="String(Boolean(results.length))"
         data-testid="reference-input"
         @input="search"
+        @keydown.enter.prevent="createFromQuery"
         @keydown.escape="results = []"
       />
 
       <ul
-        v-if="results.length"
+        v-if="results.length || offerToCreate"
         class="absolute z-10 mt-1 max-h-64 w-full overflow-y-auto rounded border border-hairline bg-surface shadow-lg"
         role="listbox"
       >
@@ -48,6 +55,16 @@
             @click="choose(item)"
           >
             {{ item.label }}
+          </button>
+        </li>
+        <li v-if="offerToCreate">
+          <button
+            type="button"
+            class="block w-full border-t border-hairline px-3 py-2 text-left text-sm text-accent hover:bg-elevated"
+            data-testid="reference-create"
+            @click="createFromQuery"
+          >
+            Create &ldquo;{{ query.trim() }}&rdquo;
           </button>
         </li>
       </ul>
@@ -73,7 +90,9 @@
  * entity already and does not need looking up.
  */
 import {
+  autoCreateTarget,
   autocompleteUrl,
+  labelFieldFor,
   labelOf,
   labelsUrl,
   targetResourceTypes,
@@ -90,7 +109,7 @@ export default {
   },
 
   data() {
-    return { query: '', results: [], status: null, selected: [], timer: null }
+    return { query: '', results: [], status: null, selected: [], timer: null, index: {} }
   },
 
   computed: {
@@ -107,6 +126,25 @@ export default {
       const data = (this.value || {}).data
       if (!data) return []
       return Array.isArray(data) ? data : [data]
+    },
+
+    /** The resource type a typed-in value would be created as, if any. */
+    createAs() {
+      return autoCreateTarget(this.schema, this.index)
+    },
+
+    /**
+     * Offer to create only what is not already there.
+     *
+     * A field that can invent its own values still should not offer to invent
+     * one that exists, or the same tag ends up in the vocabulary twice with
+     * nothing to tell them apart.
+     */
+    offerToCreate() {
+      const query = this.query.trim()
+      if (!query || !this.createAs) return false
+      const existing = [...this.results, ...this.selected]
+      return !existing.some((item) => item.label.toLowerCase() === query.toLowerCase())
     },
   },
 
@@ -168,8 +206,14 @@ export default {
     async run() {
       const query = this.query.trim()
       this.results = []
-      if (query.length < 2) {
+      if (!query.length) {
         this.status = null
+        return
+      }
+      if (query.length < 2) {
+        // Said out loud. A search box that answers nothing looks broken, and
+        // the reason it answered nothing is not guessable.
+        this.status = 'Keep typing to search.'
         return
       }
       if (!this.backendUrl) {
@@ -177,7 +221,8 @@ export default {
         return
       }
 
-      const types = targetResourceTypes(this.schema, this.current, await this.index())
+      this.index = await this.jsonapiIndex()
+      const types = targetResourceTypes(this.schema, this.current, this.index)
       if (!types.length) {
         this.status = 'This field does not say what it can reference.'
         return
@@ -241,10 +286,30 @@ export default {
     },
 
     /**
+     * Reference something that does not exist yet.
+     *
+     * Staged rather than created: the new term goes into the cart beside the
+     * change that references it, so an author with no backend can still tag
+     * something, and nothing is written to the site until they commit. The cart
+     * sends the term first, because the reference means nothing before it.
+     */
+    async createFromQuery() {
+      const label = this.query.trim()
+      if (!label || !this.createAs) return
+
+      const id = await this.$store.dispatch('authoringCart/stageNew', {
+        type: this.createAs,
+        attributes: { [labelFieldFor(String(this.createAs).split('--')[0])]: label },
+      })
+
+      this.choose({ type: this.createAs, id, label })
+    },
+
+    /**
      * The JSON:API index, for finding a target's bundles when the field allows
      * any of them. Keyed by language prefix, so the map itself is one level in.
      */
-    async index() {
+    async jsonapiIndex() {
       try {
         return (await this.$druxt.getIndex()) || {}
       } catch {
