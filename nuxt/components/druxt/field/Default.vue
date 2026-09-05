@@ -80,8 +80,8 @@
       <!-- Rich text -->
       <AuthoringWysiwyg
         v-else-if="isTypeWysiwyg"
-        v-model="model.value"
-        :format="model.format"
+        v-model="richText"
+        :format="richTextFormat"
       />
 
       <!-- Select -->
@@ -239,6 +239,26 @@ export default {
         this.schema.type
       )
     },
+    /**
+     * Rich text, via the field's whole value rather than one property of it.
+     *
+     * A field that has never been filled in has no value object at all, so
+     * reading `model.value` off it throws during render and takes the form with
+     * it. That is every field on a create form.
+     */
+    richText: {
+      get() {
+        return (this.model || {}).value || ''
+      },
+      set(value) {
+        this.model = { ...(this.model || {}), value }
+      },
+    },
+
+    richTextFormat() {
+      return (this.model || {}).format || undefined
+    },
+
     isTypeDate() {
       return ['datetime_timestamp', 'datetime_default'].includes(this.schema.type)
     },

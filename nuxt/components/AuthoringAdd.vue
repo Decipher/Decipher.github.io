@@ -27,7 +27,30 @@
     <!-- The new thing's form, in place, as soon as it is staged. -->
     <div v-if="staged" class="mt-4 rounded border border-accent p-4">
       <p class="eyebrow mb-3">Editing new {{ staged.type }}</p>
-      <AuthoringEntityForm :type="staged.type" :uuid="staged.id" @staged="onStaged" />
+      <!--
+        Given the staged resource rather than left to fetch one. Its id is
+        client-generated, so the backend answers 404 and the form comes up with
+        no fields on it.
+      -->
+      <AuthoringEntityForm
+        :type="staged.type"
+        :uuid="staged.id"
+        :value="blank"
+        @staged="onStaged"
+      />
+      <!--
+        Starting something is not committing to finishing it. Without this the
+        only way out of a new article was to commit it or to find it in the
+        drawer and work out which staged resource it was.
+      -->
+      <button
+        type="button"
+        class="mt-3 rounded border border-hairline px-3 py-1.5 text-sm text-body hover:border-accent hover:text-accent"
+        data-testid="authoring-add-cancel"
+        @click="cancel"
+      >
+        Cancel
+      </button>
     </div>
   </div>
 </template>
@@ -63,6 +86,17 @@ export default {
   },
 
   computed: {
+    /** An empty resource of the staged type, for the form to fill in. */
+    blank() {
+      if (!this.staged) return undefined
+      return {
+        type: this.staged.type,
+        id: this.staged.id,
+        attributes: { ...(this.staged.attributes || {}) },
+        relationships: { ...(this.staged.relationships || {}) },
+      }
+    },
+
     editing() {
       return this.$store.getters['authoringCart/editing']
     },
@@ -86,6 +120,22 @@ export default {
 
     onStaged() {
       this.message = 'Saved to the cart. Commit it when a backend is connected.'
+    },
+
+    /**
+     * Abandon content that was started and not wanted.
+     *
+     * The staged resource goes with it. Leaving it behind would put a nameless
+     * article in the drawer, and the author would have to work out which of the
+     * staged resources was the one they had already decided against.
+     */
+    cancel() {
+      this.$store.dispatch('authoringCart/discardOne', {
+        type: this.staged.type,
+        id: this.staged.id,
+      })
+      this.stagedId = null
+      this.message = null
     },
   },
 }
