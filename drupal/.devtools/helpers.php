@@ -481,3 +481,85 @@ if (!function_exists('QuickstartServerlessDevTools\quit') && !class_exists('PHPU
 
 }
 // @codeCoverageIgnoreEnd
+
+/**
+ * Record what an export writes before anybody has changed anything.
+ *
+ * Used by two paths. An authoring session enables simple_oauth and consumers,
+ * which creates entities the site did not have:
+ * a default consumer, an OAuth scope, token bundles, a JWKS path alias. Tome
+ * exports on save, so all of them land in `config/` and `content/`.
+ *
+ * They must not reach a content pull request. They are session infrastructure,
+ * they are recreated on every provision, and `consumers` and `simple_oauth`
+ * both give their entities a fresh random UUID each time, so committing them
+ * would add new files on every single session.
+ *
+ * A change request job enables nothing, but provisioning still writes: installing
+ * saves `system.site`, and Tome exports it.
+ *
+ * `drupal/files` is watched too, because provisioning deletes the committed
+ * `files/public/.htaccess`. That is upstream starterkit behaviour, not
+ * something authoring causes, but it would show up as a deletion in every
+ * session's pull request all the same.
+ *
+ * Rather than hardcode a list of what to ignore, which would silently rot the
+ * first time either module adds an entity, this exports once now and records
+ * whatever moved.
+ *
+ * What moved is not only infrastructure. Provisioning touches real content too,
+ * and a run against a site with content records that content as well. Subtracting
+ * a path because it is in this list would then delete a person's edit to it, and
+ * the pull request would come out empty with nothing to say why. So each path is
+ * recorded with the hash it had here, and the export only subtracts a file that
+ * still has that hash. A file the session changed no longer matches and is left
+ * alone, whatever put it in the list.
+ */
+function record_infrastructure_baseline(): void {
+  drush('tome:export --yes');
+
+  // `--untracked-files=all`, or git reports a new directory as one entry with a
+  // trailing slash instead of the files in it. The baseline is then a path that
+  // cannot be restored or removed as a file, and the restore warns and skips it.
+  $status = shell_exec('git -C .. status --porcelain --untracked-files=all -- drupal/config drupal/content drupal/files 2>/dev/null');
+  $paths = [];
+  $lines = [];
+  foreach (explode("\n", (string) $status) as $line) {
+    $line = trim($line);
+    if ($line === '') {
+      continue;
+    }
+    // "XY path" - take everything after the two-character status and space.
+    $path = substr($line, strpos($line, ' ') + 1);
+    $paths[] = $path;
+    // A deleted file has no hash. `-` says so, and reads as "no content here to
+    // compare", which is what the export's check needs to know.
+    $hash = is_file('../' . $path) ? (string) sha1_file('../' . $path) : '-';
+    $lines[] = $hash . "\t" . $path;
+  }
+
+  file_put_contents(__DIR__ . '/.session-infra', implode("\n", $lines) . (($lines === []) ? '' : "\n"));
+
+  // Put the working tree back. The database is the running site; these files
+  // are only the export of it, so discarding them changes nothing that is
+  // serving, and it leaves a clean tree for the session to diff against.
+  restore_paths($paths);
+}
+
+/**
+ * Restore a set of exported paths to their committed state.
+ */
+function restore_paths(array $paths): void {
+  foreach ($paths as $path) {
+    $escaped = escapeshellarg($path);
+    // Untracked files have nothing to restore to, so remove them instead.
+    exec('git -C .. ls-files --error-unmatch ' . $escaped . ' 2>/dev/null', $out, $tracked);
+    if ($tracked === 0) {
+      exec('git -C .. checkout -- ' . $escaped . ' 2>/dev/null');
+    }
+    elseif (is_file('../' . $path)) {
+      unlink('../' . $path);
+    }
+    $out = [];
+  }
+}
