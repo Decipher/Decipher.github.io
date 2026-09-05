@@ -21,8 +21,8 @@
         "drupal/core-composer-scaffold": "~11",
         "drupal/core-project-message": "~11",
         "drupal/core-recommended": "~11",
-        "drupal/decoupled_router": "^2.0 <2.0.7",
-        "drupal/druxt": "^1.2",
+        "drupal/decoupled_router": "^2.0",
+        "drupal/druxt": "^1.2.2",
         "drupal/simple_oauth": "^6.1",
         "drupal/tome": "^1.16",
         "drush/drush": "^13"
@@ -106,9 +106,6 @@
             ]
         },
         "patches": {
-            "drupal/druxt": {
-                "Fix ViewsPathTranslatorSubscriber crash on views with no JSON:API route": "patches/druxt-views-path-translator-route-name.patch"
-            },
             "drupal/tome": {
                 "Fix subprocess commands built with a joined string, not an argv array": "patches/tome-process-array-not-string.patch",
                 "Declare normalizer supported types so entity-specific normalizers are used": "patches/tome-normalizer-supported-types.patch"
