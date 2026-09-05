@@ -10,6 +10,7 @@ import test from 'node:test'
 import {
   cartKey,
   changedFields,
+  commitOrder,
   deepEqual,
   exportCart,
   exportSummary,
@@ -146,4 +147,163 @@ test('the summary says what changed', () => {
     'chore(content): edit 1 entity (media)'
   )
   assert.equal(exportSummary({}), 'chore(content): no changes')
+})
+
+// Staging twice, where the second edit puts a field back the way it was.
+//
+// A staged edit is a delta, so a reverted field simply stops appearing in it.
+// Merging the new delta on top of the old one then keeps the abandoned value
+// forever: the form shows the original, the cart holds the edit, and committing
+// writes back a change the author cannot see and did not ask for.
+
+test('a field put back the way it was stops being staged', () => {
+  const first = mergeEntry(null, {
+    type: 'node--article',
+    id: 'a',
+    attributes: { title: 'Edited', body: { value: 'Also edited' } },
+  })
+
+  // Second pass: the author reverted the title, so it is not in the delta,
+  // but the body edit stands.
+  const second = mergeEntry(
+    first,
+    { type: 'node--article', id: 'a', attributes: { body: { value: 'Also edited' } } },
+    { attributes: ['title', 'body'] }
+  )
+
+  assert.deepEqual(Object.keys(second.attributes), ['body'])
+  assert.equal(second.attributes.title, undefined)
+})
+
+test('a field the form never showed stays staged', () => {
+  const first = mergeEntry(null, {
+    type: 'node--article',
+    id: 'a',
+    attributes: { title: 'Edited' },
+  })
+
+  // A different form, without a title on it. Absent is not the same as
+  // reverted, and dropping it would lose an edit the author made elsewhere.
+  const second = mergeEntry(
+    first,
+    { type: 'node--article', id: 'a', attributes: { body: { value: 'New' } } },
+    { attributes: ['body'] }
+  )
+
+  assert.equal(second.attributes.title, 'Edited')
+  assert.deepEqual(second.attributes.body, { value: 'New' })
+})
+
+test('a relationship put back the way it was stops being staged', () => {
+  const first = mergeEntry(null, {
+    type: 'node--article',
+    id: 'a',
+    relationships: { field_tags: { data: [{ type: 'taxonomy_term--tags', id: '1' }] } },
+  })
+
+  const second = mergeEntry(
+    first,
+    { type: 'node--article', id: 'a', relationships: {} },
+    { relationships: ['field_tags', 'uid'] }
+  )
+
+  assert.deepEqual(second.relationships, {})
+})
+
+test('without a considered list nothing is dropped', () => {
+  // Older callers, and the new-content path, pass no list. Keeping everything
+  // is the safe reading: it is what the cart did before.
+  const first = mergeEntry(null, { type: 'node--article', id: 'a', attributes: { title: 'X' } })
+  const second = mergeEntry(first, { type: 'node--article', id: 'a', attributes: {} })
+  assert.equal(second.attributes.title, 'X')
+})
+
+// What Drupal computes is not the author's to send back.
+//
+// A text field arrives as `{ value, format, processed }`. `processed` is the
+// filtered HTML Drupal made from `value`, so a staged copy of it is a rendering
+// of the text as it was *before* the edit. Anything displaying the field
+// prefers `processed`, so keeping it means an edit that stages correctly,
+// commits correctly, and shows the old text on the page.
+
+test('a staged text field drops the rendering Drupal made of it', () => {
+  const staged = changedFields(
+    { body: { value: 'old', format: 'basic_html', processed: '<p>old</p>' } },
+    { body: { value: 'new', format: 'basic_html', processed: '<p>old</p>' } }
+  )
+
+  assert.deepEqual(staged.body, { value: 'new', format: 'basic_html' })
+  assert.ok(!('processed' in staged.body))
+})
+
+test('multi-value fields drop it too', () => {
+  const staged = changedFields(
+    { field_x: [{ value: 'a', processed: '<p>a</p>' }] },
+    { field_x: [{ value: 'b', processed: '<p>a</p>' }] }
+  )
+  assert.deepEqual(staged.field_x, [{ value: 'b' }])
+})
+
+test('a plain value is left alone', () => {
+  const staged = changedFields({ title: 'old' }, { title: 'new' })
+  assert.equal(staged.title, 'new')
+})
+
+// The order staged resources are sent in.
+//
+// A tag created while writing an article is two staged resources: the term, and
+// the article that now references it. Sent the other way round, the article
+// references a term the backend has never heard of, and the edit is rejected
+// for a reason that has nothing to do with what the author did.
+
+test('a referenced resource is sent before the one referencing it', () => {
+  const term = {
+    type: 'taxonomy_term--tags',
+    id: 'new-term',
+    isNew: true,
+    attributes: { name: 'Sourdough' },
+  }
+  const article = {
+    type: 'node--article',
+    id: 'article',
+    relationships: { field_tags: { data: [{ type: 'taxonomy_term--tags', id: 'new-term' }] } },
+  }
+
+  // Given in the wrong order on purpose: the cart is keyed by what was staged
+  // first, and the article is usually staged before its new tag.
+  assert.deepEqual(
+    commitOrder([article, term]).map((r) => r.id),
+    ['new-term', 'article']
+  )
+})
+
+test('a chain of new references comes out in order', () => {
+  const a = { type: 't--t', id: 'a' }
+  const b = { type: 't--t', id: 'b', relationships: { r: { data: { type: 't--t', id: 'a' } } } }
+  const c = { type: 'n--n', id: 'c', relationships: { r: { data: { type: 't--t', id: 'b' } } } }
+  assert.deepEqual(
+    commitOrder([c, b, a]).map((r) => r.id),
+    ['a', 'b', 'c']
+  )
+})
+
+test('references to things not in the cart are ignored', () => {
+  // Most references are to content that already exists, and waiting for it
+  // would mean never sending anything.
+  const article = {
+    type: 'node--article',
+    id: 'article',
+    relationships: { uid: { data: { type: 'user--user', id: 'someone-real' } } },
+  }
+  assert.deepEqual(
+    commitOrder([article]).map((r) => r.id),
+    ['article']
+  )
+})
+
+test('two resources referencing each other still commit', () => {
+  // A stalled commit is recoverable. A hung browser is not.
+  const a = { type: 't--t', id: 'a', relationships: { r: { data: { type: 't--t', id: 'b' } } } }
+  const b = { type: 't--t', id: 'b', relationships: { r: { data: { type: 't--t', id: 'a' } } } }
+  assert.equal(commitOrder([a, b]).length, 2)
 })

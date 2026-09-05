@@ -45,10 +45,32 @@ export function changedFields(original = {}, edited = {}) {
   const changed = {}
   for (const [field, value] of Object.entries(edited)) {
     if (!deepEqual(original[field], value)) {
-      changed[field] = value
+      changed[field] = withoutComputed(value)
     }
   }
   return changed
+}
+
+/**
+ * Properties Drupal computes, which are never the author's to send back.
+ *
+ * A text field arrives as `{ value, format, processed }`, where `processed` is
+ * the filtered HTML Drupal rendered from `value`. Keeping it means staging a
+ * rendering of the text as it was before the edit, which is stale the moment
+ * anything is typed, and which anything displaying the field prefers over the
+ * value the author actually wrote. So an edit would stage correctly, commit
+ * correctly, and show the old text on the page.
+ */
+const COMPUTED_PROPERTIES = ['processed']
+
+export function withoutComputed(value) {
+  if (Array.isArray(value)) return value.map(withoutComputed)
+  if (!value || typeof value !== 'object') return value
+  const kept = {}
+  for (const [key, item] of Object.entries(value)) {
+    if (!COMPUTED_PROPERTIES.includes(key)) kept[key] = item
+  }
+  return kept
 }
 
 /** Structural comparison, so field values are compared by content. */
@@ -70,19 +92,49 @@ export function deepEqual(a, b) {
  * Later edits win field by field rather than replacing the entry, so changing
  * the title and then the body leaves both staged, not just the body.
  */
-export function mergeEntry(existing, incoming) {
+export function mergeEntry(existing, incoming, considered = {}) {
   if (!existing) return incoming
   return {
     ...existing,
     // Carried through: without it a second edit to unsaved content would be
     // sent as a PATCH against an entity the backend has never seen.
     isNew: Boolean(existing.isNew || incoming.isNew),
-    attributes: { ...(existing.attributes || {}), ...(incoming.attributes || {}) },
+    attributes: {
+      ...withoutReverted(existing.attributes, incoming.attributes, considered.attributes),
+      ...(incoming.attributes || {}),
+    },
     relationships: {
-      ...(existing.relationships || {}),
+      ...withoutReverted(
+        existing.relationships,
+        incoming.relationships,
+        considered.relationships
+      ),
       ...(incoming.relationships || {}),
     },
   }
+}
+
+/**
+ * Drop what the author has since put back the way it was.
+ *
+ * A staged edit is a delta, so a field the author reverts stops appearing in
+ * the new one. Merging on top of what was staged before would then keep the
+ * old value forever: the form shows the original, the cart holds the edit, and
+ * committing writes back a change nobody can see any more.
+ *
+ * `considered` is the set of fields the form actually had in front of it. A
+ * field absent from that is not reverted, it was simply not on this form, so it
+ * stays staged.
+ */
+function withoutReverted(staged, incoming, considered) {
+  if (!staged) return {}
+  if (!Array.isArray(considered)) return { ...staged }
+  const kept = {}
+  for (const [field, value] of Object.entries(staged)) {
+    const reverted = considered.includes(field) && !(field in (incoming || {}))
+    if (!reverted) kept[field] = value
+  }
+  return kept
 }
 
 /** Drop the empty halves, so a resource carries no bare `attributes: {}`. */
@@ -189,4 +241,47 @@ export function exportSummary(entries) {
   const count = resources.length
   const noun = count === 1 ? 'entity' : 'entities'
   return `chore(content): edit ${count} ${noun} (${types.join(', ')})`
+}
+
+/**
+ * The order to send staged resources in.
+ *
+ * A tag created while writing an article is two staged resources: the term, and
+ * the article that now references it. Sent the other way round, the article
+ * references a term the backend has never heard of and the whole edit is
+ * rejected for a reason that has nothing to do with what the author did.
+ *
+ * So anything referenced by another staged resource goes first. Depth first, so
+ * a chain of new references still comes out in order, and cycle safe, because a
+ * pair of resources referencing each other is a stalled commit rather than a
+ * hung browser.
+ */
+export function commitOrder(resources = []) {
+  const byId = new Map(resources.map((resource) => [resource.id, resource]))
+
+  const referencedBy = (resource) =>
+    Object.values(resource.relationships || {}).flatMap((relationship) => {
+      const data = (relationship || {}).data
+      if (!data) return []
+      return (Array.isArray(data) ? data : [data]).map((item) => item.id)
+    })
+
+  const ordered = []
+  const done = new Set()
+  const visiting = new Set()
+
+  const visit = (resource) => {
+    if (done.has(resource.id) || visiting.has(resource.id)) return
+    visiting.add(resource.id)
+    for (const id of referencedBy(resource)) {
+      const dependency = byId.get(id)
+      if (dependency) visit(dependency)
+    }
+    visiting.delete(resource.id)
+    done.add(resource.id)
+    ordered.push(resource)
+  }
+
+  resources.forEach(visit)
+  return ordered
 }

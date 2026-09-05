@@ -5,6 +5,8 @@
 </template>
 
 <script>
+import { changedFields } from '../lib/cart.mjs'
+
 export default {
   name: 'AuthoringEntityForm',
 
@@ -38,6 +40,76 @@ export default {
      */
     captureOriginal(entity) {
       this.original = JSON.parse(JSON.stringify(entity || {}))
+      this.applyDraft()
+    },
+
+    /**
+     * Put an unstaged edit back into the form.
+     *
+     * The snapshot stays as the backend had it, so the diff still measures the
+     * whole change rather than what has happened since the form reopened.
+     */
+    applyDraft() {
+      const form = this.$refs.form
+      const draft = this.$store.getters['authoringCart/draftFor'](
+        this.type,
+        (this.original || {}).id
+      )
+      if (!form || !form.model || !draft) return
+      form.model = {
+        ...form.model,
+        attributes: { ...(form.model.attributes || {}), ...(draft.attributes || {}) },
+        relationships: { ...(form.model.relationships || {}), ...(draft.relationships || {}) },
+      }
+    },
+
+    /**
+     * What the author has changed beyond what is already staged.
+     *
+     * Measured against the staged version, not against the backend. Against the
+     * backend, everything just staged still counts as changed, so closing the
+     * form right after staging would file the same edit again as unstaged and
+     * the badge would flip straight back.
+     */
+    unstagedDelta() {
+      const form = this.$refs.form
+      if (!form || !form.model || !this.original) return null
+
+      const staged = this.$store.getters['authoringCart/entryFor'](
+        this.type,
+        (form.model || {}).id
+      )
+      const baseline = {
+        attributes: {
+          ...((this.original || {}).attributes || {}),
+          ...((staged || {}).attributes || {}),
+        },
+        relationships: {
+          ...((this.original || {}).relationships || {}),
+          ...((staged || {}).relationships || {}),
+        },
+      }
+
+      return {
+        attributes: changedFields(baseline.attributes, form.model.attributes || {}),
+        relationships: this.changedRelationships(form, baseline.relationships),
+      }
+    },
+
+    /**
+     * Keep an edit the author has not staged.
+     *
+     * Closing the form is not a decision to throw the work away, and silently
+     * reverting it is the worst reading of a click on "Done".
+     */
+    saveDraft() {
+      const delta = this.unstagedDelta()
+      if (!delta) return
+      this.$store.dispatch('authoringCart/saveDraft', {
+        type: this.type,
+        id: (this.$refs.form.model || {}).id,
+        ...delta,
+      })
     },
 
     /**
@@ -60,6 +132,9 @@ export default {
         original: (this.original || {}).attributes || {},
         edited: form.model.attributes || {},
         relationships: this.changedRelationships(form),
+        // Every relationship the form holds, changed or not. The action needs
+        // it to tell "put back the way it was" apart from "not on this form".
+        allRelationships: (form.model || {}).relationships || {},
       })
 
       this.message = staged
@@ -75,8 +150,8 @@ export default {
      * `data`, and a partial merge of one would produce a reference list that
      * never existed.
      */
-    changedRelationships(form) {
-      const original = (this.original || {}).relationships || {}
+    changedRelationships(form, against) {
+      const original = against || (this.original || {}).relationships || {}
       const edited = (form.model || {}).relationships || {}
       const changed = {}
       for (const [field, value] of Object.entries(edited)) {
