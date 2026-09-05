@@ -59,7 +59,22 @@ export default function (context, inject) {
     // the dispatch response, so this arrives a few seconds late.
     run: null,
     starting: false,
+    // Why a run lookup stopped, said where a signed-in author can read it.
+    // `error` is only shown to somebody signed out, and this happens to
+    // somebody signed in.
+    runError: null,
   })
+
+  /**
+   * Which sign-in the loops below belong to.
+   *
+   * Polling a run and waiting for a backend both outlive the thing that started
+   * them: they keep going for tens of minutes, and a poll already in flight when
+   * somebody signs out lands afterwards and writes the state back. Each loop
+   * takes a copy of this on the way in and stops when it no longer matches, so
+   * signing out or signing in again ends the old ones rather than racing them.
+   */
+  let generation = 0
 
   const github = {
     state,
@@ -69,6 +84,7 @@ export default function (context, inject) {
     },
 
     async signIn(token, repository) {
+      const mine = ++generation
       state.status = 'checking'
       state.error = null
 
@@ -78,6 +94,10 @@ export default function (context, inject) {
         workflow: state.workflow,
         fetch: window.fetch.bind(window),
       })
+
+      // Signed out, or signed in as somebody else, while this was in the air.
+      // Writing now would sign the old token back in, silently.
+      if (mine !== generation) return false
 
       if (!result.ok) {
         state.status = 'error'
@@ -104,9 +124,14 @@ export default function (context, inject) {
      * doing anything useful.
      */
     async startBackend(minutes) {
+      // A new dispatch ends the watchers of the last one. Two of them writing
+      // the same state is how the button ends up describing a run nobody is
+      // waiting for.
+      const mine = ++generation
       state.starting = true
       state.run = null
       state.started = null
+      state.runError = null
       const since = new Date().toISOString()
 
       const result = await startBackend({
@@ -122,16 +147,17 @@ export default function (context, inject) {
         fetch: window.fetch.bind(window),
       })
 
+      if (mine !== generation) return result
       if (!result.ok) {
         state.starting = false
         return result
       }
 
-      github.watchRun(since)
+      github.watchRun(since, mine)
       // The backend announces itself by publishing where it is, and the app
       // only read that when it started. A backend begun from here appears
       // minutes later, so look again until it does.
-      github.awaitBackend()
+      github.awaitBackend(mine)
       return result
     },
 
@@ -142,12 +168,13 @@ export default function (context, inject) {
      * without a session is one that failed, and polling on would be waiting
      * for something nobody is making.
      */
-    async awaitBackend() {
+    async awaitBackend(mine = generation) {
       const app = window.$nuxt
       const deadline = Date.now() + 20 * 60 * 1000
       const look = async () => {
-        if (Date.now() > deadline) return
+        if (mine !== generation || Date.now() > deadline) return
         const found = app && app.$authoring && (await app.$authoring.discover())
+        if (mine !== generation) return
         if (found) {
           state.started = found
           if (found.connected) return
@@ -159,11 +186,18 @@ export default function (context, inject) {
     },
 
     /** Poll for the run, then for its result, and stop when it stops. */
-    async watchRun(since) {
+    async watchRun(since, mine = generation) {
       const deadline = Date.now() + 90 * 60 * 1000
+      // A lookup can fail for a moment and come back. It can also fail because
+      // the token lost its Actions permission, and polling that for ninety
+      // minutes says "Building..." the whole time about a run nobody looked up.
+      const ALLOWED_FAILURES = 3
+      let failures = 0
       const poll = async () => {
+        if (mine !== generation) return
         if (Date.now() > deadline) {
           state.starting = false
+          state.runError = 'Gave up waiting for the run.'
           return
         }
         const found = await findRun({
@@ -173,6 +207,18 @@ export default function (context, inject) {
           since,
           fetch: window.fetch.bind(window),
         })
+        if (mine !== generation) return
+        if (!found.ok) {
+          failures++
+          if (failures > ALLOWED_FAILURES) {
+            state.starting = false
+            state.runError = found.reason || 'Could not find the run.'
+            return
+          }
+        }
+        else {
+          failures = 0
+        }
         if (found.ok && found.run) {
           state.run = found.run
           if (runIsFinished(found.run)) {
@@ -193,16 +239,24 @@ export default function (context, inject) {
     },
 
     signOut() {
+      // Ends the watchers first, so nothing in flight writes a run or a session
+      // back over the state this is about to clear.
+      generation++
       Object.assign(state, {
         token: null,
         login: null,
         status: 'idle',
         error: null,
         canStartBackend: false,
-    // The session this dispatch brought up, once it publishes itself. Kept
-    // apart from what the site is connected to, which may be something else
-    // entirely.
-    started: null,
+        // The session this dispatch brought up, once it publishes itself. Kept
+        // apart from what the site is connected to, which may be something else
+        // entirely.
+        started: null,
+        // Signing out and back in should offer to start a backend, not show a
+        // disabled button waiting on the last sign-in's run.
+        run: null,
+        starting: false,
+        runError: null,
       })
       writeStored(null)
     },
