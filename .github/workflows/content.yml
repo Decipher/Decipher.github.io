@@ -72,7 +72,16 @@ jobs:
           set -euo pipefail
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add -A drupal/content drupal/files requests
+          # Scoped, not `git add -A`. Provisioning writes a hash salt and the
+          # database into the tracked settings.php, and neither belongs in a
+          # content commit.
+          git add -A -- drupal/content drupal/files
+          # Separately, and only when there is something there to stage: a pull
+          # request that just removes a request leaves no `requests` path at all,
+          # and git treats an unmatched pathspec as an error.
+          if [ -e requests ] || git ls-files --error-unmatch requests >/dev/null 2>&1; then
+            git add -A -- requests
+          fi
           if git diff --cached --quiet; then
             echo 'The request produced no content changes.'
             exit 0
