@@ -110,6 +110,10 @@ export default function (context, inject) {
         workflow: state.workflow,
         ref: state.defaultBranch,
         minutes,
+        // Where this site actually is, which is not always where it is
+        // deployed: a tunnel or a preview build is a different origin, and the
+        // backend has to allow the one asking.
+        origin: window.location.origin,
         fetch: window.fetch.bind(window),
       })
 
