@@ -6,8 +6,14 @@
 </template>
 
 <script>
+import { seoHead } from '~/lib/seo.mjs'
+
 export default {
   name: 'AuthoringCallback',
+
+  // A redirect target with nothing on it to read. Without this it gets no
+  // canonical and no `noindex`, and turns up in search results as a blank page.
+  head: () => seoHead({ title: 'Signing in', path: '/callback' }),
 
   data: () => ({ error: null }),
 

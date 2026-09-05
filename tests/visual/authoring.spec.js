@@ -32,6 +32,21 @@ const BACKEND = 'https://backend.test'
  */
 const contentMask = (page) => [page.locator('main'), page.getByTestId('built-at')]
 
+/**
+ * Nuxt's loading bar, which is not part of any of these designs.
+ *
+ * Two pixels tall, fixed to the top, and as wide as a request is far along. It
+ * is invisible at rest, so whether it lands in a shot depends on how quickly a
+ * request settled: it caught these baselines out in both directions, once with
+ * the bar in the committed image and the run without it, once the reverse.
+ *
+ * Hidden rather than masked: masking a zero-width element covers nothing, so a
+ * mask would work only on the runs where the bar happened to show, which is the
+ * timing dependency this is here to remove.
+ */
+const hideLoadingBar = (page) =>
+  page.addStyleTag({ content: '.nuxt-progress { display: none !important; }' })
+
 async function isolateFromBackends(page) {
   await page.route(/\/(jsonapi|router)\//, (route) => route.abort())
 }
@@ -49,6 +64,7 @@ async function stubConformingBackend(page) {
 test('the site as a visitor sees it', async ({ page }) => {
   await isolateFromBackends(page)
   await page.goto('/')
+  await hideLoadingBar(page)
   await page.evaluate(() => document.fonts.ready)
   await expect(page).toHaveScreenshot('visitor.png', {
     fullPage: true,
@@ -62,6 +78,7 @@ test('the backend prompt', async ({ page }) => {
   await page.goto('/')
   await page.getByTestId('authoring-login-trigger').click()
   await expect(page.getByTestId('authoring-backend-url')).toBeVisible()
+  await hideLoadingBar(page)
   await page.evaluate(() => document.fonts.ready)
   await expect(page).toHaveScreenshot('connect.png', {
     animations: 'disabled',
@@ -75,6 +92,7 @@ test('the login step', async ({ page }) => {
   await page.goto(`/?backend=${encodeURIComponent(BACKEND)}`)
   await page.getByTestId('authoring-login-trigger').click()
   await expect(page.getByTestId('authoring-continue')).toBeVisible()
+  await hideLoadingBar(page)
   await page.evaluate(() => document.fonts.ready)
   await expect(page).toHaveScreenshot('login.png', {
     animations: 'disabled',

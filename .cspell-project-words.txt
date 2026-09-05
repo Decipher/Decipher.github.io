@@ -1,3 +1,7 @@
+Lando
+Landofile
+PKCE
+Stanislav
 appserver
 behaviour
 bmewburn
@@ -21,8 +25,6 @@ intelephense
 interruptible
 knip
 lando
-Lando
-Landofile
 lcobucci
 libasound
 libfreetype
@@ -36,6 +38,7 @@ libsqlite
 libxss
 libxtst
 libzip
+llms
 lndo
 makedirs
 mbstring
@@ -54,11 +57,9 @@ openvscode
 phpsab
 phpstan
 phpunit
-PKCE
 repository
 setuptools
 shivammathur
-Stanislav
 starterkit
 startswith
 tokenless

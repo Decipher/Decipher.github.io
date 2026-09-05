@@ -1,11 +1,42 @@
+import { contentRoutesOrNone, pagesByPath } from './lib/content-routes.mjs'
+import { ogImages } from './lib/og-images.mjs'
+import { llmsTxt, robotsTxt, sitemapXml } from './lib/sitemap.mjs'
+import { SITE_NAME, SITE_DESCRIPTION } from './lib/site.mjs'
+
 require('dotenv').config({ path: '../.env' })
 
 const baseUrl = process.env.BASE_URL || 'http://quickstart-druxt-serverless.ddev.site'
+
+// Asked of Drupal once, and used twice: to decide what to generate, and to give
+// each generated page its own title and description. Populated by `generate.routes`,
+// which Nuxt runs before it builds the runtime config into the bundle.
+const pages = []
 
 
 // Bound to 0.0.0.0, Nuxt reports the container-internal interface IP as
 // its listen URL - unreachable from the host. Rewrite the reported URL
 // only: the bind stays 0.0.0.0 so container port forwarding keeps working.
+// Druxt registers the catch-all route and points it at its own page, whose
+// `head()` sets a canonical from whatever Drupal reported. Built against a
+// throwaway backend, that is a tunnel or a localhost port, so every deployed
+// page carried a canonical to an address that stops existing when the build
+// finishes. Same routes, same component underneath, our head.
+//
+// A module rather than `router.extendRoutes`, because the config's own hook runs
+// before any module has registered a route: it saw only `/callback` and had
+// nothing to swap. Listed after `druxt-site` below, so this runs after the
+// routes it is rewriting exist.
+const seoRouterPage = function () {
+  const page = require('path').resolve(__dirname, 'lib/router-page.js')
+  this.extendRoutes((routes) => {
+    routes
+      .filter((route) => String(route.name || '').startsWith('druxt-router'))
+      .forEach((route) => {
+        route.component = page
+      })
+  })
+}
+
 const localhostListenURL = function () {
   this.nuxt.hook('listen', (server, listener) => {
     listener.host = 'localhost'
@@ -25,9 +56,15 @@ export default {
     base: process.env.ROUTER_BASE || '/',
   },
 
-  // Ensure the root route is generated and crawled.
   generate: {
-    routes: ['/']
+    // Asked of Drupal rather than crawled. The front page renders one node and
+    // links to nothing, so crawling found the homepage and stopped, and the
+    // deployed site was a single page with the rest reachable only by client-side
+    // routing: no HTML for a search engine, and nothing to put in a sitemap.
+    async routes() {
+      pages.push(...(await contentRoutesOrNone(baseUrl)))
+      return ['/', ...pages.map((page) => page.path)]
+    }
   },
 
   // Nuxt 2 defaults to binding 'localhost' (loopback only), which is not
@@ -42,15 +79,21 @@ export default {
   },
 
   // Global page headers: https://go.nuxtjs.dev/config-head
+  // Site-wide defaults only. Anything that varies per page is set by
+  // `lib/router-page.js` through `lib/seo.mjs`, keyed by `hid` so these are
+  // replaced rather than duplicated.
   head: {
-    title: 'quickstart-druxt-site',
+    // No `titleTemplate`. Nuxt serialises this config into the built bundle, so
+    // a function here arrives with its imports stripped and throws at render.
+    // `seoHead` appends the suffix instead, where the title is decided anyway.
+    title: SITE_NAME,
     htmlAttrs: {
       lang: 'en'
     },
     meta: [
       { charset: 'utf-8' },
       { name: 'viewport', content: 'width=device-width, initial-scale=1' },
-      { hid: 'description', name: 'description', content: '' },
+      { hid: 'description', name: 'description', content: SITE_DESCRIPTION },
       { name: 'format-detection', content: 'telephone=no' }
     ],
     link: [
@@ -88,6 +131,12 @@ export default {
   // is deliberately NOT here - that is discovered in the browser, because the
   // backend does not exist when the site is built.
   publicRuntimeConfig: {
+    seo: {
+      // What each page says about itself, resolved at build time. See `pages`.
+      get pages() {
+        return pagesByPath(pages)
+      },
+    },
     // Resolved once, when the site is generated. The footer shows when the
     // site was built, which is a fact about the build; reading the browser's
     // clock instead made it change after deployment, and moved the visual
@@ -138,6 +187,7 @@ export default {
   // druxt.js monorepo's own example placement.
   modules: [
     'druxt-site',
+    seoRouterPage,
     localhostListenURL,
   ],
 
@@ -157,6 +207,40 @@ export default {
     router: { middleware: false },
     // Set the default theme to render Site regions.
     site: { theme: 'olivero' },
+  },
+
+  hooks: {
+    // Written after the export rather than kept in `static/`, because all three
+    // list the pages the build actually produced and name the origin it was
+    // built for. A checked-in copy would be a guess that goes stale silently.
+    async 'generate:done'(generator) {
+      const { mkdirSync, writeFileSync } = require('fs')
+      const { join } = require('path')
+      const dir = generator.nuxt.options.generate.dir
+      const files = {
+        'sitemap.xml': sitemapXml(pages),
+        'robots.txt': robotsTxt(),
+        'llms.txt': llmsTxt(pages),
+      }
+      for (const [name, contents] of Object.entries(files)) {
+        writeFileSync(join(dir, name), contents)
+      }
+
+      // Satori and resvg are loaded here rather than imported at the top,
+      // because both are dev dependencies: a consumer installing this without
+      // them should still be able to read the config.
+      const satori = require('satori').default || require('satori')
+      const { Resvg } = require('@resvg/resvg-js')
+      const cards = await ogImages(pages, { resolve: require.resolve, satori, Resvg })
+      mkdirSync(join(dir, 'og'), { recursive: true })
+      for (const { name, png } of cards) {
+        writeFileSync(join(dir, 'og', name), png)
+      }
+
+      console.log(
+        `Wrote ${Object.keys(files).join(', ')} and ${cards.length} share cards for ${pages.length} pages.`
+      )
+    }
   },
 
   // Build Configuration: https://go.nuxtjs.dev/config-build
