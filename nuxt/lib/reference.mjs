@@ -172,3 +172,26 @@ export function toRelationship(items, multiple) {
   const data = (items || []).map(({ type, id }) => ({ type, id }))
   return { data: multiple ? data : data[0] || null }
 }
+
+/**
+ * Whether this field may invent what it references, and as what.
+ *
+ * Drupal's tags widget creates a term for anything typed that does not match,
+ * which is why a tags field feels like typing words rather than picking from a
+ * list. That behaviour is configuration (`auto_create`), not a property of tag
+ * fields, so it is read rather than assumed.
+ */
+export function autoCreateTarget(schema, index) {
+  const handlerSettings = (((schema || {}).settings || {}).config || {}).handler_settings || {}
+  if (!handlerSettings.auto_create) return null
+
+  const targets = targetResourceTypes(schema, [], index)
+  const bundle = handlerSettings.auto_create_bundle
+  if (bundle) {
+    const match = targets.find((type) => type.endsWith(`--${bundle}`))
+    if (match) return match
+  }
+  // With one allowed bundle there is no ambiguity. With several and no
+  // `auto_create_bundle`, Drupal itself cannot say which, so neither can this.
+  return targets.length === 1 ? targets[0] : null
+}

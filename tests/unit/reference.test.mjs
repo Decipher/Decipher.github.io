@@ -11,6 +11,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 
 import {
+  autoCreateTarget,
   autocompleteUrl,
   filterFieldFor,
   labelFieldFor,
@@ -162,4 +163,57 @@ test('a relationship is emitted in the shape JSON:API expects', () => {
   assert.equal(toRelationship([], false).data, null)
   // The label is display only and must not reach the wire.
   assert.deepEqual(Object.keys(toRelationship(items, true).data[0]), ['type', 'id'])
+})
+
+// Whether a field may invent what it references.
+//
+// Drupal's tags widget creates a term for anything typed that does not match,
+// which is why tagging feels like typing words rather than picking from a list.
+// That is configuration, not a property of tag fields, so it is read.
+
+test('a field configured to auto-create says what it would create', () => {
+  assert.equal(autoCreateTarget(tagsSchema, {}), 'taxonomy_term--tags')
+})
+
+test('a field without auto-create creates nothing', () => {
+  const plain = {
+    id: 'field_ref',
+    settings: {
+      storage: { target_type: 'taxonomy_term' },
+      config: { handler_settings: { target_bundles: { tags: 'tags' } } },
+    },
+  }
+  assert.equal(autoCreateTarget(plain, {}), null)
+})
+
+test('the configured bundle wins when several are allowed', () => {
+  const many = {
+    id: 'field_ref',
+    settings: {
+      storage: { target_type: 'taxonomy_term' },
+      config: {
+        handler_settings: {
+          target_bundles: { tags: 'tags', topics: 'topics' },
+          auto_create: true,
+          auto_create_bundle: 'topics',
+        },
+      },
+    },
+  }
+  assert.equal(autoCreateTarget(many, {}), 'taxonomy_term--topics')
+})
+
+test('several allowed bundles and no chosen one creates nothing', () => {
+  // Drupal itself cannot say which vocabulary a new term belongs in here, so
+  // guessing would put it in the wrong one silently.
+  const ambiguous = {
+    id: 'field_ref',
+    settings: {
+      storage: { target_type: 'taxonomy_term' },
+      config: {
+        handler_settings: { target_bundles: { tags: 'tags', topics: 'topics' }, auto_create: true },
+      },
+    },
+  }
+  assert.equal(autoCreateTarget(ambiguous, {}), null)
 })
