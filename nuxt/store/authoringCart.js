@@ -15,6 +15,7 @@
 import {
   cartKey,
   changedFields,
+  commitOrder,
   isEmptyResource,
   isNew,
   mergeEntry,
@@ -23,6 +24,7 @@ import {
   requestMethod,
   requestUrl,
   tidyResource,
+  withoutComputed,
 } from '../lib/cart.mjs'
 
 const STORAGE_KEY = 'authoring.cart'
@@ -63,6 +65,9 @@ export const state = () => ({
   drawerOpen: false,
   /** Staged resources, keyed `type:id`. */
   entries: {},
+  // Edits an author has made but not staged. Kept apart from `entries` on
+  // purpose: these are not going to be committed, they are just not lost.
+  drafts: {},
   /** False once a write to storage has failed, so the UI can stop promising. */
   persistent: true,
   /** Per-entry failure reasons from the last commit. */
@@ -78,6 +83,7 @@ export const getters = {
   /** Everything staged, as JSON:API resource objects. */
   resources: (state) => Object.values(state.entries).map(tidyResource),
   entryFor: (state) => (type, id) => state.entries[cartKey(type, id)] || null,
+  draftFor: (state) => (type, id) => state.drafts[cartKey(type, id)] || null,
   errorFor: (state) => (type, id) => state.errors[cartKey(type, id)] || null,
 }
 
@@ -88,6 +94,17 @@ export const mutations = {
 
   setDrawerOpen(state, open) {
     state.drawerOpen = open
+  },
+
+  setDraft(state, { key, draft }) {
+    // Vue 2 cannot see a new key on a plain object, so the whole map is
+    // replaced rather than mutated in place.
+    state.drafts = { ...state.drafts, [key]: draft }
+  },
+
+  clearDraft(state, key) {
+    const { [key]: gone, ...rest } = state.drafts
+    state.drafts = rest
   },
 
   stage(state, { key, resource }) {
@@ -183,21 +200,34 @@ export const actions = {
    * difference. Staging an edit that changes nothing is a no-op rather than an
    * empty resource, so the count means what it says.
    */
-  stage({ state, commit }, { type, id, original, edited, relationships }) {
+  stage({ state, commit }, { type, id, original, edited, relationships, allRelationships }) {
     const existing = state.entries[cartKey(type, id)]
     // Something staged as new keeps every field, not just what changed since
     // the form loaded: there is no saved version to differ from.
-    const attributes = isNew(existing) ? { ...edited } : changedFields(original, edited)
-    const resource = mergeEntry(existing, {
-      type,
-      id,
-      isNew: isNew(existing),
-      attributes,
-      relationships: relationships || {},
-    })
+    const attributes = isNew(existing)
+      ? withoutComputed({ ...edited })
+      : changedFields(original, edited)
+    const resource = mergeEntry(
+      existing,
+      {
+        type,
+        id,
+        isNew: isNew(existing),
+        attributes,
+        relationships: relationships || {},
+      },
+      // What this form had in front of it, so a previously staged field the
+      // author has since put back can be dropped rather than kept forever.
+      {
+        attributes: Object.keys(edited || {}),
+        relationships: Object.keys(allRelationships || relationships || {}),
+      }
+    )
 
     if (isEmptyResource(resource)) return false
 
+    // It is in the cart now, so it is no longer merely unsaved.
+    commit('clearDraft', cartKey(type, id))
     commit('stage', { key: cartKey(type, id), resource })
     commit('setPersistent', writeStored(state.entries))
     // Open on the first staged change, so it is visible that something was
@@ -206,13 +236,36 @@ export const actions = {
     return true
   },
 
+  /**
+   * Keep an edit that has not been staged.
+   *
+   * Closing a form is not a decision to throw the work away. The author gets
+   * the page rendered as they left it, marked unstaged, and stages it when they
+   * are ready. Deliberately not part of the cart: a draft is never committed,
+   * and counting it would make the drawer claim work it is not going to send.
+   */
+  saveDraft({ commit }, { type, id, attributes, relationships }) {
+    const key = cartKey(type, id)
+    const draft = { attributes: attributes || {}, relationships: relationships || {} }
+    const empty =
+      !Object.keys(draft.attributes).length && !Object.keys(draft.relationships).length
+    if (empty) return commit('clearDraft', key)
+    commit('setDraft', { key, draft })
+  },
+
+  clearDraft({ commit }, { type, id }) {
+    commit('clearDraft', cartKey(type, id))
+  },
+
   discardOne({ state, commit }, { type, id }) {
     commit('discardOne', cartKey(type, id))
+    commit('clearDraft', cartKey(type, id))
     commit('setPersistent', writeStored(state.entries))
   },
 
   discardAll({ state, commit }) {
     commit('discardAll')
+    for (const key of Object.keys(state.drafts)) commit('clearDraft', key)
     commit('setPersistent', writeStored(state.entries))
   },
 
@@ -233,7 +286,10 @@ export const actions = {
     commit('setCommitting', true)
 
     const results = { sent: 0, failed: 0 }
-    for (const [key, resource] of Object.entries({ ...state.entries })) {
+    // Ordered, not just iterated: a new resource another one references has to
+    // reach the backend first.
+    for (const resource of commitOrder(Object.values(state.entries))) {
+      const key = cartKey(resource.type, resource.id)
       try {
         const response = await request(requestUrl(backendUrl, resource), {
           method: requestMethod(resource),
