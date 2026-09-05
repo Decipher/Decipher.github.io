@@ -12,7 +12,7 @@
 </template>
 
 <script>
-import { changedFields } from '../lib/cart.mjs'
+import { changedFields, newResourceId } from '../lib/cart.mjs'
 
 export default {
   name: 'AuthoringEntityForm',
@@ -44,9 +44,32 @@ export default {
     value: { type: Object, default: undefined },
   },
 
-  data: () => ({ message: null, original: null }),
+  data: () => ({ message: null, original: null, pendingFiles: {} }),
 
   methods: {
+    /**
+     * Hold bytes chosen for a field until there is somewhere to send them.
+     *
+     * Kept beside the change rather than uploaded on the spot, because editing
+     * does not require a backend and choosing a picture should not be the one
+     * thing that does. The upload happens when the cart is committed.
+     */
+    setPendingFile(field, chosen) {
+      if (!chosen) {
+        this.$delete(this.pendingFiles, field)
+        return
+      }
+      this.$set(this.pendingFiles, field, {
+        // A client-generated id, so the relationship can point at the file
+        // before the file exists, the same way new content works.
+        id: newResourceId(),
+        name: chosen.file.name,
+        type: chosen.file.type,
+        size: chosen.file.size,
+        dataUrl: chosen.dataUrl,
+      })
+    },
+
     /**
      * Keep what the form fetched, before anything is typed into it.
      *
@@ -152,6 +175,7 @@ export default {
         // Every relationship the form holds, changed or not. The action needs
         // it to tell "put back the way it was" apart from "not on this form".
         allRelationships: (form.model || {}).relationships || {},
+        files: this.pendingFiles,
       })
 
       this.message = staged

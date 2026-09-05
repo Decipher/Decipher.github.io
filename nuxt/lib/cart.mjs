@@ -103,6 +103,7 @@ export function mergeEntry(existing, incoming, considered = {}) {
     // Carried through: without it a second edit to unsaved content would be
     // sent as a PATCH against an entity the backend has never seen.
     isNew: Boolean(existing.isNew || incoming.isNew),
+    files: { ...(existing.files || {}), ...(incoming.files || {}) },
     attributes: {
       ...withoutReverted(existing.attributes, incoming.attributes, considered.attributes),
       ...(incoming.attributes || {}),
@@ -157,6 +158,9 @@ export function tidyResource(resource) {
 
 /** True when there is nothing worth sending. */
 export function isEmptyResource(resource) {
+  // Bytes waiting to be uploaded are a change, even though they are not part of
+  // the document that gets sent.
+  if (Object.keys((resource || {}).files || {}).length) return false
   const tidy = tidyResource(resource)
   return !tidy.attributes && !tidy.relationships
 }

@@ -35,10 +35,20 @@
         @input="model = $event"
       />
 
+      <!-- A picture is chosen from a disk, not searched for by filename. -->
+      <AuthoringImage
+        v-else-if="isTypeImage"
+        :value="model || { data: null }"
+        :schema="schema"
+        :pending-file="pendingFile"
+        @input="model = $event"
+        @file="onFile"
+      />
+
       <!--
-        Every other relationship. An image or a media item is a relationship
-        too, but choosing one is a file browser, not a text search, so those
-        keep Druxt's nested form until there is a widget for them.
+        Every other relationship. A media item is a relationship too, and
+        choosing one is a library rather than a text search, so those keep
+        Druxt's nested form until there is a widget for them.
       -->
       <div v-else-if="relationship" class="rounded border border-hairline p-3">
         <DruxtEntityForm
@@ -195,6 +205,25 @@ export default {
 
   mixins: [DruxtFieldMixin],
 
+  inject: {
+    /**
+     * The form this field is on, or nothing when it is rendered outside one.
+     *
+     * Injected rather than emitted to. Druxt builds each field's slot itself,
+     * so a field is not a child of anything that would hear an event: the same
+     * reason the form's buttons live in a wrapper component.
+     */
+    authoringForm: { from: 'authoringForm', default: null },
+  },
+
+
+  methods: {
+
+    onFile(chosen) {
+      if (this.authoringForm) this.authoringForm.setPendingFile(this.schema.id, chosen)
+    },
+  },
+
   computed: {
     /** Shared control styling, so every input looks like the same site. */
     controlClass() {
@@ -259,6 +288,15 @@ export default {
       return (this.model || {}).format || undefined
     },
 
+    /** Bytes chosen for this field in this browser and not yet uploaded. */
+    pendingFile() {
+      const form = this.authoringForm
+      return form && form.pendingFiles ? form.pendingFiles[this.schema.id] || null : null
+    },
+
+    isTypeImage() {
+      return ['image_image'].includes(this.schema.type)
+    },
     isTypeDate() {
       return ['datetime_timestamp', 'datetime_default'].includes(this.schema.type)
     },

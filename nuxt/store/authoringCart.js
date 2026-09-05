@@ -27,6 +27,7 @@ import {
   tidyResource,
   withoutComputed,
 } from '../lib/cart.mjs'
+import { imageRelationship, uploadHeaders, uploadUrl } from '../lib/upload.mjs'
 
 const STORAGE_KEY = 'authoring.cart'
 
@@ -147,6 +148,55 @@ export const mutations = {
   },
 }
 
+/**
+ * Upload whatever bytes a staged resource is carrying, and point its
+ * relationships at the files that come back.
+ *
+ * Done per resource rather than up front, so a failed upload fails only the
+ * change it belongs to. An uploaded file Drupal never hears about again is
+ * temporary and its own cron clears it, so a half-done commit leaves rubbish
+ * rather than damage.
+ */
+async function sendFiles(resource, { backendUrl, token, request }) {
+  const files = resource.files || {}
+  if (!Object.keys(files).length) return { resource }
+
+  const relationships = { ...(resource.relationships || {}) }
+  for (const [field, file] of Object.entries(files)) {
+    try {
+      const response = await request(uploadUrl(backendUrl, resource.type, field), {
+        method: 'POST',
+        headers: uploadHeaders(file.name, token),
+        body: dataUrlToBlob(file.dataUrl, file.type),
+      })
+      if (!response.ok) {
+        const detail = await response.json().catch(() => null)
+        return {
+          error:
+            (detail && detail.errors && detail.errors[0] && detail.errors[0].detail) ||
+            `The image was refused with ${response.status}.`,
+        }
+      }
+      const body = await response.json()
+      const existing = ((relationships[field] || {}).data || {}).meta || {}
+      relationships[field] = imageRelationship(body.data.id, existing.alt, existing)
+    } catch (error) {
+      return { error: `The image could not be sent: ${error.message}` }
+    }
+  }
+
+  return { resource: { ...resource, relationships } }
+}
+
+/** A data URL back into bytes, because that is what the upload route wants. */
+function dataUrlToBlob(dataUrl, type) {
+  const base64 = String(dataUrl).split(',')[1] || ''
+  const binary = window.atob(base64)
+  const bytes = new Uint8Array(binary.length)
+  for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i)
+  return new Blob([bytes], { type: type || 'application/octet-stream' })
+}
+
 export const actions = {
   /** Bring back whatever the last visit staged, and whether editing was on. */
   restore({ commit }) {
@@ -207,7 +257,7 @@ export const actions = {
    * difference. Staging an edit that changes nothing is a no-op rather than an
    * empty resource, so the count means what it says.
    */
-  stage({ state, commit }, { type, id, original, edited, relationships, allRelationships }) {
+  stage({ state, commit }, { type, id, original, edited, relationships, allRelationships, files }) {
     const existing = state.entries[cartKey(type, id)]
     // Something staged as new keeps every field, not just what changed since
     // the form loaded: there is no saved version to differ from.
@@ -222,6 +272,9 @@ export const actions = {
         isNew: isNew(existing),
         attributes,
         relationships: relationships || {},
+        // Bytes chosen in the browser, kept off the wire by `tidyResource` and
+        // uploaded when this is committed.
+        files: { ...((existing || {}).files || {}), ...(files || {}) },
       },
       // What this form had in front of it, so a previously staged field the
       // author has since put back can be dropped rather than kept forever.
@@ -382,8 +435,18 @@ export const actions = {
     for (const resource of commitOrder(sending)) {
       const key = cartKey(resource.type, resource.id)
       try {
-        const response = await request(requestUrl(backendUrl, resource), {
-          method: requestMethod(resource),
+        // Bytes first. The relationship names a file that has to exist, and the
+        // upload is a different kind of request to a different URL.
+        const uploaded = await sendFiles(resource, { backendUrl, token, request })
+        if (uploaded.error) {
+          commit('setError', { key, message: uploaded.error })
+          results.failed += 1
+          continue
+        }
+        const ready = uploaded.resource
+
+        const response = await request(requestUrl(backendUrl, ready), {
+          method: requestMethod(ready),
           headers: {
             // JSON:API's own media type, not application/json. Drupal answers
             // 415 for anything else.
@@ -391,7 +454,7 @@ export const actions = {
             Accept: 'application/vnd.api+json',
             Authorization: `Bearer ${token}`,
           },
-          body: JSON.stringify(patchBody(resource)),
+          body: JSON.stringify(patchBody(ready)),
         })
 
         if (!response.ok) {
