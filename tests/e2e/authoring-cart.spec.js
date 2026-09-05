@@ -103,6 +103,8 @@ test.describe('authoring cart', () => {
   test('discarding empties the cart and does not come back', async ({ page }) => {
     await page.goto('/', { waitUntil: 'networkidle' })
     await stage(page, { type: 'node--article', id: 'abc', original: {}, edited: { title: 'A' } })
+    // Discard lives with the other destinations now.
+    await page.getByTestId('cart-tab-send').click()
     await page.getByTestId('authoring-cart-discard').click()
 
     await expect(page.getByTestId('authoring-cart-empty')).toBeVisible()
@@ -115,6 +117,7 @@ test.describe('adding content', () => {
   test('a new article can be abandoned', async ({ page }) => {
     await page.goto('/authoring', { waitUntil: 'networkidle' })
     await page.getByTestId('authoring-edit-toggle').click()
+    await page.getByTestId('cart-tab-add').click()
     await page.getByTestId('authoring-add').click()
     await expect(page.getByTestId('authoring-add-cancel')).toBeVisible()
     expect(await count(page)).toBe(1)
@@ -130,6 +133,7 @@ test.describe('adding content', () => {
   test('a new article can be put down without being thrown away', async ({ page }) => {
     await page.goto('/authoring', { waitUntil: 'networkidle' })
     await page.getByTestId('authoring-edit-toggle').click()
+    await page.getByTestId('cart-tab-add').click()
     await page.getByTestId('authoring-add').click()
 
     // "Done" means finished with the form, not finished with the idea. Without
@@ -212,6 +216,7 @@ test.describe('adding content', () => {
     // Editing became site-wide and adding was left on one route.
     await page.goto('/', { waitUntil: 'networkidle' })
     await page.getByTestId('authoring-edit-toggle').click()
+    await page.getByTestId('cart-tab-add').click()
     await expect(page.getByTestId('authoring-add')).toBeVisible()
   })
 
@@ -227,6 +232,7 @@ test.describe('adding content', () => {
 
     // A token rather than an OAuth button: GitHub's device flow endpoints send
     // no CORS headers, so a browser cannot reach them at all.
+    await page.getByTestId('cart-tab-send').click()
     await expect(page.getByTestId('authoring-cart-pr')).toBeDisabled()
     await expect(page.getByTestId('github-token')).toBeVisible()
     await expect(page.getByTestId('github-sign-in')).toBeDisabled()
@@ -312,6 +318,7 @@ test.describe('adding content', () => {
       edited: { title: 'Is' },
     })
     await page.evaluate(() => window.$nuxt.$store.dispatch('authoringCart/setDrawerOpen', true))
+    await page.getByTestId('cart-tab-send').click()
     await page.getByTestId('github-repository').fill('o/r')
     await page.getByTestId('github-token').fill('a-token')
     await page.getByTestId('github-sign-in').click()
@@ -359,6 +366,7 @@ test.describe('adding content', () => {
       edited: { title: 'Is' },
     })
     await page.evaluate(() => window.$nuxt.$store.dispatch('authoringCart/setDrawerOpen', true))
+    await page.getByTestId('cart-tab-send').click()
     await page.getByTestId('github-repository').fill('o/r')
     await page.getByTestId('github-token').fill('a-token')
     await page.getByTestId('github-sign-in').click()
@@ -383,6 +391,30 @@ test.describe('adding content', () => {
       'https://github.com/o/r/actions/runs/99'
     )
     await expect(page.getByTestId('github-start-backend')).toContainText('Building')
+  })
+
+  test('the drawer is tabbed, and the changes tab counts them', async ({ page }) => {
+    await page.goto('/', { waitUntil: 'networkidle' })
+    await page.getByTestId('authoring-edit-toggle').click()
+    await stage(page, {
+      type: 'node--article',
+      id: 'abc',
+      original: { title: 'Was' },
+      edited: { title: 'Is' },
+    })
+
+    // Adding, the changes and the ways to send them are three jobs, and block
+    // and paragraph placement are coming, so they are panels rather than one
+    // long column.
+    await expect(page.getByTestId('cart-tab-changes')).toContainText('1')
+    await expect(page.getByTestId('authoring-add')).toBeHidden()
+
+    await page.getByTestId('cart-tab-add').click()
+    await expect(page.getByTestId('authoring-add')).toBeVisible()
+    await expect(page.getByTestId('authoring-cart-expand')).toBeHidden()
+
+    await page.getByTestId('cart-tab-send').click()
+    await expect(page.getByTestId('authoring-cart-commit')).toBeVisible()
   })
 
   test('a visitor is offered no drawer at all', async ({ page }) => {

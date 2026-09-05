@@ -13,10 +13,36 @@
     </div>
 
     <!--
-      Adding lives here rather than on one page, because editing does. It moved
-      when everything else did and was left reachable from a single route.
+      Tabs rather than one long column. The drawer already holds the changes,
+      the way to add content and the ways to send it, and block and paragraph
+      placement are coming, so the list is data: another panel is an entry here
+      rather than a rewrite.
     -->
-    <AuthoringAdd class="mb-4" />
+    <nav class="mb-4 flex gap-4 border-b border-hairline" aria-label="Authoring">
+      <button
+        v-for="panel of panels"
+        :key="panel.id"
+        type="button"
+        class="-mb-px border-b-2 pb-2 font-mono text-xs uppercase tracking-eyebrow transition-colors"
+        :class="
+          tab === panel.id
+            ? 'border-accent text-accent'
+            : 'border-transparent text-muted hover:text-ink'
+        "
+        :aria-selected="String(tab === panel.id)"
+        role="tab"
+        :data-testid="`cart-tab-${panel.id}`"
+        @click="tab = panel.id"
+      >
+        {{ panel.label }}<span v-if="panel.count" class="ml-1">{{ panel.count }}</span>
+      </button>
+    </nav>
+
+    <div v-show="tab === 'add'">
+      <AuthoringAdd />
+    </div>
+
+    <div v-show="tab === 'changes'">
 
     <p
       v-if="!count && !unstaged.length"
@@ -195,6 +221,9 @@
     </section>
 
     <p v-if="refusal" class="mb-3 text-sm text-accent" data-testid="cart-refusal">{{ refusal }}</p>
+    </div>
+
+    <div v-show="tab === 'send'">
 
     <div v-if="count" class="flex flex-wrap gap-2">
       <button
@@ -237,6 +266,8 @@
       {{ blockedReason }}
     </p>
 
+    </div>
+
     <AuthoringPreview
       v-if="previewing"
       :type="previewing.type"
@@ -249,7 +280,7 @@
       this is for getting the work reviewed and published, and needs neither a
       backend nor a session.
     -->
-    <div v-if="count" class="mt-4 border-t border-hairline pt-4">
+    <div v-if="count" class="mt-4">
       <p class="eyebrow mb-2">Without a backend</p>
       <AuthoringGithub />
       <p v-if="pullRequest" class="mt-2 text-sm text-body" data-testid="authoring-cart-pr-open">
@@ -288,6 +319,7 @@ export default {
       pullRequest: null,
       prError: null,
       previewing: null,
+      tab: 'changes',
     }
   },
 
@@ -330,6 +362,21 @@ export default {
       })
     },
 
+    /**
+     * The panels, as data.
+     *
+     * Block placement and paragraph ordering are both coming, and both are a
+     * surface of their own rather than another list in this one, so this stays
+     * a list to add to.
+     */
+    panels() {
+      return [
+        { id: 'changes', label: 'Changes', count: this.count + this.unstaged.length },
+        { id: 'add', label: 'Add' },
+        { id: 'send', label: 'Send' },
+      ]
+    },
+
     githubReady() {
       return this.$authoringGithub && this.$authoringGithub.signedIn
     },
@@ -340,6 +387,19 @@ export default {
       if (!this.backendUrl) return 'Connect a backend to commit these.'
       if (!this.token) return 'Sign in to commit these.'
       return ''
+    },
+  },
+
+  watch: {
+    /**
+     * Go back to the changes when there are none left to send.
+     *
+     * Discarding everything from the Send panel leaves the reader looking at
+     * destinations for work that no longer exists, and the one thing worth
+     * saying, that the cart is empty, on a panel they are not on.
+     */
+    count(to) {
+      if (!to && !this.unstaged.length && this.tab === 'send') this.tab = 'changes'
     },
   },
 

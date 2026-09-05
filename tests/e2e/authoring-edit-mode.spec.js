@@ -23,12 +23,14 @@ test.describe('edit mode', () => {
     await page.getByTestId('authoring-edit-toggle').click()
 
     await expect(page.getByTestId('authoring-edit-toggle')).toHaveText('Editing')
+    await page.getByTestId('cart-tab-add').click()
     await expect(page.getByTestId('authoring-add')).toBeVisible()
   })
 
   test('edit mode survives a reload', async ({ page }) => {
     await open(page)
     await page.getByTestId('authoring-edit-toggle').click()
+    await page.getByTestId('cart-tab-add').click()
     await expect(page.getByTestId('authoring-add')).toBeVisible()
 
     await open(page)
@@ -40,6 +42,7 @@ test.describe('edit mode', () => {
   test('turning it off puts the page back to what a visitor sees', async ({ page }) => {
     await open(page)
     await page.getByTestId('authoring-edit-toggle').click()
+    await page.getByTestId('cart-tab-add').click()
     await expect(page.getByTestId('authoring-add')).toBeVisible()
 
     await page.getByTestId('authoring-edit-toggle').click()
@@ -54,6 +57,7 @@ test.describe('edit mode', () => {
 
     await open(page)
     await page.getByTestId('authoring-edit-toggle').click()
+    await page.getByTestId('cart-tab-add').click()
     await page.getByTestId('authoring-add').click()
 
     await expect(page.getByTestId('authoring-add-message')).toContainText('nothing is sent yet')
@@ -64,6 +68,7 @@ test.describe('edit mode', () => {
   test('something staged as new is sent as a create, not an edit', async ({ page }) => {
     await open(page)
     await page.getByTestId('authoring-edit-toggle').click()
+    await page.getByTestId('cart-tab-add').click()
     await page.getByTestId('authoring-add').click()
 
     const resource = await page.evaluate(
