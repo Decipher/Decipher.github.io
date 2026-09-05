@@ -35,6 +35,12 @@ const COLLECTIONS = [
 
 const ARTICLE = '34156cc1-48f9-4ee9-acd7-e3970ca00554'
 
+/** A 4x4 red PNG, small enough to keep in the test and real enough to upload. */
+const PNG = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAYAAACp8Z5+AAAAFklEQVR42mP8z8BQz0AEYBxVSF+FAP5FDvcfRYWgAAAAAElFTkSuQmCC',
+  'base64'
+)
+
 /**
  * Stand a JSON:API backend up in the browser.
  *
@@ -54,6 +60,25 @@ async function stubBackend(page) {
     }
 
     if (request.method() === 'OPTIONS') return route.fulfill({ status: 204, headers })
+
+    // A file upload is not a JSON:API document: it is raw bytes at the field's
+    // own route, with the filename in a header.
+    if (request.method() === 'POST' && url.pathname.endsWith('/field_image')) {
+      writes.push({
+        method: 'POST',
+        url: request.url(),
+        contentType: request.headers()['content-type'],
+        disposition: request.headers()['content-disposition'],
+        bytes: (request.postDataBuffer() || Buffer.alloc(0)).length,
+      })
+      return route.fulfill({
+        status: 201,
+        headers,
+        body: JSON.stringify({
+          data: { type: 'file--file', id: 'uploaded-file-id', attributes: { filename: 'red.png' } },
+        }),
+      })
+    }
 
     if (request.method() !== 'GET') {
       writes.push({ method: request.method(), url: request.url(), body: request.postDataJSON() })
@@ -331,6 +356,77 @@ test.describe('the edit form', () => {
     const staged = await page.evaluate(() => window.$nuxt.$store.getters['authoringCart/resources'])
     // Added, removed and added again is one change, not three.
     expect(staged.filter((r) => r.type === 'taxonomy_term--tags')).toHaveLength(1)
+  })
+
+  test('an image is held until there is somewhere to send it', async ({ page }) => {
+    const writes = await stubBackend(page)
+    await openForm(page)
+
+    await page.getByTestId('image-input').setInputFiles({
+      name: 'red.png',
+      mimeType: 'image/png',
+      buffer: PNG,
+    })
+
+    // Choosing a picture must not need a backend, the same as every other edit.
+    await expect(page.getByTestId('image-preview')).toBeVisible()
+    await expect(page.getByTestId('image-pending')).toBeVisible()
+    expect(writes).toEqual([])
+  })
+
+  test('the field says which files it will take', async ({ page }) => {
+    await stubBackend(page)
+    await openForm(page)
+
+    await page.getByTestId('image-input').setInputFiles({
+      name: 'notes.txt',
+      mimeType: 'text/plain',
+      buffer: Buffer.from('not an image'),
+    })
+
+    // Told before committing everything else along with it.
+    await expect(page.getByTestId('image-error')).toContainText('png')
+    await expect(page.getByTestId('image-preview')).toHaveCount(0)
+  })
+
+  test('committing sends the bytes, then points the field at them', async ({ page }) => {
+    const writes = await stubBackend(page)
+    await openForm(page)
+
+    await page.getByTestId('image-input').setInputFiles({
+      name: 'red.png',
+      mimeType: 'image/png',
+      buffer: PNG,
+    })
+    await page.getByTestId('image-alt').fill('A small red square')
+    await page.getByTestId('authoring-stage').click()
+    await expect(page.getByTestId('authoring-stage-message')).toContainText('Staged')
+
+    await page.evaluate(
+      ([token]) =>
+        window.$nuxt.$store.dispatch('authoringCart/commit', {
+          backendUrl: 'http://backend.test',
+          token,
+        }),
+      ['stub-token']
+    )
+
+    const upload = writes.find((w) => w.url.endsWith('/field_image'))
+    // The bytes go to the field's own route as an octet stream. JSON:API's
+    // media type here is a 415, and without the disposition there is no
+    // filename at all.
+    expect(upload.url).toBe('http://backend.test/jsonapi/node/article/field_image')
+    expect(upload.contentType).toBe('application/octet-stream')
+    expect(upload.disposition).toBe('file; filename="red.png"')
+    expect(upload.bytes).toBe(PNG.length)
+
+    // Then the entity is pointed at whatever came back, not at the id the
+    // browser invented, and the alt goes with it: a relationship sent without
+    // meta answers 200 and silently clears the alt.
+    const patch = writes.find((w) => w.method === 'PATCH')
+    const image = patch.body.data.relationships.field_image.data
+    expect(image.id).toBe('uploaded-file-id')
+    expect(image.meta.alt).toBe('A small red square')
   })
 
   test('staging nothing stages nothing', async ({ page }) => {

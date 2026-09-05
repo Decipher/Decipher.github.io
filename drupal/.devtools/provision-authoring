@@ -349,8 +349,10 @@ parameters:
     enabled: true
     # Authorization for the bearer token; Content-Type for JSON:API's
     # application/vnd.api+json, which is not a CORS-safelisted value and so
-    # makes every write a preflighted request.
-    allowedHeaders: ['authorization', 'content-type', 'x-csrf-token']
+    # makes every write a preflighted request; Content-Disposition because a
+    # file upload carries its filename in that header, and without it the
+    # preflight fails and an image can be chosen but never sent.
+    allowedHeaders: ['authorization', 'content-type', 'content-disposition', 'x-csrf-token']
     # Explicit, not ['*']: an empty list rejects the preflight outright, and a
     # wildcard is not honoured by every browser.
     allowedMethods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS']

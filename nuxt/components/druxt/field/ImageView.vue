@@ -1,0 +1,89 @@
+<template>
+  <div class="authoring-field-image">
+    <img
+      v-for="image of images"
+      :key="image.src"
+      :src="image.src"
+      :alt="image.alt"
+      loading="lazy"
+      class="h-auto max-w-full rounded"
+      data-testid="field-image"
+    />
+  </div>
+</template>
+
+<script>
+/**
+ * An image field, displayed.
+ *
+ * Replaces `DruxtFieldImage`, which druxt-entity itself marks deprecated and
+ * which does two things a decoupled frontend cannot live with: it builds
+ * `/sites/default/files/...` from the file's internal URI, which points at
+ * whatever is serving the frontend rather than at the backend, and it renders
+ * no `alt` at all, on a field Drupal is configured to require alt text for.
+ *
+ * Named `ImageView` rather than put in the fallback because Druxt resolves the
+ * most specific component it can find, and `DruxtFieldImage` is registered
+ * globally by druxt-entity: the fallback is never reached for an image.
+ * `DruxtFieldImageView` is one place more specific, so it wins.
+ *
+ * A relationship carries the file's id and the alt text but not its path, so
+ * the file entities have to be fetched before anything can be drawn.
+ */
+import { DruxtFieldMixin } from 'druxt-entity'
+
+export default {
+  name: 'DruxtFieldImageView',
+
+  mixins: [DruxtFieldMixin],
+
+  data: () => ({ files: {} }),
+
+  computed: {
+    items() {
+      const data = (this.model || {}).data
+      if (!data) return []
+      return Array.isArray(data) ? data : [data]
+    },
+
+    images() {
+      return this.items
+        .map((item) => {
+          const file = this.files[item.id]
+          const url = (((file || {}).attributes || {}).uri || {}).url
+          if (!url) return null
+          return { src: this.absolute(url), alt: (item.meta || {}).alt || '' }
+        })
+        .filter(Boolean)
+    },
+  },
+
+  watch: {
+    items: { immediate: true, handler: 'loadFiles' },
+  },
+
+  methods: {
+    async loadFiles() {
+      for (const item of this.items) {
+        if (this.files[item.id] || item.type !== 'file--file') continue
+        try {
+          // Positional on the client. The Vuex action is the one that takes an
+          // object, and passing one here fetches `/jsonapi/[object Object]`.
+          const resource = await this.$druxt.getResource(item.type, item.id)
+          if (resource && resource.data) this.$set(this.files, item.id, resource.data)
+        } catch {
+          // A file that cannot be read renders as nothing, which is better than
+          // a broken image or a page that fails to render at all.
+        }
+      }
+    },
+
+    /** Drupal returns a site-relative URL, which is not this origin. */
+    absolute(url) {
+      if (/^https?:\/\//.test(url)) return url
+      const backend = (this.$authoring && this.$authoring.state.url) || ''
+      return `${String(backend).replace(/\/+$/, '')}${url}`
+    },
+  },
+}
+</script>
