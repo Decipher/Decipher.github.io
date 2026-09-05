@@ -14,7 +14,7 @@
         v-if="state.canStartBackend"
         type="button"
         class="mt-2 flex items-center gap-2 rounded border border-hairline px-3 py-1.5 text-sm text-body hover:border-accent hover:text-accent disabled:cursor-not-allowed disabled:opacity-60"
-        :disabled="state.starting || connected"
+        :disabled="state.starting || Boolean(state.started)"
         data-testid="github-start-backend"
         @click="startBackend"
       >
@@ -30,6 +30,29 @@
         ></span>
         {{ startLabel }}
       </button>
+
+      <!--
+        Said about the backend this started, not about whatever the site
+        happens to be connected to. Those are two different things, and saying
+        "backend running" while an author edits against a different one is the
+        interface reporting something it has not checked.
+      -->
+      <p
+        v-if="startedElsewhere"
+        class="mt-1 text-sm text-body"
+        data-testid="github-started-elsewhere"
+      >
+        The backend it started is ready, and you are editing against a different
+        one.
+        <button
+          type="button"
+          class="font-mono text-[0.6875rem] uppercase tracking-eyebrow text-accent underline"
+          data-testid="github-switch-backend"
+          @click="switchToStarted"
+        >
+          Switch to it
+        </button>
+      </p>
 
       <p
         v-if="startMessage || runOutcome"
@@ -160,7 +183,7 @@ export default {
      * the author waits for a backend that is not coming.
      */
     runOutcome() {
-      if (this.connected) return 'Connected to the backend it started.'
+      if (this.onStartedBackend) return 'Connected to the backend it started.'
       const run = this.state.run
       if (!run || !run.conclusion) return null
       if (run.conclusion === 'success') return 'The backend finished its run.'
@@ -175,9 +198,10 @@ export default {
 
     /** Says which part of starting it is in, rather than just "starting". */
     startLabel() {
-      // Connected is the end of starting. A session job runs for the length of
-      // the session, so its status says nothing about whether the backend is up.
-      if (this.connected) return 'Backend running'
+      // Having published itself is the end of starting. A session job runs for
+      // the length of the session, so its status says nothing about whether the
+      // backend is up, and being connected says nothing about which one.
+      if (this.state.started) return 'Backend running'
       if (!this.state.starting) return 'Start a backend'
       if (!this.state.run) return 'Asking GitHub...'
       return this.state.run.status === 'queued' ? 'Queued...' : 'Building...'
@@ -185,6 +209,18 @@ export default {
 
     connected() {
       return this.$authoring && this.$authoring.connected
+    },
+
+    /** Connected to the backend this started, rather than to some backend. */
+    onStartedBackend() {
+      const started = this.state.started
+      if (!started || !this.connected) return false
+      const here = String(this.$authoring.state.url || '').replace(/\/+$/, '')
+      return here === String(started.url || '').replace(/\/+$/, '')
+    },
+
+    startedElsewhere() {
+      return Boolean(this.state.started) && !this.onStartedBackend
     },
     controlClass() {
       return 'w-full rounded border border-hairline bg-paper px-3 py-2 font-mono text-sm text-ink focus:border-accent focus:outline-none'
@@ -218,6 +254,11 @@ export default {
       this.startMessage = result.ok
         ? 'It takes a few minutes. The site connects itself when the backend is up.'
         : result.reason
+    },
+
+    /** Move to the backend this started, because the author asked. */
+    async switchToStarted() {
+      await this.$authoring.connectPublished(this.state.started)
     },
 
     signOut() {

@@ -504,6 +504,67 @@ test.describe('adding content', () => {
     expect(await page.evaluate(() => getComputedStyle(document.body).overflow)).toBe('visible')
   })
 
+  test('a backend it started is not the same as the one you are on', async ({ page }) => {
+    // Two different things: one exists, and you are editing against it. Saying
+    // "backend running" while an author works against a different backend is
+    // the interface reporting something it never checked.
+    await page.route(/raw\.githubusercontent\.com/, (route) =>
+      route.fulfill({
+        status: 200,
+        headers: { 'content-type': 'application/json', 'access-control-allow-origin': '*' },
+        body: JSON.stringify({
+          url: 'http://started.test',
+          clientId: 'c',
+          expiresAt: new Date(Date.now() + 3600000).toISOString(),
+        }),
+      })
+    )
+    await page.route('http://elsewhere.test/jsonapi', (route) =>
+      route.fulfill({
+        status: 200,
+        headers: {
+          'content-type': 'application/vnd.api+json',
+          'access-control-allow-origin': '*',
+        },
+        body: JSON.stringify({ jsonapi: { version: '1.1' } }),
+      })
+    )
+    await page.route('https://api.github.com/**', (route) => {
+      const url = route.request().url()
+      const json = (body) =>
+        route.fulfill({
+          status: 200,
+          headers: { 'content-type': 'application/json', 'access-control-allow-origin': '*' },
+          body: JSON.stringify(body),
+        })
+      if (url.endsWith('/user')) return json({ login: 'someone' })
+      if (url.includes('/actions/workflows/')) return json({ id: 1 })
+      return json({ full_name: 'o/r', default_branch: 'main', permissions: { push: true } })
+    })
+
+    // Connected to one backend by hand, and told about another.
+    await page.goto(`/?backend=${encodeURIComponent('http://elsewhere.test')}`, {
+      waitUntil: 'networkidle',
+    })
+    await page.getByTestId('authoring-edit-toggle').click()
+    await page.getByTestId('cart-tab-send').click()
+    await page.getByTestId('github-repository').fill('o/r')
+    await page.getByTestId('github-token').fill('a-token')
+    await page.getByTestId('github-sign-in').click()
+    await expect(page.getByTestId('github-signed-in')).toBeVisible()
+
+    await page.evaluate(async () => {
+      const found = await window.$nuxt.$authoring.discover()
+      window.$nuxt.$authoringGithub.state.started = found
+    })
+
+    await expect(page.getByTestId('github-started-elsewhere')).toBeVisible()
+    // And moving is offered, not done for you.
+    expect(await page.evaluate(() => window.$nuxt.$authoring.state.url)).toBe(
+      'http://elsewhere.test'
+    )
+  })
+
   test('a visitor is offered no drawer at all', async ({ page }) => {
     await page.goto('/', { waitUntil: 'networkidle' })
     await expect(page.getByTestId('authoring-cart-toggle')).toHaveCount(0)
