@@ -140,3 +140,6 @@ Temporary Items
 # Playwright
 /test-results/
 /playwright-report/
+
+# Scratch space, kept in the repository so it is easy to find, never committed.
+.artifacts/

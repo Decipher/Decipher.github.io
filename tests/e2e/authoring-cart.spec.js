@@ -417,6 +417,53 @@ test.describe('adding content', () => {
     await expect(page.getByTestId('authoring-cart-commit')).toBeVisible()
   })
 
+  test('a preview can be looked at at a real device width', async ({ page }) => {
+    await page.goto('/', { waitUntil: 'networkidle' })
+    await page.getByTestId('authoring-edit-toggle').click()
+    await stage(page, {
+      type: 'node--article',
+      id: 'abc',
+      original: { title: 'Was' },
+      edited: { title: 'Is' },
+    })
+    await page.getByTestId('cart-preview-abc').click()
+
+    // A real width rather than a scale, so the site's own media queries decide
+    // the layout. A wide render zoomed down looks like a phone and is not one.
+    await page.getByTestId('preview-width').selectOption({ label: 'Phone' })
+    await expect(page.getByTestId('preview-width-note')).toContainText('375px')
+    const frame = page.locator('[data-testid="authoring-preview"] > div')
+    expect(await frame.evaluate((el) => Math.round(el.getBoundingClientRect().width))).toBe(375)
+
+    // Free is the default, and returning to it is not a fixed size at all.
+    await page.getByTestId('preview-width').selectOption({ label: 'Free' })
+    await expect(page.getByTestId('preview-width-note')).toHaveCount(0)
+  })
+
+  test('the preview covers the page rather than sitting inside the drawer', async ({ page }) => {
+    await page.goto('/', { waitUntil: 'networkidle' })
+    await page.getByTestId('authoring-edit-toggle').click()
+    await stage(page, {
+      type: 'node--article',
+      id: 'abc',
+      original: { title: 'Was' },
+      edited: { title: 'Is' },
+    })
+    await page.getByTestId('cart-preview-abc').click()
+
+    // Rendered from inside a scrolling, sticky, stacked column, so it is moved
+    // to the body: otherwise the header shows through it.
+    const parent = await page
+      .getByTestId('authoring-preview')
+      .evaluate((el) => el.parentElement.tagName)
+    expect(parent).toBe('BODY')
+    // And the page behind it does not scroll while it is open.
+    expect(await page.evaluate(() => getComputedStyle(document.body).overflow)).toBe('hidden')
+
+    await page.getByTestId('preview-close').click()
+    expect(await page.evaluate(() => getComputedStyle(document.body).overflow)).toBe('visible')
+  })
+
   test('a visitor is offered no drawer at all', async ({ page }) => {
     await page.goto('/', { waitUntil: 'networkidle' })
     await expect(page.getByTestId('authoring-cart-toggle')).toHaveCount(0)

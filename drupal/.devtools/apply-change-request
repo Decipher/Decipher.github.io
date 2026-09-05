@@ -1,0 +1,203 @@
+#!/usr/bin/env php
+<?php
+
+/**
+ * @file
+ * Apply a change request written by the frontend, so it becomes content.
+ *
+ * The browser cannot write Tome's on-disk format, and should not try. Tome
+ * writes Drupal's own content normalisation: every field a delta array, every
+ * reference by `target_uuid`, the whole entity rather than the fields that
+ * changed, and an image's width and height read off the file. Producing that in
+ * JavaScript means reimplementing Drupal's normalisers and keeping them in step
+ * with a Drupal that changes underneath, which fails quietly and produces pull
+ * requests that review cleanly and break the next build.
+ *
+ * So the browser writes what it already speaks, JSON:API resources plus the
+ * bytes, and this applies them through Drupal's entity API. `tome:export` then
+ * produces the content, exactly as it does for a live authoring session.
+ *
+ * Usage:
+ *   .devtools/apply-change-request requests/edits-20260905-0230/change.json
+ *
+ * Exits non-zero without applying anything if the document cannot be read, and
+ * non-zero part way through if a resource is refused. Half-applied is better
+ * reported than hidden: the job fails, nothing is committed, and the pull
+ * request says which resource stopped it.
+ */
+
+declare(strict_types=1);
+
+namespace QuickstartServerlessDevTools;
+
+require_once __DIR__ . '/helpers.php';
+
+$path = $argv[1] ?? '';
+if ($path === '') {
+  FAIL('Usage: .devtools/apply-change-request <path to change.json>');
+}
+
+$full = str_starts_with($path, '/') ? $path : '../' . $path;
+if (!file_exists($full)) {
+  FAIL('No change request at %s.', $path);
+}
+
+$document = json_decode((string) file_get_contents($full), TRUE);
+if (!is_array($document) || !isset($document['resources'])) {
+  FAIL('%s is not a change request: no `resources`.', $path);
+}
+if (($document['version'] ?? 0) !== 1) {
+  FAIL('Change request version %s is not one this understands.', (string) ($document['version'] ?? 'missing'));
+}
+
+echo '===============================' . PHP_EOL;
+echo '     APPLY CHANGE REQUEST      ' . PHP_EOL;
+echo '===============================' . PHP_EOL;
+echo PHP_EOL;
+NOTE('Document: %s', $path);
+
+$directory = dirname($full);
+$deletions = [];
+foreach ($document['deletions'] ?? [] as $deletion) {
+  $deletions[$deletion['id']] = TRUE;
+}
+
+// Bytes first, and by uuid, so a relationship written by the browser resolves
+// to the file this creates rather than to nothing.
+$files = [];
+foreach ($document['files'] ?? [] as $file) {
+  $files[$file['id']] = $file;
+}
+
+$php = <<<'SCRIPT'
+$document = json_decode(file_get_contents(getenv('CHANGE_REQUEST')), TRUE);
+$directory = getenv('CHANGE_REQUEST_DIR');
+$applied = ['created' => 0, 'updated' => 0, 'deleted' => 0, 'files' => 0];
+
+$repository = \Drupal::service('entity.repository');
+$manager = \Drupal::entityTypeManager();
+
+$deletions = [];
+foreach ($document['deletions'] ?? [] as $deletion) {
+  $deletions[$deletion['id']] = TRUE;
+}
+
+// Files first: a relationship names a uuid, and the file has to exist under it.
+foreach ($document['files'] ?? [] as $file) {
+  if ($repository->loadEntityByUuid('file', $file['id'])) {
+    continue;
+  }
+  $bytes = file_get_contents($directory . '/../../' . $file['path']);
+  if ($bytes === FALSE) {
+    throw new \RuntimeException('Missing file in the request: ' . $file['path']);
+  }
+  $destination = 'public://' . date('Y-m') . '/' . basename($file['name']);
+  \Drupal::service('file_system')->prepareDirectory(
+    $dir = dirname($destination),
+    \Drupal\Core\File\FileSystemInterface::CREATE_DIRECTORY
+  );
+  $uri = \Drupal::service('file.repository')->writeData(
+    $bytes,
+    $destination,
+    \Drupal\Core\File\FileExists::Rename
+  );
+  // The uuid the browser invented, so the relationship pointing at it resolves.
+  $uri->set('uuid', $file['id'])->setPermanent();
+  $uri->save();
+  $applied['files']++;
+}
+
+foreach ($document['resources'] as $resource) {
+  [$entity_type, $bundle] = array_pad(explode('--', $resource['type']), 2, NULL);
+  $storage = $manager->getStorage($entity_type);
+  $entity = $repository->loadEntityByUuid($entity_type, $resource['id']);
+
+  if (isset($deletions[$resource['id']])) {
+    if ($entity) {
+      $entity->delete();
+      $applied['deleted']++;
+    }
+    continue;
+  }
+
+  if (!$entity) {
+    $definition = $manager->getDefinition($entity_type);
+    $values = ['uuid' => $resource['id']];
+    if ($key = $definition->getKey('bundle')) {
+      $values[$key] = $bundle;
+    }
+    $entity = $storage->create($values);
+    $new = TRUE;
+  }
+
+  foreach ($resource['attributes'] ?? [] as $field => $value) {
+    if (!$entity->hasField($field)) {
+      continue;
+    }
+    $entity->set($field, $value);
+  }
+
+  foreach ($resource['relationships'] ?? [] as $field => $relationship) {
+    if (!$entity->hasField($field)) {
+      continue;
+    }
+    $data = $relationship['data'] ?? NULL;
+    if ($data === NULL) {
+      $entity->set($field, NULL);
+      continue;
+    }
+    $items = array_is_list($data) ? $data : [$data];
+    $values = [];
+    foreach ($items as $item) {
+      $target_type = explode('--', $item['type'])[0];
+      $target = $repository->loadEntityByUuid($target_type, $item['id']);
+      if (!$target) {
+        throw new \RuntimeException(sprintf(
+          'Cannot set %s on %s: nothing with uuid %s',
+          $field, $resource['id'], $item['id']
+        ));
+      }
+      // The meta carries an image's alt text, and Drupal stores it beside the
+      // reference rather than on the file. Dropping it loses the alt silently.
+      $values[] = ['target_id' => $target->id()] + array_diff_key(
+        $item['meta'] ?? [],
+        array_flip(['drupal_internal__target_id'])
+      );
+    }
+    $entity->set($field, $values);
+  }
+
+  $entity->save();
+  $applied[empty($new) ? 'updated' : 'created']++;
+  unset($new);
+}
+
+echo json_encode($applied);
+SCRIPT;
+
+$script = sys_get_temp_dir() . '/apply-change-request.php';
+file_put_contents($script, "<?php\n" . $php);
+
+putenv('CHANGE_REQUEST=' . realpath($full));
+putenv('CHANGE_REQUEST_DIR=' . realpath($directory));
+
+TASK('Applying %d resource(s), %d deletion(s), %d file(s).',
+  count($document['resources']), count($deletions), count($files));
+
+$output = drush('php:script ' . escapeshellarg($script), NULL, $exit_code);
+unlink($script);
+
+if ($exit_code !== 0) {
+  echo $output . PHP_EOL;
+  FAIL('The change request was refused. Nothing has been exported.');
+}
+
+PASS('Applied.');
+echo PHP_EOL;
+echo trim($output) . PHP_EOL;
+echo PHP_EOL;
+echo '===============================' . PHP_EOL;
+echo '   CHANGE REQUEST APPLIED  ✅  ' . PHP_EOL;
+echo '===============================' . PHP_EOL;
+echo PHP_EOL;
+echo '> Next: .devtools/session-export, and commit what it leaves.' . PHP_EOL;

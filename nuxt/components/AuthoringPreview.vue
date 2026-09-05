@@ -8,16 +8,38 @@
     @click.self="$emit('close')"
     @keydown.escape="$emit('close')"
   >
-    <div class="flex max-h-full w-full max-w-3xl flex-col rounded border border-hairline bg-paper">
+    <div
+      class="flex max-h-full flex-col rounded border border-hairline bg-paper"
+      :style="frameStyle"
+    >
       <div class="flex items-baseline justify-between gap-4 border-b border-hairline px-5 py-3">
         <p class="eyebrow">Preview</p>
+
+        <!--
+          A width, because a teaser at 1200px and the same teaser at 375px are
+          different designs, and the point of previewing is to see the one that
+          will be read. Free is the default: a fixed size is a thing to switch
+          to deliberately.
+        -->
+        <label class="ml-auto flex items-baseline gap-2">
+          <span class="eyebrow">Width</span>
+          <select
+            v-model="width"
+            class="rounded border border-hairline bg-paper px-2 py-1 font-mono text-xs text-ink"
+            data-testid="preview-width"
+          >
+            <option v-for="size of sizes" :key="size.label" :value="size.width">
+              {{ size.label }}
+            </option>
+          </select>
+        </label>
 
         <!--
           The view modes this bundle actually has, read from Drupal rather than
           guessed: a site with a custom display would otherwise be told it has
           only the ones somebody hardcoded.
         -->
-        <label class="ml-auto flex items-baseline gap-2">
+        <label class="flex items-baseline gap-2">
           <span class="eyebrow">View mode</span>
           <select
             v-model="mode"
@@ -37,6 +59,14 @@
           Close
         </button>
       </div>
+
+      <p
+        v-if="width"
+        class="border-b border-hairline px-5 py-1 font-mono text-[0.6875rem] text-muted"
+        data-testid="preview-width-note"
+      >
+        {{ width }}px wide
+      </p>
 
       <div class="overflow-y-auto px-5 py-4">
         <!--
@@ -67,16 +97,50 @@ export default {
   },
 
   data() {
-    return { mode: 'default', modes: ['default'] }
+    return {
+      mode: 'default',
+      modes: ['default'],
+      // Free by default: a fixed width is deliberate, not the normal case.
+      width: 0,
+      sizes: [
+        { label: 'Free', width: 0 },
+        { label: 'Phone', width: 375 },
+        { label: 'Tablet', width: 768 },
+        { label: 'Laptop', width: 1024 },
+        { label: 'Desktop', width: 1440 },
+      ],
+    }
   },
 
   async mounted() {
+    // Moved to the body, because it is rendered from inside the drawer: a
+    // scrolling, sticky, stacked column is a bad place for something that must
+    // cover the page. Vue 2 has no portal, so this is the portal.
+    document.body.appendChild(this.$el)
+    document.body.style.overflow = 'hidden'
     document.addEventListener('keydown', this.onKey)
     this.modes = await this.availableModes()
   },
 
   beforeDestroy() {
     document.removeEventListener('keydown', this.onKey)
+    document.body.style.overflow = ''
+    // Put back where Vue expects it, or removing the component throws.
+    if (this.$el.parentNode === document.body) document.body.removeChild(this.$el)
+  },
+
+  computed: {
+    /**
+     * The frame the content is rendered in.
+     *
+     * A real width rather than a scale, so the site's own media queries decide
+     * the layout. Zooming a wide render down looks like a phone and is not one:
+     * every breakpoint would still be the desktop's.
+     */
+    frameStyle() {
+      if (!this.width) return { width: '100%', maxWidth: '48rem' }
+      return { width: `${this.width}px`, maxWidth: '100%' }
+    },
   },
 
   methods: {

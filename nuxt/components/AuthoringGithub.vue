@@ -31,8 +31,13 @@
         {{ startLabel }}
       </button>
 
-      <p v-if="startMessage" class="mt-1 text-sm text-muted" data-testid="github-start-message">
-        {{ startMessage }}
+      <p
+        v-if="startMessage || runOutcome"
+        class="mt-1 text-sm"
+        :class="runFailed ? 'text-accent' : 'text-muted'"
+        data-testid="github-start-message"
+      >
+        {{ runOutcome || startMessage }}
         <!--
           The dispatch answers with no run id, so this link arrives a few
           seconds after the click rather than with it.
@@ -146,6 +151,25 @@ export default {
     },
     ready() {
       return Boolean(this.token.trim() && this.repository.trim())
+    },
+
+    /**
+     * What became of the run, once it is over.
+     *
+     * A job that fails and says nothing is worse than one that never started:
+     * the author waits for a backend that is not coming.
+     */
+    runOutcome() {
+      const run = this.state.run
+      if (!run || !run.conclusion) return null
+      if (run.conclusion === 'success') return 'The backend finished its run.'
+      if (run.conclusion === 'cancelled') return 'That run was cancelled.'
+      return `That run ${run.conclusion}. Nothing is listening.`
+    },
+
+    runFailed() {
+      const conclusion = (this.state.run || {}).conclusion
+      return Boolean(conclusion) && conclusion !== 'success'
     },
 
     /** Says which part of starting it is in, rather than just "starting". */
