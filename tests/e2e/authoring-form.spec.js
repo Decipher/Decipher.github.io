@@ -119,12 +119,59 @@ test.describe('the edit form', () => {
   test('every field gets the widget Drupal configured for it', async ({ page }) => {
     await stubBackend(page)
     await openForm(page)
+    await page.getByTestId('authoring-advanced').click()
 
     // Reference fields are searched, not typed into: tags and the author.
     await expect(page.getByTestId('reference-input')).toHaveCount(2)
     // The URL alias is one field, not the whole path object.
     await expect(page.getByTestId('field-path')).toHaveCount(1)
+    // A timestamp is a moment, not a string to be typed.
+    await expect(page.getByTestId('field-date')).toHaveCount(1)
     await expect(page.getByTestId('field-input').first()).toBeVisible()
+    // Nothing falls through to the untyped default any more.
+    await expect(page.getByTestId('field-textarea')).toHaveCount(0)
+  })
+
+  test('the settings around the content are out of the way', async ({ page }) => {
+    await stubBackend(page)
+    await openForm(page)
+
+    // Writing something should not mean scrolling past the publishing flags
+    // to reach the body. Drupal puts these in a sidebar for the same reason.
+    await expect(page.getByTestId('field-path')).toBeHidden()
+    await expect(page.getByTestId('field-date')).toBeHidden()
+    // What the author is actually writing stays in front of them.
+    await expect(page.getByTestId('field-input').first()).toBeVisible()
+
+    await page.getByTestId('authoring-advanced').click()
+    await expect(page.getByTestId('field-path')).toBeVisible()
+  })
+
+  test('a tag that does not exist yet can be made from the field', async ({ page }) => {
+    await stubBackend(page)
+    await openForm(page)
+
+    // Drupal's tags widget creates a term for anything typed that does not
+    // match, which is why tagging feels like typing rather than picking.
+    const tags = page.getByTestId('reference-input').first()
+    await tags.fill('Sourdough')
+    await expect(page.getByTestId('reference-create')).toContainText('Sourdough')
+    await page.getByTestId('reference-create').click()
+
+    const staged = await page.evaluate(() => window.$nuxt.$store.getters['authoringCart/resources'])
+    const term = staged.find((r) => r.type === 'taxonomy_term--tags')
+    // Staged, not created: nothing reaches the site until the cart is sent.
+    expect(term.attributes.name).toBe('Sourdough')
+  })
+
+  test('one character is told to keep typing, not left silent', async ({ page }) => {
+    await stubBackend(page)
+    await openForm(page)
+
+    // A search box that answers nothing looks broken, and the reason it
+    // answered nothing is not guessable.
+    await page.getByTestId('reference-input').first().fill('b')
+    await expect(page.getByTestId('reference-status').first()).toContainText('Keep typing')
   })
 
   test('the form offers to stage, and never to save', async ({ page }) => {
@@ -162,6 +209,8 @@ test.describe('the edit form', () => {
     await stubBackend(page)
     await openForm(page)
 
+    // The alias is a setting, not the content, so it lives behind Advanced.
+    await page.getByTestId('authoring-advanced').click()
     await page.getByTestId('field-path').fill('no-leading-slash')
     await page.getByTestId('field-path').blur()
     // Drupal rejects an alias without one, which is a round trip to find out.
@@ -204,6 +253,40 @@ test.describe('the edit form', () => {
     // The author relationship holds a uuid and nothing readable, so the label
     // has to be fetched. Asking someone to recognise a uuid is not a widget.
     await expect(page.getByTestId('reference-selected').filter({ hasText: 'admin' })).toHaveCount(1)
+  })
+
+  test('an edit that was never staged is kept, not reverted', async ({ page }) => {
+    await stubBackend(page)
+    await openForm(page)
+
+    await page.getByTestId('field-input').first().fill('Typed but not staged')
+    // "Done" is not "discard". Reverting an afternoon's work is the worst
+    // available reading of that word.
+    await page.getByTestId('authoring-editable-close').click()
+
+    await expect(page.getByTestId('unstaged-badge')).toBeVisible()
+    // Kept, but not counted: the drawer must not claim work it will not send.
+    expect(await page.evaluate(() => window.$nuxt.$store.getters['authoringCart/count'])).toBe(0)
+
+    // And reopening puts it back in front of the author.
+    await page.getByTestId(`edit-node--article-${ARTICLE}`).click()
+    await expect(page.getByTestId('field-input').first()).toHaveValue('Typed but not staged')
+  })
+
+  test('staging an unstaged edit turns it into a staged one', async ({ page }) => {
+    await stubBackend(page)
+    await openForm(page)
+    await page.getByTestId('field-input').first().fill('First typed, then staged')
+    await page.getByTestId('authoring-editable-close').click()
+    await expect(page.getByTestId('unstaged-badge')).toBeVisible()
+
+    await page.getByTestId(`edit-node--article-${ARTICLE}`).click()
+    await page.getByTestId('authoring-stage').click()
+    await page.getByTestId('authoring-editable-close').click()
+
+    // One state at a time: it is either going to be sent, or it is not.
+    await expect(page.getByTestId('staged-badge')).toBeVisible()
+    await expect(page.getByTestId('unstaged-badge')).toHaveCount(0)
   })
 
   test('staging nothing stages nothing', async ({ page }) => {
