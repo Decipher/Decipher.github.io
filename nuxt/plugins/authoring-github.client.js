@@ -119,7 +119,30 @@ export default function (context, inject) {
       }
 
       github.watchRun(since)
+      // The backend announces itself by publishing where it is, and the app
+      // only read that when it started. A backend begun from here appears
+      // minutes later, so look again until it does.
+      github.awaitBackend()
       return result
+    },
+
+    /**
+     * Wait for the backend this dispatch is bringing up.
+     *
+     * Stops on connecting, and stops when the run does: a run that has ended
+     * without a session is one that failed, and polling on would be waiting
+     * for something nobody is making.
+     */
+    async awaitBackend() {
+      const app = window.$nuxt
+      const deadline = Date.now() + 20 * 60 * 1000
+      const look = async () => {
+        if (Date.now() > deadline) return
+        if (app && app.$authoring && (await app.$authoring.discover())) return
+        if (state.run && runIsFinished(state.run)) return
+        window.setTimeout(look, 10000)
+      }
+      window.setTimeout(look, 8000)
     },
 
     /** Poll for the run, then for its result, and stop when it stops. */
@@ -143,6 +166,14 @@ export default function (context, inject) {
             state.starting = false
             return
           }
+        }
+        // A session job runs for as long as the session, so waiting for it to
+        // finish is waiting for the backend to be torn down. Being connected
+        // is what "started" means.
+        const app = window.$nuxt
+        if (app && app.$authoring && app.$authoring.connected) {
+          state.starting = false
+          return
         }
         window.setTimeout(poll, state.run ? 15000 : 5000)
       }
