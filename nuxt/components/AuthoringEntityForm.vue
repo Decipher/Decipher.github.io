@@ -44,7 +44,25 @@ export default {
     value: { type: Object, default: undefined },
   },
 
-  data: () => ({ message: null, original: null, pendingFiles: {} }),
+  data: () => ({ message: null, original: null, pendingFiles: {}, draftTimer: null }),
+
+  mounted() {
+    // Watch the form's own model, once Druxt has built it. Typing is drafting:
+    // the page renders staged and unstaged edits alike, so following the form
+    // is what makes a title appear as it is typed rather than when it is
+    // staged. Debounced, because this writes to storage.
+    this.$watch(
+      () => JSON.stringify(((this.$refs.form || {}).model || {}).attributes || {}),
+      () => {
+        window.clearTimeout(this.draftTimer)
+        this.draftTimer = window.setTimeout(() => this.saveDraft(), 250)
+      }
+    )
+  },
+
+  beforeDestroy() {
+    window.clearTimeout(this.draftTimer)
+  },
 
   methods: {
     /**

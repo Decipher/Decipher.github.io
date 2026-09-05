@@ -191,6 +191,22 @@ function previewStagedContent(store) {
     }
   }
 
+  /**
+   * Anything already on screen for this resource has a model from when it was
+   * seeded, and the store changing does not reach it. Told directly, so a title
+   * appears as it is typed rather than when the page is next rebuilt.
+   */
+  const byId = new Map(staged.map((resource) => [resource.id, resource]))
+  const refreshRows = (vm) => {
+    if (vm.$options.name === 'DruxtEntity' && byId.has(vm.uuid)) {
+      const resource = byId.get(vm.uuid)
+      const model = asResource(resource).data
+      if (JSON.stringify(vm.model) !== JSON.stringify(model)) vm.model = model
+    }
+    vm.$children.forEach(refreshRows)
+  }
+  refreshRows(app)
+
   const visit = (vm) => {
     // `results` is a computed over `resource.data`, so the rows have to be put
     // where they are read from rather than where they are read.

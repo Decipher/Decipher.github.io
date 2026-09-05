@@ -60,7 +60,10 @@ test.describe('edit mode', () => {
     await page.getByTestId('cart-tab-add').click()
     await page.getByTestId('authoring-add').click()
 
-    await expect(page.getByTestId('authoring-add-message')).toContainText('nothing is sent yet')
+    await expect(page.getByTestId('authoring-add-message')).toContainText(
+      'nothing is staged or sent'
+    )
+    await page.getByTestId('authoring-add-done').click()
     await expect(page.getByTestId('authoring-cart-count')).toContainText('1 change')
     expect(requests, 'nothing may be sent without a backend').toEqual([])
   })
@@ -71,13 +74,18 @@ test.describe('edit mode', () => {
     await page.getByTestId('cart-tab-add').click()
     await page.getByTestId('authoring-add').click()
 
+    // Staged only when staged: pressing Add opens a form, it does not decide
+    // to send anything.
+    await page.getByTestId('authoring-add-done').click()
+
     const resource = await page.evaluate(
       () =>
         window.$nuxt.$store.state.authoringCart.entries[
           Object.keys(window.$nuxt.$store.state.authoringCart.entries)[0]
         ]
     )
-    // The flag is what decides POST over PATCH at commit time.
+    // The flag is what decides POST over PATCH at commit time, and it has to
+    // survive the trip through being an unstaged draft.
     expect(resource.isNew).toBe(true)
     expect(resource.type).toBe('node--article')
     // A client-generated id, so the cart can key and name it before Drupal has

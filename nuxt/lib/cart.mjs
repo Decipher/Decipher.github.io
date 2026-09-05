@@ -164,6 +164,10 @@ export function tidyResource(resource) {
 export function isEmptyResource(resource) {
   // A removal changes everything about the thing, and carries no fields at all.
   if (isDeletion(resource)) return false
+  // Nor is content that does not exist yet: bringing it into being is the
+  // change, whatever is in it. An author who pressed Add and then Done meant
+  // the article to exist, and Drupal will say if it is missing a title.
+  if (isNew(resource)) return false
   // Bytes waiting to be uploaded are a change, even though they are not part of
   // the document that gets sent.
   if (Object.keys((resource || {}).files || {}).length) return false

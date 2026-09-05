@@ -95,8 +95,21 @@ export const getters = {
    */
   staged: (state) => Object.values(state.entries),
   entryFor: (state) => (type, id) => state.entries[cartKey(type, id)] || null,
-  /** Staged resources that do not exist on the backend yet. */
-  stagedNew: (state) => Object.values(state.entries).filter((resource) => resource.isNew),
+  /**
+   * Content that does not exist on the backend yet, staged or not.
+   *
+   * A listing should show something the moment it is begun, not only once it
+   * is staged: staging is a decision about sending, not about existing.
+   */
+  stagedNew: (state) => [
+    ...Object.values(state.entries).filter((resource) => resource.isNew),
+    ...Object.entries(state.drafts)
+      .filter(([, draft]) => draft.isNew)
+      .map(([key, draft]) => {
+        const [type, id] = key.split(':')
+        return { type, id, isNew: true, ...draft }
+      }),
+  ],
   draftFor: (state) => (type, id) => state.drafts[cartKey(type, id)] || null,
   errorFor: (state) => (type, id) => state.errors[cartKey(type, id)] || null,
 }
@@ -245,6 +258,28 @@ export const actions = {
    * has seen it. JSON:API accepts a client-supplied id on create, so the
    * placeholder becomes the real id rather than being swapped for one.
    */
+  /**
+   * Begin a new piece of content, without staging it.
+   *
+   * Pressing Add is not a decision to commit anything: it is opening a form.
+   * The resource is held unstaged, the same as any other edit that has not been
+   * staged, so the page shows it and the drawer does not claim it is going to
+   * be sent.
+   */
+  draftNew({ state, commit }, { type, attributes, relationships }) {
+    const id = newResourceId()
+    commit('setDraft', {
+      key: cartKey(type, id),
+      draft: {
+        isNew: true,
+        attributes: attributes || {},
+        relationships: relationships || {},
+        files: {},
+      },
+    })
+    return id
+  },
+
   stageNew({ state, commit }, { type, attributes, relationships, onlyIfReferenced }) {
     const id = newResourceId()
     const resource = {
@@ -272,10 +307,14 @@ export const actions = {
    * empty resource, so the count means what it says.
    */
   stage({ state, commit }, { type, id, original, edited, relationships, allRelationships, files }) {
-    const existing = state.entries[cartKey(type, id)]
+    const key = cartKey(type, id)
+    const existing = state.entries[key]
+    // From the draft too: content begun and never staged lives there, and
+    // forgetting it is new turns its create into a PATCH against nothing.
+    const wasNew = isNew(existing) || Boolean((state.drafts[key] || {}).isNew)
     // Something staged as new keeps every field, not just what changed since
     // the form loaded: there is no saved version to differ from.
-    const attributes = isNew(existing)
+    const attributes = wasNew
       ? withoutComputed({ ...edited })
       : changedFields(original, edited)
     const resource = mergeEntry(
@@ -283,7 +322,7 @@ export const actions = {
       {
         type,
         id,
-        isNew: isNew(existing),
+        isNew: wasNew,
         attributes,
         relationships: relationships || {},
         // Bytes chosen in the browser, kept off the wire by `tidyResource` and
@@ -326,9 +365,11 @@ export const actions = {
     const key = cartKey(type, id)
     // An unstaged deletion has no fields and is not nothing, so it survives a
     // form being closed over it.
-    const deleted = Boolean((state.drafts[key] || {}).deleted)
+    const existing = state.drafts[key] || {}
+    const deleted = Boolean(existing.deleted)
     const draft = {
       deleted,
+      isNew: Boolean(existing.isNew),
       attributes: attributes || {},
       relationships: relationships || {},
       // Bytes for a picture chosen and not staged. Without these the file is
@@ -338,6 +379,7 @@ export const actions = {
     }
     const empty =
       !deleted &&
+      !draft.isNew &&
       !Object.keys(draft.attributes).length &&
       !Object.keys(draft.relationships).length &&
       !Object.keys(draft.files).length
@@ -439,7 +481,9 @@ export const actions = {
     const resource = mergeEntry(existing, {
       type,
       id,
-      isNew: isNew(existing),
+      // From the draft as well: content begun and not yet staged is new, and
+      // forgetting that turns its create into a PATCH against nothing.
+      isNew: isNew(existing) || Boolean(draft.isNew),
       attributes: draft.attributes || {},
       relationships: draft.relationships || {},
       files: draft.files || {},
