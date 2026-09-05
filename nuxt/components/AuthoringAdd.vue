@@ -138,16 +138,18 @@ export default {
     },
 
     /**
-     * Close the form, keeping the new content and whatever is typed into it.
+     * Close the form, keeping the new content and what was typed into it.
      *
-     * The same reading of "Done" as everywhere else: it means finished with
-     * this form, not finished with the idea.
+     * Staged rather than left unstaged, unlike Done on an existing entity. The
+     * new thing is already in the cart, put there by Add, so leaving its fields
+     * unstaged would show one item twice: an empty shell under Staged and its
+     * contents under Unstaged, for one article the author wrote once.
      */
-    done() {
+    async done() {
       const form = this.$refs.form
-      if (form && typeof form.saveDraft === 'function') form.saveDraft()
+      if (form && typeof form.stage === 'function') await form.stage()
       this.stagedId = null
-      this.message = 'Kept. Find it in the drawer.'
+      this.message = 'Staged. Find it in the drawer.'
     },
 
     /**

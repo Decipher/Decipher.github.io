@@ -83,8 +83,16 @@ export const getters = {
   drawerOpen: (state) => state.drawerOpen,
   count: (state) => Object.keys(state.entries).length,
   isEmpty: (state) => !Object.keys(state.entries).length,
-  /** Everything staged, as JSON:API resource objects. */
+  /** Everything staged, as JSON:API resource objects, ready for the wire. */
   resources: (state) => Object.values(state.entries).map(tidyResource),
+  /**
+   * Everything staged, as the cart holds it.
+   *
+   * `resources` strips the cart's own bookkeeping, which is right for sending
+   * and wrong for showing: a deletion tidied for the wire is indistinguishable
+   * from an edit that changed nothing.
+   */
+  staged: (state) => Object.values(state.entries),
   entryFor: (state) => (type, id) => state.entries[cartKey(type, id)] || null,
   /** Staged resources that do not exist on the backend yet. */
   stagedNew: (state) => Object.values(state.entries).filter((resource) => resource.isNew),
@@ -305,11 +313,25 @@ export const actions = {
    * are ready. Deliberately not part of the cart: a draft is never committed,
    * and counting it would make the drawer claim work it is not going to send.
    */
-  saveDraft({ commit }, { type, id, attributes, relationships }) {
+  saveDraft({ state, commit }, { type, id, attributes, relationships, files }) {
     const key = cartKey(type, id)
-    const draft = { attributes: attributes || {}, relationships: relationships || {} }
+    // An unstaged deletion has no fields and is not nothing, so it survives a
+    // form being closed over it.
+    const deleted = Boolean((state.drafts[key] || {}).deleted)
+    const draft = {
+      deleted,
+      attributes: attributes || {},
+      relationships: relationships || {},
+      // Bytes for a picture chosen and not staged. Without these the file is
+      // gone the moment the form closes, and the field points at an id nothing
+      // can resolve.
+      files: files || {},
+    }
     const empty =
-      !Object.keys(draft.attributes).length && !Object.keys(draft.relationships).length
+      !deleted &&
+      !Object.keys(draft.attributes).length &&
+      !Object.keys(draft.relationships).length &&
+      !Object.keys(draft.files).length
     if (empty) return commit('clearDraft', key)
     commit('setDraft', { key, draft })
   },
@@ -358,8 +380,14 @@ export const actions = {
     const entry = state.entries[key]
     if (!entry) return false
 
-    // A removal has no fields to keep, so unstaging one is calling it off.
+    // A removal has no fields, but it is still an intention worth keeping: an
+    // author unticking it means "not in this commit", not "forget I said it".
+    // Calling it off is what Discard is for.
     if (isDeletion(entry)) {
+      commit('setDraft', {
+        key,
+        draft: { deleted: true, attributes: {}, relationships: {}, files: {} },
+      })
       commit('discardOne', key)
       commit('setPersistent', writeStored(state.entries))
       return true
@@ -371,6 +399,7 @@ export const actions = {
       draft: {
         attributes: { ...(entry.attributes || {}), ...(existing.attributes || {}) },
         relationships: { ...(entry.relationships || {}), ...(existing.relationships || {}) },
+        files: { ...(entry.files || {}), ...(existing.files || {}) },
       },
     })
     commit('discardOne', key)
@@ -390,6 +419,13 @@ export const actions = {
     const draft = state.drafts[key]
     if (!draft) return false
 
+    if (draft.deleted) {
+      commit('clearDraft', key)
+      commit('stage', { key, resource: { type, id, deleted: true } })
+      commit('setPersistent', writeStored(state.entries))
+      return true
+    }
+
     const existing = state.entries[key]
     const resource = mergeEntry(existing, {
       type,
@@ -397,6 +433,7 @@ export const actions = {
       isNew: isNew(existing),
       attributes: draft.attributes || {},
       relationships: draft.relationships || {},
+      files: draft.files || {},
     })
     commit('clearDraft', key)
     commit('stage', { key, resource })

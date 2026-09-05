@@ -1,5 +1,5 @@
 <template>
-  <div class="authoring-field-image">
+  <div class="authoring-field-image" :data-authoring-field="schema.id">
     <img
       v-for="image of images"
       :key="image.src"
@@ -72,10 +72,14 @@ export default {
      * rendered by Druxt from a slot and has no parent to take a prop from.
      */
     pendingFiles() {
-      const entries = this.$store.state.authoringCart.entries || {}
+      const cart = this.$store.state.authoringCart
       const found = {}
-      for (const resource of Object.values(entries)) {
-        for (const file of Object.values(resource.files || {})) found[file.id] = file
+      // Staged and unstaged alike: an image chosen and not staged still shows
+      // on the page, the same as an unstaged word does.
+      for (const held of [cart.entries || {}, cart.drafts || {}]) {
+        for (const resource of Object.values(held)) {
+          for (const file of Object.values(resource.files || {})) found[file.id] = file
+        }
       }
       return found
     },

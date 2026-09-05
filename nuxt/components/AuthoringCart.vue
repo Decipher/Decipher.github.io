@@ -56,12 +56,21 @@
               <span class="w-3 shrink-0 font-mono text-xs text-muted" aria-hidden="true">
                 {{ isExpanded(resource) ? '-' : '+' }}
               </span>
+              <!-- A deletion is not an edit, and must not read like one. -->
+              <span
+                v-if="resource.deleted"
+                class="shrink-0 rounded bg-accent px-1.5 py-0.5 font-mono text-[0.625rem] uppercase tracking-eyebrow text-accent-contrast"
+                data-testid="cart-delete-tag"
+                >Delete</span
+              >
               <span
                 class="truncate"
-                :class="resource.deleted ? 'text-accent line-through' : 'text-ink'"
+                :class="resource.deleted ? 'text-muted line-through' : 'text-ink'"
                 >{{ labelFor(resource.id) }}</span
               >
-              <span class="truncate text-muted">{{ fieldNames(resource) }}</span>
+              <span v-if="!resource.deleted" class="truncate text-muted">
+                {{ fieldNames(resource) }}
+              </span>
             </button>
             <button
               type="button"
@@ -126,9 +135,17 @@
             :data-testid="`cart-stage-${item.id}`"
             @change="stageDraft(item)"
           />
-          <span class="min-w-0 flex-1 truncate">
-            <span class="text-ink">{{ item.label }}</span>
-            <span class="text-muted"> {{ item.fields }}</span>
+          <span class="flex min-w-0 flex-1 items-baseline gap-2 truncate">
+            <span
+              v-if="item.deleted"
+              class="shrink-0 rounded border border-accent px-1.5 py-0.5 font-mono text-[0.625rem] uppercase tracking-eyebrow text-accent"
+              data-testid="cart-delete-tag-draft"
+              >Delete</span
+            >
+            <span :class="item.deleted ? 'text-muted line-through' : 'text-ink'">
+              {{ item.label }}
+            </span>
+            <span v-if="!item.deleted" class="text-muted">{{ item.fields }}</span>
           </span>
           <button
             type="button"
@@ -207,7 +224,7 @@ export default {
       return this.$store.getters['authoringCart/count']
     },
     resources() {
-      return this.$store.getters['authoringCart/resources']
+      return this.$store.getters['authoringCart/staged']
     },
     persistent() {
       return this.$store.state.authoringCart.persistent
@@ -234,7 +251,8 @@ export default {
           key,
           type,
           id,
-          label: attributes.title || attributes.name || type,
+          deleted: Boolean(draft.deleted),
+          label: attributes.title || attributes.name || this.labelOnPage(type, id) || type,
           fields: Object.keys({ ...attributes, ...(draft.relationships || {}) }).join(', '),
         }
       })
@@ -262,15 +280,20 @@ export default {
       const attributes = resource.attributes || {}
       // A deletion carries no fields at all, and an edit carries only what
       // changed, so the title is often not among them. The page knows it.
-      const onPage = document.querySelector(
-        `[data-authoring-entity="${resource.type}:${resource.id}"] [data-testid="entity-label"]`
-      )
       return (
         attributes.title ||
         attributes.name ||
-        (onPage && onPage.textContent.trim()) ||
+        this.labelOnPage(resource.type, resource.id) ||
         resource.type
       )
+    },
+
+    /** What the page is calling this, when the change itself does not say. */
+    labelOnPage(type, id) {
+      const el = document.querySelector(
+        `[data-authoring-entity="${type}:${id}"] [data-testid="entity-label"]`
+      )
+      return el ? el.textContent.trim() : ''
     },
 
     /**
@@ -321,15 +344,30 @@ export default {
      * then have to go and find is most of a navigation problem.
      */
     reveal(item) {
-      const target = document.querySelector(`[data-authoring-entity="${item.type}:${item.id}"]`)
-      if (!target) {
+      const entity = document.querySelector(`[data-authoring-entity="${item.type}:${item.id}"]`)
+      if (!entity) {
         this.refusal = 'That content is not on this page.'
         return
       }
       this.refusal = null
-      target.scrollIntoView({ behavior: 'smooth', block: 'center' })
-      target.classList.add('is-revealed')
-      window.setTimeout(() => target.classList.remove('is-revealed'), 1600)
+
+      // The fields that actually changed, where the page is showing them.
+      // Falling back to the whole entity for a deletion, which is about all of
+      // it, and for a change to something this display does not render.
+      const changed = Object.keys({
+        ...(item.attributes || {}),
+        ...(item.relationships || {}),
+      })
+      const found = changed
+        .map((field) => entity.querySelector(`[data-authoring-field="${field}"]`))
+        .filter(Boolean)
+      const targets = found.length ? found : [entity]
+
+      targets[0].scrollIntoView({ behavior: 'smooth', block: 'center' })
+      for (const target of targets) target.classList.add('is-revealed')
+      window.setTimeout(() => {
+        for (const target of targets) target.classList.remove('is-revealed')
+      }, 1800)
     },
 
     /** One resource's own tree, open or shut. Shut by default: the drawer is a
@@ -406,15 +444,17 @@ export default {
  * Drawn rather than tinted, because `accent-color` cannot change the shape and
  * the shape is most of the problem.
  */
-.authoring-check {
+input.authoring-check {
   appearance: none;
   -webkit-appearance: none;
   flex: none;
   width: 0.875rem;
   height: 0.875rem;
   margin: 0;
-  border: 1px solid rgb(var(--c-hairline));
-  background: rgb(var(--c-paper));
+  /* Darker than a hairline: at hairline weight an empty box reads as a
+     disabled one rather than as something to tick. */
+  border: 1px solid rgb(var(--c-muted));
+  background-color: rgb(var(--c-paper));
   cursor: pointer;
   position: relative;
   top: 0.125rem;
@@ -423,22 +463,25 @@ export default {
     background-color 120ms;
 }
 
-.authoring-check:hover {
+input.authoring-check:hover {
   border-color: rgb(var(--c-accent));
 }
 
-.authoring-check:focus-visible {
+input.authoring-check:focus-visible {
   outline: 2px solid rgb(var(--c-accent));
   outline-offset: 1px;
 }
 
-.authoring-check:checked {
-  background: var(--accent);
+input.authoring-check:checked {
+  /* The palette is raw channels, so every use goes through rgb(). `--accent`
+     does not exist, and an invalid shorthand silently leaves the box
+     transparent with a white tick drawn on nothing. */
+  background-color: rgb(var(--c-accent));
   border-color: rgb(var(--c-accent));
 }
 
 /* A tick, drawn as two borders rotated, so it needs no font and no image. */
-.authoring-check:checked::after {
+input.authoring-check:checked::after {
   content: '';
   position: absolute;
   left: 0.25rem;

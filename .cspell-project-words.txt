@@ -72,6 +72,7 @@ unstage
 unstaged
 untick
 unticked
+unticking
 valeryan
 vfox
 viewports
