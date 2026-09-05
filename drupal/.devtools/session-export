@@ -45,20 +45,30 @@ $baseline = read_baseline($baseline_file);
 $restored = 0;
 $kept = 0;
 foreach ($baseline as $path => $hash) {
+  $escaped = escapeshellarg($path);
+  $out = [];
+  exec('git -C .. ls-files --error-unmatch ' . $escaped . ' 2>/dev/null', $out, $tracked);
+
   // Only subtract a file that still looks the way it did when the baseline was
   // taken. Provisioning moves real content as well as infrastructure, so the
   // list alone cannot tell the two apart: what tells them apart is whether the
   // session changed the file. One that changed is somebody's edit, and removing
   // it would leave a pull request with nothing in it and no error to explain it.
+  //
+  // A baseline hash of `-` says the file was not there when the baseline was
+  // taken. For a tracked file that means provisioning deleted committed state,
+  // which is `drupal/files/public/.htaccess` and upstream starterkit behaviour:
+  // Drupal writes it back during the run, and putting the committed one back is
+  // restoring the repository rather than discarding anybody's work. Provisioning
+  // imports the committed content, so it never deletes a committed content file,
+  // and this cannot reach one.
   $current = is_file('../' . $path) ? (string) sha1_file('../' . $path) : '-';
-  if ($hash !== NULL && $current !== $hash) {
+  $recreated = $hash === '-' && $tracked === 0;
+  if ($hash !== NULL && !$recreated && $current !== $hash) {
     $kept++;
     continue;
   }
 
-  $escaped = escapeshellarg($path);
-  $out = [];
-  exec('git -C .. ls-files --error-unmatch ' . $escaped . ' 2>/dev/null', $out, $tracked);
   if ($tracked === 0) {
     exec('git -C .. checkout -- ' . $escaped . ' 2>/dev/null');
   }

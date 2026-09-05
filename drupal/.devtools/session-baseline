@@ -1,0 +1,43 @@
+#!/usr/bin/env php
+<?php
+
+/**
+ * @file
+ * Record what provisioning wrote, so a session's export can subtract it.
+ *
+ * `.devtools/provision-authoring` does this as its last step, because a session
+ * needs the OAuth setup as well. A change request job needs none of that: there
+ * is no browser signing in, only a document to apply. It still needs the
+ * baseline, because provisioning writes whether or not anybody asked it to
+ * (installing saves `system.site`, and Tome exports it), and without a baseline
+ * that would arrive in the pull request as content nobody edited.
+ *
+ * Run after `.devtools/provision` and before applying anything.
+ *
+ * Usage:
+ *   .devtools/session-baseline
+ */
+
+declare(strict_types=1);
+
+namespace QuickstartServerlessDevTools;
+
+require_once __DIR__ . '/helpers.php';
+
+echo '===============================' . PHP_EOL;
+echo '       SESSION BASELINE        ' . PHP_EOL;
+echo '===============================' . PHP_EOL;
+echo PHP_EOL;
+
+$status = trim((string) shell_exec('git -C .. status --porcelain -- drupal/config drupal/content 2>/dev/null'));
+if ($status !== '') {
+  echo $status . PHP_EOL . PHP_EOL;
+  FAIL('Uncommitted changes in drupal/config or drupal/content. The baseline records what provisioning wrote, and cannot tell those apart from it. Commit or stash first.');
+}
+
+TASK('Recording the export baseline.');
+record_infrastructure_baseline();
+PASS('Baseline recorded at .devtools/.session-infra.');
+
+echo PHP_EOL;
+echo '> Next: .devtools/apply-change-request <document>, then .devtools/session-export.' . PHP_EOL;

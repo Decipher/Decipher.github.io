@@ -1,0 +1,92 @@
+name: Apply change request
+
+# Turn a change request into content, on the pull request that carries it.
+#
+# The browser can write what an author meant, but not what Drupal would store:
+# references by `target_uuid`, an image's width and height read off the file,
+# the processed body. So a pull request arrives holding the author's intent, and
+# this job stands a Drupal up, applies it, and commits back what Tome writes.
+# Review then sees the real content diff rather than a document about it.
+#
+# The Drupal exists for the length of this job and is never exposed. There is no
+# tunnel, no OAuth setup and no login: nobody is signing in, there is only a
+# document to apply.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - 'requests/**'
+
+# Enough to commit the content back onto the branch the request came in on.
+permissions:
+  contents: write
+
+# Queued per pull request, not cancelled. Cancelling halfway through leaves a
+# Drupal mid-apply, and the next push would start from a branch whose content
+# state nobody can describe.
+concurrency:
+  group: change-request-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  apply:
+    # A fork's pull request gets a read-only token, so the commit back would
+    # fail after doing all the work. Authors here have write access by
+    # construction: the browser opens the branch through the API with their own
+    # token, which it only gets from someone who can push.
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          # The commit back goes to this branch, so the default token has to
+          # stay for git to use.
+          persist-credentials: true
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          # sodium, even though nothing here signs in. The lock file still holds
+          # simple_oauth's dependencies, and `composer install` refuses to
+          # install a lock whose platform requirements are not met, whether or
+          # not the job goes on to use them.
+          extensions: mbstring, pdo_sqlite, intl, gd, xml, zip, opcache, sodium
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+
+      - name: Apply it
+        run: scripts/apply-change-request.sh
+
+      - name: Commit what it became
+        env:
+          NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A drupal/content drupal/files requests
+          if git diff --cached --quiet; then
+            echo 'The request produced no content changes.'
+            exit 0
+          fi
+          git commit -m "chore(content): apply the change request from #${NUMBER}"
+          # A push made with GITHUB_TOKEN starts no workflow, so this cannot set
+          # itself off again. The trade is that the checks do not re-run on the
+          # content commit; what validated it is the Drupal that just accepted it.
+          git push origin "HEAD:${{ github.event.pull_request.head.ref }}"
+
+      - name: Upload the logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: change-request-logs
+          path: drupal/.logs/
+          if-no-files-found: ignore
