@@ -1,0 +1,101 @@
+name: Authoring session
+
+# Stand a Drupal backend up on demand, expose it, and hold it open while
+# somebody writes. What they wrote leaves as a pull request; the backend leaves
+# with the runner.
+#
+# Triggered by hand and nothing else. `workflow_dispatch` is restricted to
+# people with write access to the repository, which is the access control this
+# whole thing rests on: there is no other way to start a session, and no push,
+# pull request or schedule can.
+#
+# The work is in scripts/session.sh, shared with the GitLab job and with running
+# a session on a laptop, so all three produce a backend the frontend cannot tell
+# apart.
+
+on:
+  workflow_dispatch:
+    inputs:
+      minutes:
+        description: 'How long to hold the backend open'
+        required: false
+        default: '55'
+        type: string
+
+permissions:
+  contents: read
+
+# Queued, not cancelled. Two sessions at once would race, and the second export
+# would overwrite the first, so a second dispatch waits rather than colliding.
+concurrency:
+  group: authoring-session
+  cancel-in-progress: false
+
+jobs:
+  session:
+    runs-on: ubuntu-latest
+    # Where the secrets below live, and the only thing keeping them off an
+    # arbitrary ref. A dispatch can name any branch or tag, and the workflow
+    # file is read from that ref too, so nothing written here can stop a
+    # modified copy of this job running: pinning the checkout to the default
+    # branch would not, because the pin would be the attacker's to remove.
+    #
+    # An environment is enforced by GitHub instead. Its deployment branch rules
+    # decide which refs may read its secrets, and a branch that simply drops
+    # this line gets nothing, because the secrets are not repository-wide.
+    environment: authoring
+    # Above the longest session, so the job's own limit is a backstop for a
+    # hang rather than the thing that ends a session.
+    timeout-minutes: 90
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # A content pull request cannot be opened with GITHUB_TOKEN: a pull
+          # request opened with it does not trigger workflows, so the checks
+          # that are the entire review gate would never run. The session uses
+          # AUTHORING_PR_TOKEN instead, and the checkout must not leave the
+          # default credential behind for git to pick up.
+          persist-credentials: false
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          # sodium: simple_oauth pulls in lcobucci/jwt, which needs it.
+          extensions: mbstring, pdo_sqlite, intl, gd, xml, zip, opcache, sodium
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+
+      - name: Install cloudflared
+        # A Quick Tunnel needs no Cloudflare account and no stored credential,
+        # which is why a fork of this repository can start a session without
+        # setting anything up. Pinned and digest-checked by the script, because
+        # this binary runs in the same job as the secrets below.
+        run: scripts/install-cloudflared.sh
+
+      - name: Run the session
+        env:
+          SESSION_MINUTES: ${{ inputs.minutes }}
+          SITE_ORIGIN: ${{ vars.SITE_ORIGIN || format('https://{0}.github.io', github.repository_owner) }}
+          # Not GITHUB_TOKEN, for the reason above. Absent is fine: the session
+          # then says so and leaves the export in the working tree rather than
+          # failing.
+          GITHUB_TOKEN: ${{ secrets.AUTHORING_PR_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          # Where the one-time login link is sent. This repository is public, so
+          # its logs are world-readable and the session refuses to print the
+          # link without somewhere private to send it.
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: scripts/session.sh
+
+      - name: Upload the tunnel log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: session-logs
+          path: drupal/.logs/
+          if-no-files-found: ignore

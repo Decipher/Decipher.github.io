@@ -113,15 +113,27 @@ deliver_login_link() {
   fi
 
   if [ -n "${DISCORD_WEBHOOK_URL:-}" ]; then
-    local payload
-    payload=$(printf '{"content":"Authoring session ready.\\nBackend: %s\\nExpires: %s\\nLogin: %s"}' \
-      "$SESSION_URL" "$EXPIRES_AT" "$LOGIN_LINK")
-    if curl -sf -X POST -H 'Content-Type: application/json' -d "$payload" \
-        "$DISCORD_WEBHOOK_URL" >/dev/null; then
-      echo "Login link sent to the private channel. It is deliberately not printed here."
-      return 0
-    fi
-    echo "Could not reach the private channel." >&2
+    # What follows is a one-click administrator session, so it does not go over
+    # a plaintext connection. Checked rather than assumed: the URL comes from a
+    # secret, and a typo there would otherwise put the link on the wire in
+    # clear. `--proto '=https'` is the belt to this brace, and also stops curl
+    # being talked down to another scheme.
+    case "$DISCORD_WEBHOOK_URL" in
+      https://*)
+        local payload
+        payload=$(printf '{"content":"Authoring session ready.\\nBackend: %s\\nExpires: %s\\nLogin: %s"}' \
+          "$SESSION_URL" "$EXPIRES_AT" "$LOGIN_LINK")
+        if curl -sf --proto '=https' -X POST -H 'Content-Type: application/json' -d "$payload" \
+            "$DISCORD_WEBHOOK_URL" >/dev/null; then
+          echo "Login link sent to the private channel. It is deliberately not printed here."
+          return 0
+        fi
+        echo "Could not reach the private channel." >&2
+        ;;
+      *)
+        echo "DISCORD_WEBHOOK_URL is not https, so nothing was sent to it." >&2
+        ;;
+    esac
   fi
 
   # No private channel configured. On a public repository a job log is
