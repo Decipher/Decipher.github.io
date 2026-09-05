@@ -182,7 +182,7 @@ test.describe('adding content', () => {
 
     // Tidied for the wire, a deletion is indistinguishable from an edit that
     // changed nothing, so the drawer reads the cart's own copy.
-    await expect(page.getByTestId('cart-delete-tag')).toBeVisible()
+    await expect(page.getByTestId('cart-method-gone')).toHaveText('Delete')
   })
 
   test('unticking a deletion holds it back rather than calling it off', async ({ page }) => {
@@ -200,12 +200,12 @@ test.describe('adding content', () => {
     // Unticking means "not in this commit", not "forget I said it". It
     // disappearing entirely read as a discard nobody asked for.
     expect(await count(page)).toBe(0)
-    await expect(page.getByTestId('cart-delete-tag-draft')).toBeVisible()
+    await expect(page.getByTestId('cart-method-draft-gone')).toHaveText('Delete')
 
     // And it can be put back.
     await page.getByTestId('cart-stage-gone').click()
     expect(await count(page)).toBe(1)
-    await expect(page.getByTestId('cart-delete-tag')).toBeVisible()
+    await expect(page.getByTestId('cart-method-gone')).toHaveText('Delete')
   })
 
   test('the staged json reads as a change, not just its result', async ({ page }) => {
@@ -563,6 +563,37 @@ test.describe('adding content', () => {
     expect(await page.evaluate(() => window.$nuxt.$authoring.state.url)).toBe(
       'http://elsewhere.test'
     )
+  })
+
+  test('each change says what it will do to the backend', async ({ page }) => {
+    await page.goto('/', { waitUntil: 'networkidle' })
+    await page.getByTestId('authoring-edit-toggle').click()
+
+    // Taken from the request the commit will make, not described alongside it:
+    // creating, changing and removing read very differently to someone
+    // deciding what to send.
+    await stage(page, {
+      type: 'node--article',
+      id: 'edited',
+      original: { title: 'Was' },
+      edited: { title: 'Is' },
+    })
+    const created = await page.evaluate(() =>
+      window.$nuxt.$store.dispatch('authoringCart/stageNew', {
+        type: 'node--article',
+        attributes: { title: 'Brand new' },
+      })
+    )
+    await page.evaluate(() =>
+      window.$nuxt.$store.dispatch('authoringCart/stageDeletion', {
+        type: 'node--article',
+        id: 'removed',
+      })
+    )
+
+    await expect(page.getByTestId('cart-method-edited')).toHaveText('Update')
+    await expect(page.getByTestId(`cart-method-${created}`)).toHaveText('New')
+    await expect(page.getByTestId('cart-method-removed')).toHaveText('Delete')
   })
 
   test('a visitor is offered no drawer at all', async ({ page }) => {
