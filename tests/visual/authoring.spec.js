@@ -34,6 +34,10 @@ const contentMask = (page) => [page.locator('main'), page.getByTestId('built-at'
 
 async function isolateFromBackends(page) {
   await page.route(/\/(jsonapi|router)\//, (route) => route.abort())
+  // A build that knows where sessions are published looks for one on load.
+  // Left to reach the network, these shots depend on whether a backend happens
+  // to be running somewhere, which is not what they are testing.
+  await page.route(/raw\.githubusercontent\.com/, (route) => route.abort())
 }
 
 async function stubConformingBackend(page) {
