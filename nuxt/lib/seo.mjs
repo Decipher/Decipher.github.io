@@ -11,22 +11,17 @@
  */
 
 import {
-  siteOrigin,
   SITE_NAME,
   SITE_DESCRIPTION,
   TITLE_SUFFIX,
   canonicalUrl,
   isPrivateRoute,
+  shareImageUrl,
   siteUrl,
 } from './site.mjs'
 
 /** Longest description worth emitting. Search results truncate around here. */
 const DESCRIPTION_LIMIT = 160
-
-/** The share card a page with none of its own falls back to. */
-export function defaultShareImage() {
-  return `${siteOrigin()}/og/site.png`
-}
 
 /**
  * Trim a description to a whole word within the limit.
@@ -78,7 +73,7 @@ export function seoHead({ title, description, path = '/', image, canonical, type
   // A share card wants it regardless: it stands alone, with no browser chrome to
   // say which site it came from.
   const shareTitle = title ? `${title}${TITLE_SUFFIX}` : SITE_NAME
-  const shareImage = image || defaultShareImage()
+  const shareImage = image || shareImageUrl(path)
   const private_ = isPrivateRoute(path)
 
   return {

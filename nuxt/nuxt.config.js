@@ -1,4 +1,5 @@
 import { contentRoutesOrNone, pagesByPath } from './lib/content-routes.mjs'
+import { ogImages } from './lib/og-images.mjs'
 import { llmsTxt, robotsTxt, sitemapXml } from './lib/sitemap.mjs'
 import { SITE_NAME, SITE_DESCRIPTION } from './lib/site.mjs'
 
@@ -212,8 +213,8 @@ export default {
     // Written after the export rather than kept in `static/`, because all three
     // list the pages the build actually produced and name the origin it was
     // built for. A checked-in copy would be a guess that goes stale silently.
-    'generate:done'(generator) {
-      const { writeFileSync } = require('fs')
+    async 'generate:done'(generator) {
+      const { mkdirSync, writeFileSync } = require('fs')
       const { join } = require('path')
       const dir = generator.nuxt.options.generate.dir
       const files = {
@@ -224,7 +225,21 @@ export default {
       for (const [name, contents] of Object.entries(files)) {
         writeFileSync(join(dir, name), contents)
       }
-      console.log(`Wrote ${Object.keys(files).join(', ')} for ${pages.length} pages.`)
+
+      // Satori and resvg are loaded here rather than imported at the top,
+      // because both are dev dependencies: a consumer installing this without
+      // them should still be able to read the config.
+      const satori = require('satori').default || require('satori')
+      const { Resvg } = require('@resvg/resvg-js')
+      const cards = await ogImages(pages, { resolve: require.resolve, satori, Resvg })
+      mkdirSync(join(dir, 'og'), { recursive: true })
+      for (const { name, png } of cards) {
+        writeFileSync(join(dir, 'og', name), png)
+      }
+
+      console.log(
+        `Wrote ${Object.keys(files).join(', ')} and ${cards.length} share cards for ${pages.length} pages.`
+      )
     }
   },
 

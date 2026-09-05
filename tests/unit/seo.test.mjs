@@ -13,6 +13,7 @@ import { escapeXml, llmsTxt, robotsTxt, sitemapXml } from '../../nuxt/lib/sitema
 import {
   SITE_NAME,
   canonicalUrl,
+  cardFileName,
   isPrivateRoute,
   isSyndicated,
   siteUrl,
@@ -162,4 +163,24 @@ test('llms.txt says what each page is, which is what a sitemap does not', () => 
 
 test('an empty site still produces a valid llms.txt', () => {
   assert.match(llmsTxt([]), /^- No content published yet\.$/m)
+})
+
+test('a card file name cannot collide across route shapes', () => {
+  assert.equal(cardFileName('/'), 'site.png')
+  assert.equal(cardFileName('/node/7'), 'node-7.png')
+  assert.equal(cardFileName('/a-new-alias'), 'a-new-alias.png')
+  // `/node/7` and a page aliased `/node-7` would otherwise be the same file.
+  assert.notEqual(cardFileName('/node/7'), cardFileName('/node/7/x'))
+})
+
+test('a page shares its own card, and machinery shares the site one', () => {
+  assert.equal(
+    metaOf(seoHead({ path: '/a-new-alias' }), 'og:image'),
+    'https://decipher.github.io/og/a-new-alias.png'
+  )
+  // No card is drawn for these, so pointing at one would share a broken image.
+  assert.equal(
+    metaOf(seoHead({ path: '/callback' }), 'og:image'),
+    'https://decipher.github.io/og/site.png'
+  )
 })

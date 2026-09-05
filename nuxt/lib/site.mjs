@@ -80,3 +80,29 @@ export function isPrivateRoute(path) {
   const route = String(path || '')
   return PRIVATE_ROUTES.some((prefix) => route === prefix || route.startsWith(`${prefix}/`))
 }
+
+/**
+ * The file name of a route's share card.
+ *
+ * One flat directory, so `/node/7` cannot collide with a page called `node`.
+ * The homepage is `site.png`, which is also what anything without a card of its
+ * own falls back to.
+ */
+export function cardFileName(path) {
+  const slug = String(path || '/')
+    .replace(/^\/+|\/+$/g, '')
+    .replace(/[^a-z0-9]+/gi, '-')
+    .toLowerCase()
+  return `${slug || 'site'}.png`
+}
+
+/**
+ * The share card for a route.
+ *
+ * Machinery routes get the site card rather than one of their own: no card is
+ * drawn for them, and pointing at a file the build never wrote gives a share
+ * with a broken image on it.
+ */
+export function shareImageUrl(path = '/') {
+  return siteUrl(`/og/${isPrivateRoute(path) ? 'site.png' : cardFileName(path)}`)
+}

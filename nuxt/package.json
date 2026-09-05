@@ -22,6 +22,8 @@
     "@nuxt/image": "^0.7.1",
     "@nuxtjs/storybook": "4.2.0",
     "@nuxtjs/tailwindcss": "^4.2.1",
-    "postcss": "8.4.16"
+    "@resvg/resvg-js": "^2.6.2",
+    "postcss": "8.4.16",
+    "satori": "^0.33.4"
   }
 }
