@@ -73,11 +73,15 @@ export async function checkConformance(url, { fetch: fetchImpl, origin } = {}) {
  * as it does for any visitor when nothing is running, so a missing record, a
  * malformed one and an expired one all mean the same thing.
  */
-export async function readSessionRecord(recordUrl, { fetch: fetchImpl, now = Date.now() } = {}) {
+export async function readSessionRecord(
+  recordUrl,
+  { fetch: fetchImpl, now = Date.now(), token } = {}
+) {
   if (!recordUrl) return null
+  const { url, headers } = sessionRecordRequest(recordUrl, token)
   let record
   try {
-    const response = await fetchImpl(recordUrl, { cache: 'no-store' })
+    const response = await fetchImpl(url, { cache: 'no-store', headers })
     if (!response.ok) return null
     record = await response.json()
   } catch {
@@ -86,6 +90,52 @@ export async function readSessionRecord(recordUrl, { fetch: fetchImpl, now = Dat
   if (!record || typeof record.url !== 'string' || !record.url) return null
   if (isExpired(record.expiresAt, now)) return null
   return { ...record, url: normaliseUrl(record.url) }
+}
+
+/**
+ * The API address of a record published as a raw file, if it is one.
+ *
+ * `raw.githubusercontent.com/<owner>/<repo>/<ref>/<path>` and the contents API
+ * serve the same bytes, and only one of them is current.
+ */
+export function contentsApiUrl(recordUrl) {
+  const match = String(recordUrl || '').match(
+    /^https:\/\/raw\.githubusercontent\.com\/([^/]+)\/([^/]+)\/([^/]+)\/(.+)$/
+  )
+  if (!match) return null
+  const [, owner, repo, ref, path] = match
+  return `https://api.github.com/repos/${owner}/${repo}/contents/${path}?ref=${encodeURIComponent(ref)}`
+}
+
+/**
+ * How to ask for the session record, given what we are allowed to use.
+ *
+ * Two problems, one function. `raw.githubusercontent.com` is served through a
+ * CDN with `max-age=300`, and `cache: 'no-store'` only speaks to the browser's
+ * cache, not to Fastly's: a backend that came up a minute ago stays invisible
+ * for five, and a 404 fetched before the session started is cached just as
+ * happily as a hit. A unique query string is a different cache key, so this
+ * always asks for the current file.
+ *
+ * With a token there is a better answer still. The contents API is not the CDN
+ * and is current the moment the job pushes, which is as close to the job telling
+ * the page as a static site can get.
+ */
+export function sessionRecordRequest(recordUrl, token) {
+  const api = token && contentsApiUrl(recordUrl)
+  if (api) {
+    return {
+      url: api,
+      headers: {
+        // The file itself rather than the metadata envelope, so the caller
+        // parses one shape whichever address answered.
+        accept: 'application/vnd.github.raw',
+        authorization: `Bearer ${token}`,
+      },
+    }
+  }
+  const separator = String(recordUrl).includes('?') ? '&' : '?'
+  return { url: `${recordUrl}${separator}t=${Date.now()}`, headers: undefined }
 }
 
 /** base64url, the encoding every OAuth PKCE value uses. */

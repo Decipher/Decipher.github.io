@@ -21,8 +21,22 @@ import {
   readSessionRecord,
   resolveSource,
 } from '../lib/authoring.mjs'
+import { readStoredToken } from '../lib/github.mjs'
 
 const STORAGE_KEY = 'authoring.backend'
+
+/**
+ * The GitHub token this tab holds, if any.
+ *
+ * Read from storage rather than from `$authoringGithub`, because that plugin
+ * loads after this one and is not there to ask when the record is first read.
+ * With a token the record comes from the API, which is current the moment the
+ * job publishes; without one it comes from the CDN, five minutes late.
+ */
+function githubToken() {
+  const stored = readStoredToken(window.sessionStorage)
+  return (stored && stored.token) || undefined
+}
 
 /**
  * Read and write the remembered backend, tolerating a browser that refuses.
@@ -331,6 +345,10 @@ export default async function (context, inject) {
       if (!config.sessionRecordUrl) return null
       const published = await readSessionRecord(config.sessionRecordUrl, {
         fetch: window.fetch.bind(window),
+        // A signed-in author reads the record through the API instead, which is
+        // current the moment the job publishes rather than up to five minutes
+        // later. Anonymous visitors get the cache-busted raw file.
+        token: githubToken(),
       })
       if (!published || !published.url) return null
       if (state.status === 'connected' && state.url === normaliseUrl(published.url)) {
@@ -402,6 +420,7 @@ export default async function (context, inject) {
     stored: readStored(),
     published: await readSessionRecord(config.sessionRecordUrl, {
       fetch: window.fetch.bind(window),
+      token: githubToken(),
     }),
   })
 

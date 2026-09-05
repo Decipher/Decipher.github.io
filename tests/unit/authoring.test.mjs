@@ -11,10 +11,12 @@ import {
   base64Url,
   callbackUrl,
   checkConformance,
+  contentsApiUrl,
   isExpired,
   normaliseUrl,
   readSessionRecord,
   resolveSource,
+  sessionRecordRequest,
 } from '../../nuxt/lib/authoring.mjs'
 
 const jsonapiOk = () => ({
@@ -179,4 +181,55 @@ test('an explicit URL beats a remembered one, which beats a published one', () =
   assert.equal(resolveSource({ stored, published }).source, 'stored')
   assert.equal(resolveSource({ published }).source, 'published')
   assert.equal(resolveSource({}), null)
+})
+
+test('the record is never read from a cache that could be five minutes old', () => {
+  // `raw.githubusercontent.com` is served through a CDN with `max-age=300`, and
+  // `cache: 'no-store'` only speaks to the browser's cache. A backend that came
+  // up a minute ago stayed invisible for five, and a 404 fetched before the
+  // session started was cached just as happily as a hit.
+  const raw = 'https://raw.githubusercontent.com/o/r/session/session.json'
+  const first = sessionRecordRequest(raw).url
+  assert.match(first, /\?t=\d+$/)
+  assert.ok(first.startsWith(`${raw}?`))
+  assert.equal(sessionRecordRequest('https://x.test/a?b=1').url.includes('&t='), true)
+})
+
+test('a signed-in author reads the record from the API, not the CDN', () => {
+  // As close to the job telling the page as a static site gets: the contents
+  // API is current the moment the job pushes the branch.
+  const raw = 'https://raw.githubusercontent.com/o/r/session/session.json'
+  const { url, headers } = sessionRecordRequest(raw, 'a-token')
+  assert.equal(url, 'https://api.github.com/repos/o/r/contents/session.json?ref=session')
+  assert.equal(headers.authorization, 'Bearer a-token')
+  // The file, not the metadata envelope, so one shape comes back either way.
+  assert.equal(headers.accept, 'application/vnd.github.raw')
+})
+
+test('a record published somewhere other than GitHub still reads', () => {
+  assert.equal(contentsApiUrl('https://example.test/session.json'), null)
+  const { url, headers } = sessionRecordRequest('https://example.test/session.json', 'a-token')
+  assert.match(url, /^https:\/\/example\.test\/session\.json\?t=\d+$/)
+  assert.equal(headers, undefined)
+})
+
+test('the record read sends the token it was given', async () => {
+  const seen = []
+  const fetch = async (url, init) => {
+    seen.push({ url, headers: init.headers })
+    return {
+      ok: true,
+      json: async () => ({
+        url: 'https://backend.test',
+        expiresAt: new Date(Date.now() + 3600000).toISOString(),
+      }),
+    }
+  }
+  const record = await readSessionRecord(
+    'https://raw.githubusercontent.com/o/r/session/session.json',
+    { fetch, token: 'a-token' }
+  )
+  assert.equal(record.url, 'https://backend.test')
+  assert.ok(seen[0].url.startsWith('https://api.github.com/'))
+  assert.equal(seen[0].headers.authorization, 'Bearer a-token')
 })
