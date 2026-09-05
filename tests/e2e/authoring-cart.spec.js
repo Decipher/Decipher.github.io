@@ -858,4 +858,37 @@ test.describe('the drawer as a review surface', () => {
     expect(await count(page)).toBe(2)
     await expect(page.getByTestId(`cart-select-${tagId}`)).toBeChecked()
   })
+
+  test('a reference cannot be thrown away while something still needs it', async ({ page }) => {
+    // Unstaging was already refused. Discarding was not, and it is the worse of
+    // the two: unstaging leaves the tag in the cart to be found again, and
+    // discarding takes it away entirely, leaving the article pointing at
+    // nothing for the commit to fail on.
+    await page.goto('/', { waitUntil: 'networkidle' })
+    const tagId = await page.evaluate(() =>
+      window.$nuxt.$store.dispatch('authoringCart/stageNew', {
+        type: 'taxonomy_term--tags',
+        attributes: { name: 'Rye' },
+        onlyIfReferenced: true,
+      })
+    )
+    await stage(page, {
+      type: 'node--article',
+      id: 'article',
+      original: {},
+      edited: { title: 'Tagged' },
+      relationships: { field_tags: { data: [{ type: 'taxonomy_term--tags', id: tagId }] } },
+    })
+    await page.evaluate(() => window.$nuxt.$store.dispatch('authoringCart/setDrawerOpen', true))
+
+    await page.getByTestId(`cart-discard-${tagId}`).click()
+    await expect(page.getByTestId('cart-refusal')).toContainText('cannot be discarded')
+    expect(await count(page)).toBe(2)
+
+    // The article can go, because nothing depends on it. The tag then can too.
+    await page.getByTestId('cart-discard-article').click()
+    expect(await count(page)).toBe(1)
+    await page.getByTestId(`cart-discard-${tagId}`).click()
+    expect(await count(page)).toBe(0)
+  })
 })

@@ -504,8 +504,25 @@ export default {
       this.$store.dispatch('authoringCart/stageDraft', { type: item.type, id: item.id })
     },
 
+    /**
+     * Throw a change away, unless something else in the cart needs it.
+     *
+     * The same rule as unstaging, and more important here: unstaging leaves the
+     * resource in the cart to be found again, discarding does not. Without this
+     * an author could discard a new tag while the article referencing it stayed,
+     * and the commit would go out with a relationship pointing at nothing.
+     */
     discardOne(resource) {
       this.refusal = null
+      const needed = requiredBy(
+        resource.id,
+        this.resources.map((r) => r.id),
+        this.resources
+      )
+      if (needed.length) {
+        this.refusal = `${this.labelFor(needed[0])} references this, so it cannot be discarded.`
+        return
+      }
       this.$store.dispatch('authoringCart/discardOne', {
         type: resource.type,
         id: resource.id,

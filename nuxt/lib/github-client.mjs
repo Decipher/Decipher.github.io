@@ -117,6 +117,16 @@ export async function openChangeRequest({
     )
     const baseSha = baseRef.object.sha
 
+    // A ref names a commit, and `base_tree` wants a tree. GitHub has been
+    // willing to resolve one to the other, but that is not what the API says it
+    // takes, and this path had never actually run against GitHub to find out.
+    // One more request buys the documented contract.
+    const baseCommit = await call(
+      request,
+      `${apiUrl(repository)}/git/commits/${baseSha}`,
+      token
+    )
+
     // Every file becomes a blob first, so the tree can point at real content
     // rather than carrying base64 inline.
     const tree = []
@@ -137,7 +147,7 @@ export async function openChangeRequest({
 
     const created = await call(request, `${apiUrl(repository)}/git/trees`, token, {
       method: 'POST',
-      body: JSON.stringify({ base_tree: baseSha, tree }),
+      body: JSON.stringify({ base_tree: baseCommit.tree.sha, tree }),
     })
 
     const commit = await call(request, `${apiUrl(repository)}/git/commits`, token, {
