@@ -50,6 +50,10 @@ export default function (context, inject) {
     // Whether this token may start a backend, which needs Actions on top of
     // the two permissions proposing a change needs.
     canStartBackend: false,
+    // The session this dispatch brought up, once it publishes itself. Kept
+    // apart from what the site is connected to, which may be something else
+    // entirely.
+    started: null,
     workflow: config.workflow || 'authoring.yml',
     // The run a dispatch started, once it can be found. There is no run id in
     // the dispatch response, so this arrives a few seconds late.
@@ -102,6 +106,7 @@ export default function (context, inject) {
     async startBackend(minutes) {
       state.starting = true
       state.run = null
+      state.started = null
       const since = new Date().toISOString()
 
       const result = await startBackend({
@@ -142,7 +147,11 @@ export default function (context, inject) {
       const deadline = Date.now() + 20 * 60 * 1000
       const look = async () => {
         if (Date.now() > deadline) return
-        if (app && app.$authoring && (await app.$authoring.discover())) return
+        const found = app && app.$authoring && (await app.$authoring.discover())
+        if (found) {
+          state.started = found
+          if (found.connected) return
+        }
         if (state.run && runIsFinished(state.run)) return
         window.setTimeout(look, 10000)
       }
@@ -172,10 +181,9 @@ export default function (context, inject) {
           }
         }
         // A session job runs for as long as the session, so waiting for it to
-        // finish is waiting for the backend to be torn down. Being connected
-        // is what "started" means.
-        const app = window.$nuxt
-        if (app && app.$authoring && app.$authoring.connected) {
+        // finish is waiting for the backend to be torn down. The session having
+        // published itself is what "started" means.
+        if (state.started) {
           state.starting = false
           return
         }
@@ -191,6 +199,10 @@ export default function (context, inject) {
         status: 'idle',
         error: null,
         canStartBackend: false,
+    // The session this dispatch brought up, once it publishes itself. Kept
+    // apart from what the site is connected to, which may be something else
+    // entirely.
+    started: null,
       })
       writeStored(null)
     },

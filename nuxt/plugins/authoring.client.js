@@ -327,14 +327,33 @@ export default async function (context, inject) {
      * session, and nothing looked again. A backend can appear minutes after the
      * page did.
      */
-    async discover() {
-      if (!config.sessionRecordUrl) return false
+    async discover({ connect = true } = {}) {
+      if (!config.sessionRecordUrl) return null
       const published = await readSessionRecord(config.sessionRecordUrl, {
         fetch: window.fetch.bind(window),
       })
-      if (!published || !published.url) return false
-      if (state.status === 'connected' && state.url === normaliseUrl(published.url)) return true
+      if (!published || !published.url) return null
+      if (state.status === 'connected' && state.url === normaliseUrl(published.url)) {
+        return { ...published, connected: true }
+      }
 
+      // Not switched out from under the author. Someone editing against a local
+      // backend has chosen it, and moving them to another one because a session
+      // started somewhere is the interface deciding something that is theirs to
+      // decide.
+      if (!connect || state.status === 'connected') {
+        return { ...published, connected: false }
+      }
+
+      if (published.expiresAt) state.expiresAt = published.expiresAt
+      if (published.clientId) state.clientId = published.clientId
+      const ok = await authoring.connect(published.url, 'published')
+      return { ...published, connected: ok }
+    },
+
+    /** Connect to a session already found, when the author asks for it. */
+    async connectPublished(published) {
+      if (!published || !published.url) return false
       if (published.expiresAt) state.expiresAt = published.expiresAt
       if (published.clientId) state.clientId = published.clientId
       return authoring.connect(published.url, 'published')
