@@ -350,11 +350,12 @@ session:authoring:
   before_script:
     - !reference [.php-node-setup, before_script]
     # cloudflared is not in the image. A Quick Tunnel needs no account and no
-    # credential, so this is just the binary.
-    - curl -sSL -o /usr/local/bin/cloudflared
-      https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64
-    - chmod +x /usr/local/bin/cloudflared
-    - cloudflared --version
+    # credential, so this is just the binary. The script pins the version,
+    # checks the digest and picks the build for the runner's own architecture:
+    # these runners are arm64, and an amd64 binary starts here under emulation
+    # rather than failing, which is worse. It then takes seconds to publish a
+    # hostname where it should take milliseconds.
+    - scripts/install-cloudflared.sh
     # Created up front: a session that fails before the tunnel starts would
     # otherwise have no artifact path, and the upload error masks the real one.
     - mkdir -p drupal/.logs && touch drupal/.logs/.keep
@@ -418,9 +419,7 @@ preview:frontend:
     PREVIEW_MINUTES: '55'
   before_script:
     - !reference [.php-node-setup, before_script]
-    - curl -sSL -o /usr/local/bin/cloudflared
-      https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64
-    - chmod +x /usr/local/bin/cloudflared
+    - scripts/install-cloudflared.sh
     - mkdir -p .logs && touch .logs/.keep
   script:
     - scripts/preview-frontend.sh
