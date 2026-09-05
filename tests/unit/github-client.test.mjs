@@ -37,6 +37,12 @@ function fakeGitHub({ overrides = {} } = {}) {
     if (path.includes('/git/refs/heads/')) return answer({ object: { sha: 'base-sha' } })
     if (path.includes('/git/blobs')) return answer({ sha: `blob-${calls.length}` })
     if (path.includes('/git/trees')) return answer({ sha: 'tree-sha' })
+    // Reading the base commit, which is a different thing from writing a new
+    // one. Deliberately distinct shas: a commit and its tree are not the same
+    // object, and a fake that returns one value for both cannot tell you when
+    // the code has confused them.
+    if (path.startsWith('/repos/o/r/git/commits/'))
+      return answer({ sha: 'base-sha', tree: { sha: 'base-tree-sha' } })
     if (path.includes('/git/commits')) return answer({ sha: 'commit-sha' })
     if (path.includes('/git/refs')) return answer({ ref: 'refs/heads/x' })
     if (path.includes('/pulls')) return answer({ html_url: 'https://github.com/o/r/pull/1' })
@@ -145,7 +151,9 @@ test('the commit carries the image as a file, and the document points at it', as
   assert.equal(blob.body.encoding, 'base64')
 
   const tree = gh.calls.find((c) => c.path.includes('/git/trees'))
-  assert.equal(tree.body.base_tree, 'base-sha')
+  // The base commit's tree, not the commit. The API documents `base_tree` as a
+  // tree sha, and this used to send the commit sha it also uses as the parent.
+  assert.equal(tree.body.base_tree, 'base-tree-sha')
   const paths = tree.body.tree.map((entry) => entry.path)
   assert.ok(paths.some((p) => p.endsWith('/files/f1-red.png')))
   assert.ok(paths.some((p) => p.endsWith('/change.json')))
@@ -165,7 +173,9 @@ test('the commit is built on the branch it will be merged into', async () => {
     fetch: gh.fetch,
     now: new Date(),
   })
-  const commit = gh.calls.find((c) => c.path.includes('/git/commits'))
+  // The POST, not the read of the base commit that now precedes it. `includes`
+  // matched both and picked the read, whose body has no parents at all.
+  const commit = gh.calls.find((c) => c.method === 'POST' && c.path.endsWith('/git/commits'))
   assert.deepEqual(commit.body.parents, ['base-sha'])
 })
 
