@@ -49,6 +49,16 @@
         <p v-if="!relationships.length" class="text-sm text-muted">Nothing referenced yet.</p>
       </div>
 
+      <!-- A moment in time, not a string to be typed -->
+      <input
+        v-else-if="isTypeDate"
+        :id="fieldId"
+        v-model="dateValue"
+        type="datetime-local"
+        :class="controlClass"
+        data-testid="field-date"
+      />
+
       <!-- URL alias -->
       <AuthoringPath
         v-else-if="isTypePath"
@@ -178,6 +188,8 @@
 import { DruxtEntity, DruxtFieldMixin } from 'druxt-entity'
 import Draggable from 'vuedraggable'
 
+import { fromDateInput, toDateInput } from '../../../lib/datetime.mjs'
+
 export default {
   components: { Draggable, DruxtEntity },
 
@@ -227,6 +239,9 @@ export default {
         this.schema.type
       )
     },
+    isTypeDate() {
+      return ['datetime_timestamp', 'datetime_default'].includes(this.schema.type)
+    },
     isTypePath() {
       return ['path'].includes(this.schema.type)
     },
@@ -235,6 +250,22 @@ export default {
     },
     isTypeWysiwyg() {
       return ['text_textarea', 'text_textarea_with_summary'].includes(this.schema.type)
+    },
+
+    /**
+     * The date, in the only shape a `datetime-local` input accepts.
+     *
+     * Drupal sends ISO 8601 with an offset, which the input will not display:
+     * it shows an empty field rather than refusing, so the author sees a date
+     * field that has apparently lost its date.
+     */
+    dateValue: {
+      get() {
+        return toDateInput(this.model)
+      },
+      set(local) {
+        this.model = fromDateInput(local)
+      },
     },
 
     label() {
