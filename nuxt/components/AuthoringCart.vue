@@ -23,10 +23,29 @@
       This browser will not keep them past a reload.
     </p>
 
-    <ul v-if="count" class="mb-3 space-y-1">
+    <ul v-if="count" class="mb-3 space-y-2">
       <li v-for="resource in resources" :key="resource.type + resource.id" class="text-sm">
-        <code class="font-mono text-ink">{{ resource.type }}</code>
-        <span class="text-muted"> {{ fieldNames(resource) }}</span>
+        <button
+          type="button"
+          class="flex w-full items-baseline gap-1 text-left"
+          :aria-expanded="String(isExpanded(resource))"
+          data-testid="authoring-cart-expand"
+          @click="toggle(resource)"
+        >
+          <span class="w-3 shrink-0 font-mono text-xs text-muted" aria-hidden="true">
+            {{ isExpanded(resource) ? '-' : '+' }}
+          </span>
+          <code class="font-mono text-ink">{{ resource.type }}</code>
+          <span class="text-muted">{{ fieldNames(resource) }}</span>
+        </button>
+
+        <!-- What is actually going to be sent, rather than a summary of it. -->
+        <AuthoringJsonTree
+          v-if="isExpanded(resource)"
+          :value="resource"
+          class="ml-4 mt-1 border-l border-hairline pl-2"
+        />
+
         <span
           v-if="errorFor(resource)"
           class="block text-accent"
@@ -82,6 +101,10 @@ export default {
 
   data: () => ({ result: null }),
 
+  data() {
+    return { expanded: {} }
+  },
+
   computed: {
     count() {
       return this.$store.getters['authoringCart/count']
@@ -114,6 +137,17 @@ export default {
   },
 
   methods: {
+    /** One resource's own tree, open or shut. Shut by default: the drawer is a
+     * list first, and a reader opens the one they care about. */
+    isExpanded(resource) {
+      return Boolean(this.expanded[resource.type + resource.id])
+    },
+
+    toggle(resource) {
+      const key = resource.type + resource.id
+      this.$set(this.expanded, key, !this.expanded[key])
+    },
+
     close() {
       this.$store.dispatch('authoringCart/setDrawerOpen', false)
     },
