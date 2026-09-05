@@ -336,6 +336,18 @@ test.describe('adding content', () => {
         return route.fulfill({ status: 204, headers: { 'access-control-allow-origin': '*' } })
       }
       if (url.endsWith('/user')) return json({ login: 'the-maintainer' })
+      if (url.includes('/runs?') || url.includes('/runs&'))
+        return json({
+          workflow_runs: [
+            {
+              id: 99,
+              html_url: 'https://github.com/o/r/actions/runs/99',
+              status: 'in_progress',
+              conclusion: null,
+              created_at: new Date().toISOString(),
+            },
+          ],
+        })
       if (url.includes('/actions/workflows/')) return json({ id: 1, name: 'Authoring session' })
       return json({ full_name: 'o/r', default_branch: 'main', permissions: { push: true } })
     })
@@ -358,6 +370,19 @@ test.describe('adding content', () => {
     // The same workflow a maintainer runs by hand, on the default branch.
     expect(dispatched).toHaveLength(1)
     expect(dispatched[0].ref).toBe('main')
+
+    // Dispatching a second one queues it behind the first rather than doing
+    // anything useful, so the control stays out of action while one is going.
+    await expect(page.getByTestId('github-start-backend')).toBeDisabled()
+    await expect(page.getByTestId('github-spinner')).toBeVisible()
+
+    // The dispatch answers with no run id, so the link arrives once the run
+    // can be found by when it started.
+    await expect(page.getByTestId('github-run-link')).toHaveAttribute(
+      'href',
+      'https://github.com/o/r/actions/runs/99'
+    )
+    await expect(page.getByTestId('github-start-backend')).toContainText('Building')
   })
 
   test('a visitor is offered no drawer at all', async ({ page }) => {

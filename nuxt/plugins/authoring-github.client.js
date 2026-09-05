@@ -14,7 +14,7 @@
  */
 import Vue from 'vue'
 
-import { checkAccess, startBackend } from '../lib/github-client.mjs'
+import { checkAccess, findRun, runIsFinished, startBackend } from '../lib/github-client.mjs'
 
 const TOKEN_KEY = 'authoring.github'
 
@@ -51,6 +51,10 @@ export default function (context, inject) {
     // the two permissions proposing a change needs.
     canStartBackend: false,
     workflow: config.workflow || 'authoring.yml',
+    // The run a dispatch started, once it can be found. There is no run id in
+    // the dispatch response, so this arrives a few seconds late.
+    run: null,
+    starting: false,
   })
 
   const github = {
@@ -88,8 +92,19 @@ export default function (context, inject) {
       return true
     },
 
+    /**
+     * Start a backend, and keep watching until it is no longer starting.
+     *
+     * The button stays out of action for as long as a run is queued or going,
+     * because dispatching a second one queues it behind the first rather than
+     * doing anything useful.
+     */
     async startBackend(minutes) {
-      return startBackend({
+      state.starting = true
+      state.run = null
+      const since = new Date().toISOString()
+
+      const result = await startBackend({
         repository: state.repository,
         token: state.token,
         workflow: state.workflow,
@@ -97,6 +112,41 @@ export default function (context, inject) {
         minutes,
         fetch: window.fetch.bind(window),
       })
+
+      if (!result.ok) {
+        state.starting = false
+        return result
+      }
+
+      github.watchRun(since)
+      return result
+    },
+
+    /** Poll for the run, then for its result, and stop when it stops. */
+    async watchRun(since) {
+      const deadline = Date.now() + 90 * 60 * 1000
+      const poll = async () => {
+        if (Date.now() > deadline) {
+          state.starting = false
+          return
+        }
+        const found = await findRun({
+          repository: state.repository,
+          token: state.token,
+          workflow: state.workflow,
+          since,
+          fetch: window.fetch.bind(window),
+        })
+        if (found.ok && found.run) {
+          state.run = found.run
+          if (runIsFinished(found.run)) {
+            state.starting = false
+            return
+          }
+        }
+        window.setTimeout(poll, state.run ? 15000 : 5000)
+      }
+      poll()
     },
 
     signOut() {

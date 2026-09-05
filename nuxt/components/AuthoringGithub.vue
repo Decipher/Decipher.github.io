@@ -13,15 +13,38 @@
       <button
         v-if="state.canStartBackend"
         type="button"
-        class="mt-2 block rounded border border-hairline px-3 py-1.5 text-sm text-body hover:border-accent hover:text-accent disabled:opacity-60"
-        :disabled="starting"
+        class="mt-2 flex items-center gap-2 rounded border border-hairline px-3 py-1.5 text-sm text-body hover:border-accent hover:text-accent disabled:cursor-not-allowed disabled:opacity-60"
+        :disabled="state.starting"
         data-testid="github-start-backend"
         @click="startBackend"
       >
-        {{ starting ? 'Starting...' : 'Start a backend' }}
+        <!--
+          Drawn rather than a character, so it turns rather than flickering, and
+          hidden from a reader who is not looking at it.
+        -->
+        <span
+          v-if="state.starting"
+          class="authoring-spinner"
+          aria-hidden="true"
+          data-testid="github-spinner"
+        ></span>
+        {{ startLabel }}
       </button>
+
       <p v-if="startMessage" class="mt-1 text-sm text-muted" data-testid="github-start-message">
         {{ startMessage }}
+        <!--
+          The dispatch answers with no run id, so this link arrives a few
+          seconds after the click rather than with it.
+        -->
+        <a
+          v-if="state.run"
+          :href="state.run.url"
+          target="_blank"
+          rel="noreferrer noopener"
+          data-testid="github-run-link"
+          >Watch the job</a
+        >
       </p>
 
       <button
@@ -108,7 +131,7 @@ export default {
   name: 'AuthoringGithub',
 
   data() {
-    return { token: '', repository: '', starting: false, startMessage: null }
+    return { token: '', repository: '', startMessage: null }
   },
 
   computed: {
@@ -123,6 +146,13 @@ export default {
     },
     ready() {
       return Boolean(this.token.trim() && this.repository.trim())
+    },
+
+    /** Says which part of starting it is in, rather than just "starting". */
+    startLabel() {
+      if (!this.state.starting) return 'Start a backend'
+      if (!this.state.run) return 'Asking GitHub...'
+      return this.state.run.status === 'queued' ? 'Queued...' : 'Building...'
     },
     controlClass() {
       return 'w-full rounded border border-hairline bg-paper px-3 py-2 font-mono text-sm text-ink focus:border-accent focus:outline-none'
@@ -151,12 +181,10 @@ export default {
      * frontend already watches for.
      */
     async startBackend() {
-      this.starting = true
       this.startMessage = null
       const result = await this.$authoringGithub.startBackend()
-      this.starting = false
       this.startMessage = result.ok
-        ? 'Asked GitHub to start one. It takes a few minutes, and the site connects itself when it is up.'
+        ? 'It takes a few minutes. The site connects itself when the backend is up.'
         : result.reason
     },
 
@@ -166,3 +194,29 @@ export default {
   },
 }
 </script>
+
+<style>
+.authoring-spinner {
+  display: inline-block;
+  width: 0.75rem;
+  height: 0.75rem;
+  border: 1.5px solid rgb(var(--c-hairline));
+  border-top-color: rgb(var(--c-accent));
+  border-radius: 50%;
+  animation: authoring-spin 700ms linear infinite;
+}
+
+@keyframes authoring-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Someone who has asked not to see movement should not be made to. */
+@media (prefers-reduced-motion: reduce) {
+  .authoring-spinner {
+    animation: none;
+    border-top-color: rgb(var(--c-hairline));
+  }
+}
+</style>

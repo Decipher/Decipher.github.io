@@ -7,7 +7,13 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { checkAccess, openChangeRequest, startBackend } from '../../nuxt/lib/github-client.mjs'
+import {
+  checkAccess,
+  findRun,
+  openChangeRequest,
+  runIsFinished,
+  startBackend,
+} from '../../nuxt/lib/github-client.mjs'
 
 /** A GitHub that records what it was asked and answers plausibly. */
 function fakeGitHub({ overrides = {} } = {}) {
@@ -251,4 +257,67 @@ test('a missing workflow names the branch it looked on', async () => {
     fetch: gh.fetch,
   })
   assert.match(result.reason, /feature\/x/)
+})
+
+test('a dispatch is matched to its run by when it started', async () => {
+  // `workflow_dispatch` answers 204 with no body, so the only way to find the
+  // run is to ask what has started since. Matched on time rather than on being
+  // newest, or someone else's run from a minute ago is mistaken for this one.
+  const now = new Date()
+  const old = new Date(now.getTime() - 10 * 60 * 1000).toISOString()
+  const gh = fakeGitHub({
+    overrides: {
+      '/runs': {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          workflow_runs: [
+            { id: 2, html_url: 'u2', status: 'queued', created_at: now.toISOString() },
+            { id: 1, html_url: 'u1', status: 'completed', created_at: old },
+          ],
+        }),
+      },
+    },
+  })
+
+  const found = await findRun({
+    repository: 'o/r',
+    token: 't',
+    workflow: 'authoring.yml',
+    since: now.toISOString(),
+    fetch: gh.fetch,
+  })
+  assert.equal(found.run.id, 2)
+  assert.equal(found.run.status, 'queued')
+})
+
+test('a run that started long before this dispatch is not it', async () => {
+  const gh = fakeGitHub({
+    overrides: {
+      '/runs': {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          workflow_runs: [
+            { id: 1, html_url: 'u1', status: 'completed', created_at: '2020-01-01T00:00:00Z' },
+          ],
+        }),
+      },
+    },
+  })
+  const found = await findRun({
+    repository: 'o/r',
+    token: 't',
+    workflow: 'authoring.yml',
+    since: new Date().toISOString(),
+    fetch: gh.fetch,
+  })
+  assert.equal(found.run, null)
+})
+
+test('only a finished run stops the waiting', () => {
+  assert.equal(runIsFinished({ status: 'queued' }), false)
+  assert.equal(runIsFinished({ status: 'in_progress' }), false)
+  assert.equal(runIsFinished({ status: 'completed' }), true)
+  assert.equal(runIsFinished(null), false)
 })
