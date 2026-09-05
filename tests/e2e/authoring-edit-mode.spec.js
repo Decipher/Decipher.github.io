@@ -33,6 +33,8 @@ test.describe('edit mode', () => {
 
     await open(page)
     await expect(page.getByTestId('authoring-edit-toggle')).toHaveText('Editing')
+    // The mode survives; the drawer is left however it was last put.
+    await expect(page.getByTestId('authoring-cart-toggle')).toBeVisible()
   })
 
   test('turning it off puts the page back to what a visitor sees', async ({ page }) => {

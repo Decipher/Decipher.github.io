@@ -17,6 +17,7 @@ import {
   changedFields,
   commitOrder,
   isDeletion,
+  valuesBefore,
   withDependencies,
   isEmptyResource,
   isNew,
@@ -224,6 +225,10 @@ export const actions = {
   /** Turn editing on or off, and remember which. */
   setEditing({ commit }, editing) {
     commit('setEditing', Boolean(editing))
+    // Edit mode is a mode, and the drawer is its surface: it holds the changes
+    // and the way to add content. Turning the mode on and finding neither is
+    // how adding became unreachable from every page but one.
+    commit('setDrawerOpen', Boolean(editing))
     try {
       if (editing) window.localStorage.setItem('authoring.editing', '1')
       else window.localStorage.removeItem('authoring.editing')
@@ -284,6 +289,10 @@ export const actions = {
         // Bytes chosen in the browser, kept off the wire by `tidyResource` and
         // uploaded when this is committed.
         files: { ...((existing || {}).files || {}), ...(files || {}) },
+        before: {
+          ...valuesBefore(original || {}, attributes),
+          ...valuesBefore((allRelationships || {}), relationships || {}),
+        },
       },
       // What this form had in front of it, so a previously staged field the
       // author has since put back can be dropped rather than kept forever.
