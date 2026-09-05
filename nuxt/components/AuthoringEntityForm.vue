@@ -1,6 +1,13 @@
 <template>
   <div class="authoring-entity-form">
-    <DruxtEntityForm ref="form" :type="type" :uuid="uuid" :mode="mode" @error="onError" />
+    <DruxtEntityForm
+      ref="form"
+      :type="type"
+      :uuid="uuid"
+      :mode="mode"
+      :value="value"
+      @error="onError"
+    />
   </div>
 </template>
 
@@ -25,6 +32,16 @@ export default {
     type: { type: String, required: true },
     uuid: { type: String, required: true },
     mode: { type: String, default: 'default' },
+    /**
+     * A resource to edit instead of fetching one.
+     *
+     * Content that has only been staged has an id the backend has never seen,
+     * so fetching it is a 404 and the form renders no fields at all: an author
+     * gets an empty box and a Stage button that reports nothing changed.
+     * Druxt skips its fetch when given a value, which is exactly what a create
+     * form needs.
+     */
+    value: { type: Object, default: undefined },
   },
 
   data: () => ({ message: null, original: null }),

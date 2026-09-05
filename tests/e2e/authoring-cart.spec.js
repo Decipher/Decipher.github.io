@@ -104,3 +104,20 @@ test.describe('authoring cart', () => {
     await expect(page.getByTestId('authoring-drawer')).toHaveCount(0)
   })
 })
+
+test.describe('adding content', () => {
+  test('a new article can be abandoned', async ({ page }) => {
+    await page.goto('/authoring', { waitUntil: 'networkidle' })
+    await page.getByTestId('authoring-edit-toggle').click()
+    await page.getByTestId('authoring-add').click()
+    await expect(page.getByTestId('authoring-add-cancel')).toBeVisible()
+    expect(await count(page)).toBe(1)
+
+    // Starting something is not committing to finishing it, and the staged
+    // resource has to go too: a nameless article left in the drawer is worse
+    // than no cancel button at all.
+    await page.getByTestId('authoring-add-cancel').click()
+    await expect(page.getByTestId('authoring-add-cancel')).toHaveCount(0)
+    expect(await count(page)).toBe(0)
+  })
+})
