@@ -10,7 +10,13 @@
   -->
   <div class="flex min-h-screen bg-paper">
     <div class="flex min-w-0 flex-1 flex-col transition-all duration-200">
-      <header class="border-b border-hairline">
+      <!--
+        Sticky, because the header carries the staged count and the edit toggle.
+        Editing happens down the page, and a count you have to scroll back up to
+        read is a count nobody reads. Opaque background, or the content scrolls
+        through it.
+      -->
+      <header class="sticky top-0 z-20 border-b border-hairline bg-paper">
         <div class="mx-auto flex w-full max-w-5xl items-baseline gap-6 px-6 py-5">
           <NuxtLink to="/" class="no-underline">
             <span class="font-mono text-sm uppercase tracking-eyebrow text-ink">deciphered</span>
@@ -51,7 +57,7 @@
     -->
     <aside
       v-if="cartOpen"
-      class="w-full shrink-0 overflow-y-auto border-l border-hairline bg-surface sm:w-96"
+      class="sticky top-0 h-screen w-full shrink-0 overflow-y-auto border-l border-hairline bg-surface sm:w-96"
       data-testid="authoring-drawer"
       aria-label="Staged changes"
     >
