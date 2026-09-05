@@ -72,7 +72,8 @@ foreach ($document['files'] ?? [] as $file) {
 $php = <<<'SCRIPT'
 $document = json_decode(file_get_contents(getenv('CHANGE_REQUEST')), TRUE);
 $directory = getenv('CHANGE_REQUEST_DIR');
-$applied = ['created' => 0, 'updated' => 0, 'deleted' => 0, 'files' => 0];
+$applied = ['created' => 0, 'updated' => 0, 'deleted' => 0, 'files' => 0, 'linked' => 0];
+$second_pass = [];
 
 $repository = \Drupal::service('entity.repository');
 $manager = \Drupal::entityTypeManager();
@@ -87,9 +88,27 @@ foreach ($document['files'] ?? [] as $file) {
   if ($repository->loadEntityByUuid('file', $file['id'])) {
     continue;
   }
-  $bytes = file_get_contents($directory . '/../../' . $file['path']);
-  if ($bytes === FALSE) {
-    throw new \RuntimeException('Missing file in the request: ' . $file['path']);
+  // Two shapes, because there are two ways a request arrives. One committed to
+  // a branch keeps its files beside it and names them by `path`, so a reviewer
+  // sees the picture rather than a megabyte of base64 in a JSON diff. One
+  // downloaded from the browser has to stand on its own, so it carries the bytes
+  // inline as a data URL. Reading only the first made the offline route fail
+  // here, after the document had already been accepted as valid.
+  if (isset($file['path'])) {
+    $bytes = @file_get_contents($directory . '/../../' . $file['path']);
+    if ($bytes === FALSE) {
+      throw new \RuntimeException('Missing file in the request: ' . $file['path']);
+    }
+  }
+  elseif (isset($file['data'])) {
+    $encoded = (string) preg_replace('/^data:[^,]*,/', '', (string) $file['data']);
+    $bytes = base64_decode($encoded, TRUE);
+    if ($bytes === FALSE) {
+      throw new \RuntimeException('Unreadable file data in the request: ' . $file['id']);
+    }
+  }
+  else {
+    throw new \RuntimeException('File in the request has neither a path nor data: ' . $file['id']);
   }
   $destination = 'public://' . date('Y-m') . '/' . basename($file['name']);
   // A variable, not an assignment expression: prepareDirectory() takes the
@@ -109,6 +128,15 @@ foreach ($document['files'] ?? [] as $file) {
   $uri->set('uuid', $file['id'])->setPermanent();
   $uri->save();
   $applied['files']++;
+}
+
+// Anything this document is going to create, so a reference to one can be told
+// apart from a reference to something that simply is not there.
+$pending = [];
+foreach ($document['resources'] as $resource) {
+  if (!isset($deletions[$resource['id']])) {
+    $pending[$resource['id']] = TRUE;
+  }
 }
 
 foreach ($document['resources'] as $resource) {
@@ -141,6 +169,7 @@ foreach ($document['resources'] as $resource) {
     $entity->set($field, $value);
   }
 
+  $deferred = [];
   foreach ($resource['relationships'] ?? [] as $field => $relationship) {
     if (!$entity->hasField($field)) {
       continue;
@@ -152,10 +181,20 @@ foreach ($document['resources'] as $resource) {
     }
     $items = array_is_list($data) ? $data : [$data];
     $values = [];
+    $wait = FALSE;
     foreach ($items as $item) {
       $target_type = explode('--', $item['type'])[0];
       $target = $repository->loadEntityByUuid($target_type, $item['id']);
       if (!$target) {
+        // Two resources that reference each other cannot both come second, so
+        // no ordering exists that would resolve this now. The rest of the entity
+        // is saved and the field is set on a second pass, once the target has an
+        // id to point at. A target this document never creates is a different
+        // thing, and still stops the run.
+        if (!empty($pending[$item['id']])) {
+          $wait = TRUE;
+          break;
+        }
         throw new \RuntimeException(sprintf(
           'Cannot set %s on %s: nothing with uuid %s',
           $field, $resource['id'], $item['id']
@@ -168,12 +207,49 @@ foreach ($document['resources'] as $resource) {
         array_flip(['drupal_internal__target_id'])
       );
     }
+    if ($wait) {
+      $deferred[$field] = $relationship;
+      continue;
+    }
     $entity->set($field, $values);
   }
 
   $entity->save();
   $applied[empty($new) ? 'updated' : 'created']++;
   unset($new);
+
+  if ($deferred !== []) {
+    $second_pass[] = ['type' => $resource['type'], 'id' => $resource['id'], 'relationships' => $deferred];
+  }
+}
+
+// Only the references that had nothing to point at the first time round, and
+// only the resources that had one. Everything else was finished above, and
+// saving it again would add a revision that records no change.
+foreach ($second_pass as $resource) {
+  $entity_type = explode('--', $resource['type'])[0];
+  $entity = $repository->loadEntityByUuid($entity_type, $resource['id']);
+  foreach ($resource['relationships'] as $field => $relationship) {
+    $data = $relationship['data'];
+    $items = array_is_list($data) ? $data : [$data];
+    $values = [];
+    foreach ($items as $item) {
+      $target = $repository->loadEntityByUuid(explode('--', $item['type'])[0], $item['id']);
+      if (!$target) {
+        throw new \RuntimeException(sprintf(
+          'Cannot set %s on %s: nothing with uuid %s',
+          $field, $resource['id'], $item['id']
+        ));
+      }
+      $values[] = ['target_id' => $target->id()] + array_diff_key(
+        $item['meta'] ?? [],
+        array_flip(['drupal_internal__target_id'])
+      );
+    }
+    $entity->set($field, $values);
+  }
+  $entity->save();
+  $applied['linked']++;
 }
 
 echo json_encode($applied);
