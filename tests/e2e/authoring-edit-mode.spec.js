@@ -6,9 +6,16 @@
 
 import { expect, test } from '@playwright/test'
 
+import { isolateFromPublishedSessions } from './isolate.js'
+
 // networkidle throughout: the cart and the edit mode are restored by a plugin
 // during startup, and asserting before that settles reads the pre-hydration page.
 const open = (page, path = '/authoring') => page.goto(path, { waitUntil: 'networkidle' })
+
+// Every test in this file, not only the first describe: a build knows where
+// sessions publish themselves and looks there on load, so anything asserting
+// "no backend" would depend on whether one happens to be running.
+test.beforeEach(({ page }) => isolateFromPublishedSessions(page))
 
 test.describe('edit mode', () => {
   test('a visitor is offered edit mode but sees no editing UI', async ({ page }) => {

@@ -7,6 +7,8 @@
 
 import { expect, test } from '@playwright/test'
 
+import { isolateFromPublishedSessions } from './isolate.js'
+
 // Every navigation waits for networkidle. The cart is restored by a plugin
 // during startup, so staging or asserting before that settles races it: the
 // restore would overwrite an edit staged a moment too early.
@@ -31,6 +33,11 @@ const count = (page) => page.evaluate(() => window.$nuxt.$store.getters['authori
 /** Edits made and not staged, which is where new content starts. */
 const drafts = (page) =>
   page.evaluate(() => Object.keys(window.$nuxt.$store.state.authoringCart.drafts).length)
+
+// Every test in this file, not only the first describe: a build knows where
+// sessions publish themselves and looks there on load, so anything asserting
+// "no backend" would depend on whether one happens to be running.
+test.beforeEach(({ page }) => isolateFromPublishedSessions(page))
 
 test.describe('authoring cart', () => {
   test('a visitor sees no cart', async ({ page }) => {

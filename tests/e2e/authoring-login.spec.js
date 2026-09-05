@@ -7,6 +7,8 @@
 
 import { expect, test } from '@playwright/test'
 
+import { isolateFromPublishedSessions } from './isolate.js'
+
 const BACKEND = 'https://backend.test'
 
 /** Answer /jsonapi the way a conforming Drupal does. */
@@ -19,6 +21,11 @@ async function stubConformingBackend(page) {
     })
   )
 }
+
+// Every test in this file, not only the first describe: a build knows where
+// sessions publish themselves and looks there on load, so anything asserting
+// "no backend" would depend on whether one happens to be running.
+test.beforeEach(({ page }) => isolateFromPublishedSessions(page))
 
 test.describe('authoring login', () => {
   test('a visitor sees only a login control, and no backend', async ({ page }) => {

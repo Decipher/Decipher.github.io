@@ -319,6 +319,27 @@ export default async function (context, inject) {
       return true
     },
 
+    /**
+     * Look again for a published session, and connect to it.
+     *
+     * The record is read once while the app starts, which is the wrong and only
+     * moment if the backend is started from the site: at load time there was no
+     * session, and nothing looked again. A backend can appear minutes after the
+     * page did.
+     */
+    async discover() {
+      if (!config.sessionRecordUrl) return false
+      const published = await readSessionRecord(config.sessionRecordUrl, {
+        fetch: window.fetch.bind(window),
+      })
+      if (!published || !published.url) return false
+      if (state.status === 'connected' && state.url === normaliseUrl(published.url)) return true
+
+      if (published.expiresAt) state.expiresAt = published.expiresAt
+      if (published.clientId) state.clientId = published.clientId
+      return authoring.connect(published.url, 'published')
+    },
+
     disconnect() {
       Object.assign(state, {
         url: null,
