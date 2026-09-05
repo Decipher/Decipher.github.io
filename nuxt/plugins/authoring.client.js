@@ -226,7 +226,9 @@ function previewStagedContent(store) {
     // where they are read from rather than where they are read.
     if (vm.$options.name === 'DruxtView' && vm.resource && Array.isArray(vm.resource.data)) {
       const rows = vm.resource.data
-      const previews = previewsFor(rows, staged)
+      // The display as well as the rows. With no rows there is nothing to infer
+      // a type from, and an empty listing is the one case this exists for.
+      const previews = previewsFor(rows, staged, vm.display)
       const already = new Set(rows.map((row) => row.id))
       const missing = previews.filter((resource) => !already.has(resource.id))
       // Removed as well as added: discarding new content has to take it back
