@@ -83,6 +83,8 @@ export const getters = {
   /** Everything staged, as JSON:API resource objects. */
   resources: (state) => Object.values(state.entries).map(tidyResource),
   entryFor: (state) => (type, id) => state.entries[cartKey(type, id)] || null,
+  /** Staged resources that do not exist on the backend yet. */
+  stagedNew: (state) => Object.values(state.entries).filter((resource) => resource.isNew),
   draftFor: (state) => (type, id) => state.drafts[cartKey(type, id)] || null,
   errorFor: (state) => (type, id) => state.errors[cartKey(type, id)] || null,
 }
@@ -178,12 +180,16 @@ export const actions = {
    * has seen it. JSON:API accepts a client-supplied id on create, so the
    * placeholder becomes the real id rather than being swapped for one.
    */
-  stageNew({ state, commit }, { type, attributes, relationships }) {
+  stageNew({ state, commit }, { type, attributes, relationships, onlyIfReferenced }) {
     const id = newResourceId()
     const resource = {
       type,
       id,
       isNew: true,
+      // A tag invented inside a reference field is only worth creating while
+      // something still points at it. A new article is not: it stands alone.
+      // `tidyResource` keeps this off the wire, like `isNew`.
+      onlyIfReferenced: Boolean(onlyIfReferenced),
       attributes: attributes || {},
       relationships: relationships || {},
     }
@@ -255,6 +261,32 @@ export const actions = {
 
   clearDraft({ commit }, { type, id }) {
     commit('clearDraft', cartKey(type, id))
+  },
+
+  /**
+   * Drop a staged resource that only existed to be referenced.
+   *
+   * A tag typed into a field and then taken out again should leave nothing
+   * behind. Doing it here rather than in the field means the check can see the
+   * whole cart: another entity may still reference the same new term, and
+   * deleting it would break that one instead.
+   */
+  discardIfUnreferenced({ state, commit, getters }, { type, id }) {
+    const entry = state.entries[cartKey(type, id)]
+    if (!entry || !entry.onlyIfReferenced) return false
+
+    const referenced = getters.resources.some((resource) =>
+      Object.values(resource.relationships || {}).some((relationship) => {
+        const data = (relationship || {}).data
+        if (!data) return false
+        return (Array.isArray(data) ? data : [data]).some((item) => item.id === id)
+      })
+    )
+    if (referenced) return false
+
+    commit('discardOne', cartKey(type, id))
+    commit('setPersistent', writeStored(state.entries))
+    return true
   },
 
   discardOne({ state, commit }, { type, id }) {

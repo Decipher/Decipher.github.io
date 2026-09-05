@@ -307,3 +307,12 @@ test('two resources referencing each other still commit', () => {
   const b = { type: 't--t', id: 'b', relationships: { r: { data: { type: 't--t', id: 'a' } } } }
   assert.equal(commitOrder([a, b]).length, 2)
 })
+
+test("Drupal's own rendering is not a change the author made", () => {
+  // A value that has been staged once has no `processed`. Compared against a
+  // freshly fetched one that still has it, every field looks edited, and an
+  // entity staged and then closed comes back marked unstaged.
+  const staged = { body: { value: 'new', format: 'basic_html' } }
+  const fromBackend = { body: { value: 'new', format: 'basic_html', processed: '<p>new</p>' } }
+  assert.deepEqual(changedFields(staged, fromBackend), {})
+})
