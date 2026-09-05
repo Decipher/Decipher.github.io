@@ -57,7 +57,7 @@
       <p
         v-if="startMessage || runOutcome"
         class="mt-1 text-sm"
-        :class="runFailed ? 'text-accent' : 'text-muted'"
+        :class="runFailed || state.runError ? 'text-accent' : 'text-muted'"
         data-testid="github-start-message"
       >
         {{ runOutcome || startMessage }}
@@ -184,6 +184,9 @@ export default {
      */
     runOutcome() {
       if (this.onStartedBackend) return 'Connected to the backend it started.'
+      // Said rather than swallowed. Without this the button sat on
+      // "Building..." for ninety minutes about a run that was never found.
+      if (this.state.runError) return this.state.runError
       const run = this.state.run
       if (!run || !run.conclusion) return null
       if (run.conclusion === 'success') return 'The backend finished its run.'

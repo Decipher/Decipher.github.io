@@ -307,6 +307,135 @@ test.describe('adding content', () => {
     expect(await count(page)).toBe(1)
   })
 
+  test('signing out ends what the last sign-in started', async ({ page }) => {
+    // Polling a run outlives the sign-in that began it. Without a way to end
+    // one, signing out left `starting` true, so signing back in showed a
+    // disabled button waiting on somebody else's run, and the old poll wrote
+    // its result over the new session's state.
+    await page.route('https://api.github.com/**', (route) => {
+      const url = route.request().url()
+      const json = (body) =>
+        route.fulfill({
+          status: 200,
+          headers: { 'content-type': 'application/json', 'access-control-allow-origin': '*' },
+          body: JSON.stringify(body),
+        })
+      if (url.endsWith('/user')) return json({ login: 'someone' })
+      // Before the workflow check: a dispatch is a POST to
+      // `/actions/workflows/<file>/dispatches` and matches that pattern too.
+      // Answered with the workflow, the dispatch fails, the watcher never
+      // starts, and this test passes without testing anything.
+      if (url.includes('/dispatches'))
+        return route.fulfill({
+          status: 204,
+          headers: { 'access-control-allow-origin': '*' },
+          body: '',
+        })
+      // A run that is still going, so the watcher keeps polling and `starting`
+      // is genuinely true when sign-out happens.
+      if (url.includes('/runs'))
+        return json({
+          workflow_runs: [
+            {
+              id: 7,
+              html_url: 'https://github.com/o/r/actions/runs/7',
+              status: 'in_progress',
+              conclusion: null,
+              created_at: new Date().toISOString(),
+            },
+          ],
+        })
+      if (url.includes('/actions/workflows/')) return json({ id: 1 })
+      return json({ full_name: 'o/r', default_branch: 'main', permissions: { push: true } })
+    })
+    await page.goto('/', { waitUntil: 'networkidle' })
+    await page.getByTestId('authoring-edit-toggle').click()
+    await page.getByTestId('cart-tab-send').click()
+    await page.getByTestId('github-repository').fill('o/r')
+    await page.getByTestId('github-token').fill('a-token')
+    await page.getByTestId('github-sign-in').click()
+    await expect(page.getByTestId('github-signed-in')).toBeVisible()
+
+    await page.getByTestId('github-start-backend').click()
+    // Waited for, not sampled. `starting` is set before the dispatch is sent, so
+    // reading it straight after the click sees `true` even when the dispatch
+    // then fails and clears it: the assertion passed either way, and so did the
+    // sign-out below it.
+    await expect
+      .poll(() => page.evaluate(() => window.$nuxt.$authoringGithub.state.run))
+      .not.toBeNull()
+    expect(await page.evaluate(() => window.$nuxt.$authoringGithub.state.starting)).toBe(true)
+
+    await page.getByTestId('github-sign-out').click()
+    expect(
+      await page.evaluate(() => {
+        const s = window.$nuxt.$authoringGithub.state
+        return { starting: s.starting, run: s.run, started: s.started, token: s.token }
+      })
+    ).toEqual({ starting: false, run: null, started: null, token: null })
+
+    // And a poll still in the air cannot sign the old token back in.
+    await page.waitForTimeout(1200)
+    expect(await page.evaluate(() => window.$nuxt.$authoringGithub.state.status)).toBe('idle')
+  })
+
+  test('a run that cannot be looked up is said, not waited on', async ({ page }) => {
+    // Four lookups five seconds apart is longer than a test is given by default,
+    // and the default is what killed this before the assertion could be reached.
+    test.setTimeout(90000)
+    // The lookup failing was ignored, so the button sat on "Building..." for
+    // ninety minutes about a run nobody had found. A few failures in a row is a
+    // network blip; more than that is something to report.
+    await page.route('https://api.github.com/**', (route) => {
+      const url = route.request().url()
+      const json = (body, status = 200) =>
+        route.fulfill({
+          status,
+          headers: { 'content-type': 'application/json', 'access-control-allow-origin': '*' },
+          body: JSON.stringify(body),
+        })
+      if (url.endsWith('/user')) return json({ login: 'someone' })
+      // Before the workflow check, not after. A dispatch is a POST to
+      // `/actions/workflows/<file>/dispatches`, so it matches that pattern too
+      // and was being answered with the workflow instead. `startBackend` then
+      // gave up and no watcher ever ran, which is what this test is about.
+      if (url.includes('/dispatches'))
+        return route.fulfill({
+          status: 204,
+          headers: { 'access-control-allow-origin': '*' },
+          body: '',
+        })
+      // What a token that lost its Actions permission gets.
+      if (url.includes('/runs')) return json({ message: 'Not Found' }, 404)
+      if (url.includes('/actions/workflows/')) return json({ id: 1 })
+      return json({ full_name: 'o/r', default_branch: 'main', permissions: { push: true } })
+    })
+    await page.goto('/', { waitUntil: 'networkidle' })
+    await page.getByTestId('authoring-edit-toggle').click()
+    await page.getByTestId('cart-tab-send').click()
+    await page.getByTestId('github-repository').fill('o/r')
+    await page.getByTestId('github-token').fill('a-token')
+    await page.getByTestId('github-sign-in').click()
+    await expect(page.getByTestId('github-signed-in')).toBeVisible()
+
+    await page.getByTestId('github-start-backend').click()
+
+    // Waited for by the state, not by the label. The label reads "Asking
+    // GitHub..." until a run is found, so asserting it no longer says
+    // "Building" passed on the first tick and tested nothing.
+    //
+    // Four lookups five seconds apart, so this is the slowest test here by some
+    // way. Shortening it would mean making the interval a setting, which is a
+    // knob nothing else needs.
+    await expect
+      .poll(() => page.evaluate(() => window.$nuxt.$authoringGithub.state.runError), {
+        timeout: 45000,
+      })
+      .toBeTruthy()
+    expect(await page.evaluate(() => window.$nuxt.$authoringGithub.state.starting)).toBe(false)
+    await expect(page.getByTestId('github-start-message')).not.toContainText('Asking GitHub')
+  })
+
   test('someone who can only propose changes is offered only that', async ({ page }) => {
     // Contents and Pull requests are enough to propose a change. Starting a
     // backend also needs Actions, and a button that cannot work is worse than
