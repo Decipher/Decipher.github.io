@@ -100,10 +100,16 @@ test.describe('authoring login', () => {
     await page.goto(`/?backend=${encodeURIComponent(BACKEND)}`)
     await page.getByTestId('authoring-login-trigger').click()
     await expect(page.getByTestId('authoring-disconnect')).toBeVisible()
-    await page.getByTestId('authoring-disconnect').click()
 
-    // Disconnecting reloads, so the dialog closes with it: the built content
-    // only comes back on a fresh load. Reopen to see the state it left behind.
+    // Waited for, not assumed. Disconnecting reloads the page, and clicking the
+    // trigger before that lands hits the old document: the click is thrown away
+    // with it and the dialog never opens. Passed about two runs in three.
+    const reloaded = page.waitForEvent('load')
+    await page.getByTestId('authoring-disconnect').click()
+    await reloaded
+
+    // The dialog closes with the reload, because the built content only comes
+    // back on a fresh load. Reopen to see the state it left behind.
     await page.getByTestId('authoring-login-trigger').click()
     await expect(page.getByTestId('authoring-backend-url')).toBeVisible()
 
