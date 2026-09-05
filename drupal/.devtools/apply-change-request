@@ -92,8 +92,12 @@ foreach ($document['files'] ?? [] as $file) {
     throw new \RuntimeException('Missing file in the request: ' . $file['path']);
   }
   $destination = 'public://' . date('Y-m') . '/' . basename($file['name']);
+  // A variable, not an assignment expression: prepareDirectory() takes the
+  // directory by reference, and PHP cannot pass the result of an assignment
+  // that way.
+  $directory_uri = dirname($destination);
   \Drupal::service('file_system')->prepareDirectory(
-    $dir = dirname($destination),
+    $directory_uri,
     \Drupal\Core\File\FileSystemInterface::CREATE_DIRECTORY
   );
   $uri = \Drupal::service('file.repository')->writeData(
