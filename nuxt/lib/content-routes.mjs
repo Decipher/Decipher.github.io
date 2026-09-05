@@ -32,9 +32,12 @@ export async function contentRoutes(baseUrl, { client } = {}) {
 
   const pages = []
   for (const type of types) {
-    const query = new DrupalJsonApiParams()
-      .addFields(type, ['title', 'path', 'body', 'changed', 'drupal_internal__nid'])
-      .addFilter('status', '1')
+    // No `fields[]` restriction. Naming the fields keeps the payload small, but
+    // JSON:API answers 400 for a field the bundle does not have, so a content
+    // type without a `body` would fail the build outright, and a canonical field
+    // could never be picked up without being added here first. This runs once per
+    // build over a handful of nodes.
+    const query = new DrupalJsonApiParams().addFilter('status', '1')
     const collections = await druxt.getCollectionAll(type, query)
     for (const collection of collections) {
       for (const resource of collection.data || []) {
@@ -48,6 +51,10 @@ export async function contentRoutes(baseUrl, { client } = {}) {
           // A summary is written to be an excerpt, so it beats the body it
           // summarises. Both are HTML, and a meta description is not.
           description: textFrom(body.summary || body.processed || body.value || ''),
+          // Where a post says it was published somewhere else first. Nothing
+          // sets this yet; when the blog is syndicated in, the copy here points
+          // at the original rather than competing with it in search.
+          canonical: attributes.field_canonical_url || undefined,
           changed: attributes.changed,
         })
       }
