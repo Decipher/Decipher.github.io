@@ -599,9 +599,16 @@ test.describe('adding content', () => {
     await page.getByTestId('github-sign-in').click()
     await expect(page.getByTestId('github-signed-in')).toBeVisible()
 
-    await page.evaluate(async () => {
-      const found = await window.$nuxt.$authoring.discover()
-      window.$nuxt.$authoringGithub.state.started = found
+    // Set rather than discovered. `discover()` gives up before it fetches
+    // anything unless the build baked in a session record URL, which CI does not
+    // do, so going through it tested the build's environment rather than the
+    // interface. What is under test is what the interface says once a backend it
+    // started exists and is not the one being edited against.
+    await page.evaluate(() => {
+      window.$nuxt.$authoringGithub.state.started = {
+        url: 'http://started.test',
+        clientId: 'c',
+      }
     })
 
     await expect(page.getByTestId('github-started-elsewhere')).toBeVisible()
