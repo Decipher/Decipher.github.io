@@ -1,8 +1,27 @@
 <template>
   <div class="authoring-entity-form-fields">
-    <div v-for="id of fieldIds" :key="id" class="authoring-entity-form-field">
+    <div v-for="id of contentFields" :key="id" class="authoring-entity-form-field">
       <slot :name="id" />
     </div>
+
+    <!--
+      Closed by default. These are the settings around a piece of content
+      rather than the content, and an author writing something should not have
+      to scroll past the publishing flags to reach the body.
+    -->
+    <details v-if="advancedFields.length" class="mb-5 rounded border border-hairline">
+      <summary
+        class="cursor-pointer px-3 py-2 font-mono text-xs uppercase tracking-eyebrow text-muted hover:text-accent"
+        data-testid="authoring-advanced"
+      >
+        Advanced
+      </summary>
+      <div class="border-t border-hairline px-3 pt-4">
+        <div v-for="id of advancedFields" :key="id" class="authoring-entity-form-field">
+          <slot :name="id" />
+        </div>
+      </div>
+    </details>
 
     <!-- The authoring buttons, when this form is inside the authoring UI. -->
     <div v-if="form" class="mt-4 flex flex-wrap gap-2">
@@ -53,6 +72,8 @@
  * The staging itself stays in `AuthoringEntityForm`, reached through inject
  * because Druxt gives the wrapper no way to emit back to the parent.
  */
+import { groupFields } from '../../../lib/form-groups.mjs'
+
 export default {
   name: 'DruxtEntityFormDefault',
 
@@ -78,6 +99,14 @@ export default {
     fieldIds() {
       const fromSchema = (this.schema.fields || []).map((field) => field.id).filter(Boolean)
       return fromSchema.length ? fromSchema : Object.keys(this.fields)
+    },
+
+    contentFields() {
+      return groupFields(this.fieldIds).content
+    },
+
+    advancedFields() {
+      return groupFields(this.fieldIds).advanced
     },
   },
 }
