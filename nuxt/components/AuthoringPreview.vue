@@ -40,6 +40,25 @@
           guessed: a site with a custom display would otherwise be told it has
           only the ones somebody hardcoded.
         -->
+        <!--
+          Scale, not width. A 1440 frame narrowed to fit is a 900px layout
+          pretending to be a desktop; scaled down it is still a desktop, just
+          smaller. Which is the whole reason to look at it.
+        -->
+        <label class="flex items-baseline gap-2">
+          <span class="eyebrow">Zoom</span>
+          <select
+            v-model="zoom"
+            class="rounded border border-hairline bg-paper px-2 py-1 font-mono text-xs text-ink"
+            data-testid="preview-zoom"
+          >
+            <option :value="0">Fit ({{ Math.round(fitScale * 100) }}%)</option>
+            <option v-for="step of zooms" :key="step" :value="step">
+              {{ Math.round(step * 100) }}%
+            </option>
+          </select>
+        </label>
+
         <label class="flex items-baseline gap-2">
           <span class="eyebrow">View mode</span>
           <select
@@ -62,12 +81,20 @@
       </div>
 
       <!-- The canvas. Only this takes the chosen width. -->
-      <div class="flex justify-center overflow-auto bg-elevated px-5 py-4">
-        <div
-          class="w-full rounded bg-paper p-4"
-          :style="frameStyle"
-          data-testid="preview-frame"
-        >
+      <div ref="canvas" class="flex justify-center overflow-auto bg-elevated px-5 py-4">
+        <!--
+          Two boxes: the outer one is the size the scaled content occupies, the
+          inner one is the size the content thinks it is. A transform does not
+          change layout, so without the outer box the canvas would reserve room
+          for the unscaled frame and scroll for no reason.
+        -->
+        <div :style="scaledStyle">
+          <div
+            ref="frame"
+            class="w-full rounded bg-paper p-4"
+            :style="frameStyle"
+            data-testid="preview-frame"
+          >
           <p
             v-if="width"
             class="mb-3 border-b border-hairline pb-1 font-mono text-[0.6875rem] text-muted"
@@ -80,7 +107,8 @@
             Keyed by mode, so switching rebuilds rather than trying to patch one
             display's markup into another's.
           -->
-          <DruxtEntity :key="mode" :type="type" :uuid="uuid" :mode="mode" />
+            <DruxtEntity :key="mode" :type="type" :uuid="uuid" :mode="mode" />
+          </div>
         </div>
       </div>
     </div>
@@ -110,6 +138,11 @@ export default {
       modes: ['default'],
       // Free by default: a fixed width is deliberate, not the normal case.
       width: 0,
+      // 0 means fit: work the scale out from the room available.
+      zoom: 0,
+      zooms: [1, 0.75, 0.5, 0.25],
+      available: 0,
+      frameHeight: 0,
       sizes: [
         { label: 'Free', width: 0 },
         { label: 'Phone', width: 375 },
@@ -127,10 +160,20 @@ export default {
     document.body.appendChild(this.$el)
     document.body.style.overflow = 'hidden'
     document.addEventListener('keydown', this.onKey)
+    this.measure()
+    window.addEventListener('resize', this.measure)
+    // The rendered entity decides its own height, and it arrives after this
+    // does, so the box around it is sized from what actually got drawn.
+    if (window.ResizeObserver) {
+      this.observer = new window.ResizeObserver(() => this.measure())
+      if (this.$refs.frame) this.observer.observe(this.$refs.frame)
+    }
     this.modes = await this.availableModes()
   },
 
   beforeDestroy() {
+    window.removeEventListener('resize', this.measure)
+    if (this.observer) this.observer.disconnect()
     document.removeEventListener('keydown', this.onKey)
     document.body.style.overflow = ''
     // Put back where Vue expects it, or removing the component throws.
@@ -148,12 +191,52 @@ export default {
     frameStyle() {
       if (!this.width) return { maxWidth: '48rem' }
       // `flex: none` so the flex parent cannot shrink it back: a 1440 frame in
-      // a narrower window should scroll sideways, not quietly become the window.
-      return { width: `${this.width}px`, flex: 'none' }
+      // a narrower window should be scaled, not quietly become the window.
+      return {
+        width: `${this.width}px`,
+        flex: 'none',
+        ...(this.scale === 1
+          ? {}
+          : { transform: `scale(${this.scale})`, transformOrigin: 'top left' }),
+      }
+    },
+
+    /** The largest scale that fits the room available, never enlarging. */
+    fitScale() {
+      if (!this.width || !this.available) return 1
+      return Math.min(1, this.available / this.width)
+    },
+
+    scale() {
+      return this.zoom || this.fitScale
+    },
+
+    /**
+     * The room the scaled frame actually occupies.
+     *
+     * A transform does not change layout, so the canvas would otherwise reserve
+     * space for the frame at full size and scroll when nothing is off screen.
+     */
+    scaledStyle() {
+      if (!this.width || this.scale === 1) return {}
+      return {
+        width: `${Math.round(this.width * this.scale)}px`,
+        height: this.frameHeight ? `${Math.round(this.frameHeight * this.scale)}px` : undefined,
+      }
     },
   },
 
   methods: {
+    /** How much room the canvas has, and how tall the frame drew itself. */
+    measure() {
+      const canvas = this.$refs.canvas
+      const frame = this.$refs.frame
+      // Minus the canvas padding, or the frame is measured against room that
+      // includes its own margins and comes out a little too wide.
+      if (canvas) this.available = Math.max(0, canvas.clientWidth - 40)
+      if (frame) this.frameHeight = frame.scrollHeight
+    },
+
     onKey(event) {
       if (event.key === 'Escape') this.$emit('close')
     },
