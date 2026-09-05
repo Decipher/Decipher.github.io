@@ -224,6 +224,35 @@ test('starting a backend dispatches the workflow', async () => {
   assert.equal(call.body.inputs.minutes, '30')
 })
 
+test('the dispatch says which frontend the backend is for', async () => {
+  // A session provisions for one origin: CORS allows it, and the OAuth
+  // redirect is its `/callback`. Without this a backend started from a tunnel
+  // refuses the very site that asked for it.
+  const gh = fakeGitHub({
+    overrides: { '/dispatches': { ok: true, status: 204, json: async () => null } },
+  })
+  await startBackend({
+    repository: 'o/r',
+    token: 't',
+    workflow: 'authoring.yml',
+    origin: 'https://preview.example',
+    fetch: gh.fetch,
+  })
+  const call = gh.calls.find((c) => c.path.includes('/dispatches'))
+  assert.equal(call.body.inputs.origin, 'https://preview.example')
+})
+
+test('a dispatch with no origin sends none, and the workflow decides', async () => {
+  // A manual run from the Actions tab has no site to speak for it, and the
+  // deployment is the right default there.
+  const gh = fakeGitHub({
+    overrides: { '/dispatches': { ok: true, status: 204, json: async () => null } },
+  })
+  await startBackend({ repository: 'o/r', token: 't', workflow: 'authoring.yml', fetch: gh.fetch })
+  const call = gh.calls.find((c) => c.path.includes('/dispatches'))
+  assert.equal('origin' in call.body.inputs, false)
+})
+
 test('a token without Actions access is told exactly what it is missing', async () => {
   // "Forbidden" on its own sends someone to check the wrong permission.
   const gh = fakeGitHub({

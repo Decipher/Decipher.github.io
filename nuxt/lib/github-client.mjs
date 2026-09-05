@@ -181,7 +181,15 @@ export async function openChangeRequest({
  * follow. The session announces itself the way it already does, by publishing
  * where it is, and the frontend waits for that rather than for GitHub.
  */
-export async function startBackend({ repository, token, workflow, ref, minutes, fetch: request }) {
+export async function startBackend({
+  repository,
+  token,
+  workflow,
+  ref,
+  minutes,
+  origin,
+  fetch: request,
+}) {
   try {
     const response = await request(
       `${apiUrl(repository)}/actions/workflows/${encodeURIComponent(workflow)}/dispatches`,
@@ -190,7 +198,11 @@ export async function startBackend({ repository, token, workflow, ref, minutes, 
         headers: headers(token),
         body: JSON.stringify({
           ref: ref || 'main',
-          inputs: { minutes: String(minutes || 55) },
+          // The origin, because a session provisions for one frontend: CORS
+          // allows it and the OAuth redirect is its `/callback`. A backend
+          // that does not know where the request came from refuses the very
+          // site that asked for it.
+          inputs: { minutes: String(minutes || 55), ...(origin ? { origin } : {}) },
         }),
       }
     )
