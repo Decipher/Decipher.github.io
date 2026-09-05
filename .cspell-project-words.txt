@@ -37,6 +37,7 @@ libxss
 libxtst
 libzip
 lndo
+lockfiles
 makedirs
 mbstring
 namelist
@@ -63,6 +64,7 @@ starterkit
 startswith
 tokenless
 trixie
+unkeyed
 unparseable
 valeryan
 vfox
