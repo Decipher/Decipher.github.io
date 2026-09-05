@@ -191,6 +191,15 @@
       </button>
       <button
         type="button"
+        class="rounded bg-accent px-3 py-1.5 text-sm text-accent-contrast hover:opacity-90 disabled:opacity-60"
+        :disabled="!githubReady || opening"
+        data-testid="authoring-cart-pr"
+        @click="openPullRequest"
+      >
+        {{ opening ? 'Opening...' : 'Open a pull request' }}
+      </button>
+      <button
+        type="button"
         class="rounded border border-hairline px-3 py-1.5 text-sm text-body hover:border-ink"
         data-testid="authoring-cart-download"
         @click="download"
@@ -210,6 +219,23 @@
     <p v-if="!canCommit" class="text-sm text-muted mt-3" data-testid="authoring-cart-blocked">
       {{ blockedReason }}
     </p>
+
+    <!--
+      The second destination. A backend is for validating against a real site;
+      this is for getting the work reviewed and published, and needs neither a
+      backend nor a session.
+    -->
+    <div v-if="count" class="mt-4 border-t border-hairline pt-4">
+      <p class="eyebrow mb-2">Without a backend</p>
+      <AuthoringGithub />
+      <p v-if="pullRequest" class="mt-2 text-sm text-body" data-testid="authoring-cart-pr-open">
+        Opened
+        <a :href="pullRequest" target="_blank" rel="noreferrer noopener">the pull request</a>.
+      </p>
+      <p v-if="prError" class="mt-2 text-sm text-accent" data-testid="authoring-cart-pr-error">
+        {{ prError }}
+      </p>
+    </div>
     <p v-if="result" class="text-sm text-muted mt-3" data-testid="authoring-cart-result">
       {{ result }}
     </p>
@@ -224,12 +250,13 @@ import {
   requiredBy,
   tidyResource,
 } from '../lib/cart.mjs'
+import { openChangeRequest } from '../lib/github-client.mjs'
 
 export default {
   name: 'AuthoringCart',
 
   data() {
-    return { result: null, expanded: {}, refusal: null }
+    return { result: null, expanded: {}, refusal: null, opening: false, pullRequest: null, prError: null }
   },
 
   computed: {
@@ -271,6 +298,10 @@ export default {
       })
     },
 
+    githubReady() {
+      return this.$authoringGithub && this.$authoringGithub.signedIn
+    },
+
     // Says which half is missing, because "cannot commit" on its own sends
     // people looking in the wrong place.
     blockedReason() {
@@ -299,6 +330,32 @@ export default {
         this.labelOnPage(resource.type, resource.id) ||
         resource.type
       )
+    },
+
+    /**
+     * Send the cart to GitHub as a pull request.
+     *
+     * The cart is left exactly as it is on success as well as on failure: what
+     * has been proposed has not yet been published, and clearing it would tell
+     * the author their work had landed when it is waiting for review.
+     */
+    async openPullRequest() {
+      this.opening = true
+      this.pullRequest = null
+      this.prError = null
+
+      const state = this.$authoringGithub.state
+      const result = await openChangeRequest({
+        repository: state.repository,
+        token: state.token,
+        exported: exportCart(this.$store.state.authoringCart.entries),
+        base: state.defaultBranch,
+        fetch: window.fetch.bind(window),
+      })
+
+      this.opening = false
+      if (result.ok) this.pullRequest = result.url
+      else this.prError = result.reason
     },
 
     /** The document that will be sent, without the cart's own bookkeeping. */

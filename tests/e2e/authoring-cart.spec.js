@@ -215,6 +215,151 @@ test.describe('adding content', () => {
     await expect(page.getByTestId('authoring-add')).toBeVisible()
   })
 
+  test('a pull request needs signing in, and says so', async ({ page }) => {
+    await page.goto('/', { waitUntil: 'networkidle' })
+    await stage(page, {
+      type: 'node--article',
+      id: 'abc',
+      original: { title: 'Was' },
+      edited: { title: 'Is' },
+    })
+    await page.evaluate(() => window.$nuxt.$store.dispatch('authoringCart/setDrawerOpen', true))
+
+    // A token rather than an OAuth button: GitHub's device flow endpoints send
+    // no CORS headers, so a browser cannot reach them at all.
+    await expect(page.getByTestId('authoring-cart-pr')).toBeDisabled()
+    await expect(page.getByTestId('github-token')).toBeVisible()
+    await expect(page.getByTestId('github-sign-in')).toBeDisabled()
+  })
+
+  test('GitHub says no and the cart says why', async ({ page }) => {
+    await page.route('https://api.github.com/**', (route) =>
+      route.fulfill({
+        status: 401,
+        headers: { 'content-type': 'application/json', 'access-control-allow-origin': '*' },
+        body: JSON.stringify({ message: 'Bad credentials' }),
+      })
+    )
+    await page.goto('/', { waitUntil: 'networkidle' })
+    await stage(page, {
+      type: 'node--article',
+      id: 'abc',
+      original: { title: 'Was' },
+      edited: { title: 'Is' },
+    })
+    await page.evaluate(() => window.$nuxt.$store.dispatch('authoringCart/setDrawerOpen', true))
+
+    await page.getByTestId('github-repository').fill('o/r')
+    await page.getByTestId('github-token').fill('not-a-real-token')
+    await page.getByTestId('github-sign-in').click()
+
+    await expect(page.getByTestId('github-error')).toContainText('did not accept')
+    // And the work is still there to try again with.
+    expect(await count(page)).toBe(1)
+  })
+
+  test('signing in offers the pull request, and staged work survives it', async ({ page }) => {
+    await page.route('https://api.github.com/**', (route) => {
+      const url = route.request().url()
+      const json = (body) =>
+        route.fulfill({
+          status: 200,
+          headers: { 'content-type': 'application/json', 'access-control-allow-origin': '*' },
+          body: JSON.stringify(body),
+        })
+      if (url.endsWith('/user')) return json({ login: 'someone' })
+      return json({ full_name: 'o/r', default_branch: 'main', permissions: { push: true } })
+    })
+    await page.goto('/', { waitUntil: 'networkidle' })
+    await stage(page, {
+      type: 'node--article',
+      id: 'abc',
+      original: { title: 'Was' },
+      edited: { title: 'Is' },
+    })
+    await page.evaluate(() => window.$nuxt.$store.dispatch('authoringCart/setDrawerOpen', true))
+
+    await page.getByTestId('github-repository').fill('o/r')
+    await page.getByTestId('github-token').fill('a-token')
+    await page.getByTestId('github-sign-in').click()
+
+    await expect(page.getByTestId('github-signed-in')).toContainText('someone')
+    await expect(page.getByTestId('authoring-cart-pr')).toBeEnabled()
+    expect(await count(page)).toBe(1)
+  })
+
+  test('someone who can only propose changes is offered only that', async ({ page }) => {
+    // Contents and Pull requests are enough to propose a change. Starting a
+    // backend also needs Actions, and a button that cannot work is worse than
+    // no button.
+    await page.route('https://api.github.com/**', (route) => {
+      const url = route.request().url()
+      const json = (body, status = 200) =>
+        route.fulfill({
+          status,
+          headers: { 'content-type': 'application/json', 'access-control-allow-origin': '*' },
+          body: JSON.stringify(body),
+        })
+      if (url.endsWith('/user')) return json({ login: 'a-contributor' })
+      if (url.includes('/actions/workflows/')) return json({ message: 'Not Found' }, 404)
+      return json({ full_name: 'o/r', default_branch: 'main', permissions: { push: true } })
+    })
+    await page.goto('/', { waitUntil: 'networkidle' })
+    await stage(page, {
+      type: 'node--article',
+      id: 'abc',
+      original: { title: 'Was' },
+      edited: { title: 'Is' },
+    })
+    await page.evaluate(() => window.$nuxt.$store.dispatch('authoringCart/setDrawerOpen', true))
+    await page.getByTestId('github-repository').fill('o/r')
+    await page.getByTestId('github-token').fill('a-token')
+    await page.getByTestId('github-sign-in').click()
+
+    await expect(page.getByTestId('github-signed-in')).toContainText('a-contributor')
+    await expect(page.getByTestId('authoring-cart-pr')).toBeEnabled()
+    await expect(page.getByTestId('github-start-backend')).toHaveCount(0)
+  })
+
+  test('someone who can start a backend is offered that too', async ({ page }) => {
+    const dispatched = []
+    await page.route('https://api.github.com/**', (route) => {
+      const url = route.request().url()
+      const json = (body, status = 200) =>
+        route.fulfill({
+          status,
+          headers: { 'content-type': 'application/json', 'access-control-allow-origin': '*' },
+          body: JSON.stringify(body),
+        })
+      if (url.endsWith('/dispatches')) {
+        dispatched.push(JSON.parse(route.request().postData()))
+        return route.fulfill({ status: 204, headers: { 'access-control-allow-origin': '*' } })
+      }
+      if (url.endsWith('/user')) return json({ login: 'the-maintainer' })
+      if (url.includes('/actions/workflows/')) return json({ id: 1, name: 'Authoring session' })
+      return json({ full_name: 'o/r', default_branch: 'main', permissions: { push: true } })
+    })
+    await page.goto('/', { waitUntil: 'networkidle' })
+    await stage(page, {
+      type: 'node--article',
+      id: 'abc',
+      original: { title: 'Was' },
+      edited: { title: 'Is' },
+    })
+    await page.evaluate(() => window.$nuxt.$store.dispatch('authoringCart/setDrawerOpen', true))
+    await page.getByTestId('github-repository').fill('o/r')
+    await page.getByTestId('github-token').fill('a-token')
+    await page.getByTestId('github-sign-in').click()
+
+    await expect(page.getByTestId('github-start-backend')).toBeVisible()
+    await page.getByTestId('github-start-backend').click()
+
+    await expect(page.getByTestId('github-start-message')).toContainText('connects itself')
+    // The same workflow a maintainer runs by hand, on the default branch.
+    expect(dispatched).toHaveLength(1)
+    expect(dispatched[0].ref).toBe('main')
+  })
+
   test('a visitor is offered no drawer at all', async ({ page }) => {
     await page.goto('/', { waitUntil: 'networkidle' })
     await expect(page.getByTestId('authoring-cart-toggle')).toHaveCount(0)
