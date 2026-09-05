@@ -1,31 +1,53 @@
 <template>
-  <div class="authoring-entity relative" :class="{ 'is-staged': staged }">
+  <div class="authoring-entity" :class="{ 'is-staged': staged, group: editable }">
     <!-- The entity as the site renders it, edit mode or not. -->
     <div v-if="!open">
-      <slot />
-
-      <button
-        v-if="editable"
-        type="button"
-        class="absolute right-1 top-1 rounded border border-hairline bg-surface px-2 py-0.5 font-mono text-[0.6875rem] uppercase tracking-eyebrow text-muted hover:border-accent hover:text-accent"
-        :data-testid="`edit-${entity.type}-${entity.id}`"
-        @click="open = true"
-      >
-        Edit
-      </button>
       <!--
-        Two states worth telling apart. Staged is going to be sent; unstaged is
-        an edit the author has made and not committed to, which the page shows
-        so it is not invisible and not lost.
+        A bar of its own, above the content rather than over it. Overlaying
+        these on the corners put them on top of the first line of whatever was
+        being edited, which is the line most worth being able to read.
+
+        Only in edit mode, so a visitor's page is not reshaped by controls they
+        will never see.
       -->
-      <span
-        v-if="editable && (staged || drafted)"
-        class="absolute left-1 top-1 rounded px-2 py-0.5 font-mono text-[0.6875rem] uppercase tracking-eyebrow"
-        :class="drafted ? 'border border-accent text-accent' : 'bg-accent text-accent-contrast'"
-        :data-testid="drafted ? 'unstaged-badge' : 'staged-badge'"
+      <div
+        v-if="editable"
+        class="mb-2 flex items-baseline justify-between gap-3 border-b border-transparent pb-1 transition-colors group-hover:border-hairline group-focus-within:border-hairline"
       >
-        {{ drafted ? 'Unstaged' : 'Staged' }}
-      </span>
+        <!--
+          Two states worth telling apart. Staged is going to be sent; unstaged
+          is an edit the author has made and not committed to, which the page
+          shows so it is neither invisible nor lost.
+        -->
+        <span
+          v-if="staged || drafted"
+          class="rounded px-2 py-0.5 font-mono text-[0.6875rem] uppercase tracking-eyebrow"
+          :class="drafted ? 'border border-accent text-accent' : 'bg-accent text-accent-contrast'"
+          :data-testid="drafted ? 'unstaged-badge' : 'staged-badge'"
+        >
+          {{ drafted ? 'Unstaged' : 'Staged' }}
+        </span>
+        <span v-else aria-hidden="true"></span>
+
+        <button
+          type="button"
+          class="authoring-edit font-mono text-[0.6875rem] uppercase tracking-eyebrow text-muted underline opacity-0 transition-opacity hover:text-accent focus:opacity-100 group-hover:opacity-100 group-focus-within:opacity-100"
+          :data-testid="`edit-${entity.type}-${entity.id}`"
+          @click="open = true"
+        >
+          Edit
+        </button>
+      </div>
+
+      <!--
+        The label, which Drupal renders from the node template rather than as a
+        field, so it is not in the view display and Druxt never renders it. A
+        listing of articles with no titles is not a listing, and an author
+        editing a title could not see it change.
+      -->
+      <h2 v-if="showLabel" class="mb-2 text-lg" data-testid="entity-label">{{ label }}</h2>
+
+      <slot />
     </div>
 
     <!-- Its form, in the place the content was. -->
@@ -68,6 +90,8 @@
  * referenced entity, which arrives back here. Without the `editing` guard the
  * result is an Edit control on the inside of a form that is already editing.
  */
+import { labelFieldFor } from '../../../lib/reference.mjs'
+
 export default {
   name: 'DruxtEntityNode',
 
@@ -101,6 +125,36 @@ export default {
     draft() {
       if (!this.entity.type || !this.entity.id) return null
       return this.$store.getters['authoringCart/draftFor'](this.entity.type, this.entity.id)
+    },
+
+    /**
+     * The entity as it should read: what the backend holds, then what is
+     * staged, then what has been typed and not staged.
+     *
+     * `entity` is what was fetched and stays that way, which is what makes
+     * discarding a change put the page back with no reload.
+     */
+    merged() {
+      const next = JSON.parse(JSON.stringify(this.entity || {}))
+      for (const layer of [this.entry, this.draft]) {
+        if (!layer) continue
+        next.attributes = { ...(next.attributes || {}), ...(layer.attributes || {}) }
+        next.relationships = { ...(next.relationships || {}), ...(layer.relationships || {}) }
+      }
+      return next
+    },
+
+    labelField() {
+      return labelFieldFor(String((this.entity || {}).type || '').split('--')[0])
+    },
+
+    label() {
+      return (this.merged.attributes || {})[this.labelField] || ''
+    },
+
+    /** Only when the display does not already have a field for it. */
+    showLabel() {
+      return Boolean(this.label) && !Object.keys(this.fields || {}).includes(this.labelField)
     },
 
     staged() {
@@ -174,16 +228,22 @@ export default {
      * compare the staged value against itself and never unstage it.
      */
     showStaged() {
-      const next = JSON.parse(JSON.stringify(this.entity || {}))
-      // Staged first, then the unstaged edit on top: a draft is the most recent
-      // thing the author did, so it is what they expect to see.
-      for (const layer of [this.entry, this.draft]) {
-        if (!layer) continue
-        next.attributes = { ...(next.attributes || {}), ...(layer.attributes || {}) }
-        next.relationships = { ...(next.relationships || {}), ...(layer.relationships || {}) }
-      }
-      this.$emit('input', next)
+      this.$emit('input', this.merged)
     },
   },
 }
 </script>
+
+<style>
+/*
+ * A pointer that cannot hover has no way to reveal a hover-only control, so on
+ * a touch screen the Edit control is simply there. Written as a media query
+ * rather than a utility class because Tailwind 2 has no `hover: none` variant,
+ * and a control nobody on a phone can reach is not a style question.
+ */
+@media (hover: none) {
+  .authoring-entity .authoring-edit {
+    opacity: 1;
+  }
+}
+</style>

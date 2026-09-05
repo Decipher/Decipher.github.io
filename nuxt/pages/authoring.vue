@@ -26,7 +26,6 @@
 
     <ul v-else class="space-y-6">
       <li v-for="article in articles" :key="article.id" class="rounded border border-hairline p-4">
-        <h2 class="mb-2 text-lg">{{ article.attributes.title }}</h2>
         <!--
           Rendered by Druxt rather than by hand, so this listing goes through
           the same wrapper the rest of the site does and gets the edit control,
