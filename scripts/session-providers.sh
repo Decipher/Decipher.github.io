@@ -120,8 +120,13 @@ deliver_login_link() {
     # being talked down to another scheme.
     case "$DISCORD_WEBHOOK_URL" in
       https://*)
+        # Every URL in angle brackets, and embeds suppressed, because the
+        # login link is single use and Discord spends it: unfurling a link
+        # means fetching it, and fetching a one-time login link logs the
+        # unfurler in and invalidates it before anyone clicks. The link arrives
+        # looking fine and is already dead.
         local payload
-        payload=$(printf '{"content":"Authoring session ready.\\nBackend: %s\\nExpires: %s\\nLogin: %s"}' \
+        payload=$(printf '{"content":"Authoring session ready.\\nBackend: <%s>\\nExpires: %s\\nLogin: <%s>","flags":4}' \
           "$SESSION_URL" "$EXPIRES_AT" "$LOGIN_LINK")
         if curl -sf --proto '=https' -X POST -H 'Content-Type: application/json' -d "$payload" \
             "$DISCORD_WEBHOOK_URL" >/dev/null; then

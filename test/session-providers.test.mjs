@@ -68,6 +68,18 @@ function deliver(webhook, { provider = 'github' } = {}) {
 }
 
 describe('deliver_login_link', () => {
+  it('sends the link in a form nothing will follow on its way past', () => {
+    // Unfurling a link means fetching it, and fetching a single-use login link
+    // spends it: the message arrives looking fine and the link is already
+    // dead. Angle brackets stop Discord unfurling, and the flag suppresses
+    // embeds outright.
+    const { args } = deliver('https://discord.test/api/webhooks/1/abc')
+    const payload = JSON.parse(args.split('\n').find((arg) => arg.startsWith('{')))
+
+    assert.match(payload.content, /Login: <https:\/\/[^>]+>/)
+    assert.equal(payload.flags, 4)
+  })
+
   it('sends over https, and says so without printing the link', () => {
     const { args, stdout } = deliver('https://discord.test/api/webhooks/1/abc')
 
