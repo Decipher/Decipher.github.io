@@ -32,8 +32,27 @@ const BACKEND = 'https://backend.test'
  */
 const contentMask = (page) => [page.locator('main'), page.getByTestId('built-at')]
 
+/**
+ * Nuxt's loading bar, which is not part of any of these designs.
+ *
+ * Two pixels tall, fixed to the top, and as wide as a request is far along. It
+ * is invisible at rest, so locally it never appeared in a baseline and never
+ * had to; on CI a request settled slowly enough to catch it mid-flight and the
+ * suite went red on 2560 pixels, which is 1280 wide by exactly its two rows.
+ *
+ * Hidden rather than masked: masking a zero-width element covers nothing, so a
+ * mask would work only on the runs where the bar happened to show, which is the
+ * timing dependency this is here to remove.
+ */
+const hideLoadingBar = (page) =>
+  page.addStyleTag({ content: '.nuxt-progress { display: none !important; }' })
+
 async function isolateFromBackends(page) {
   await page.route(/\/(jsonapi|router)\//, (route) => route.abort())
+  // A build that knows where sessions are published looks for one on load.
+  // Left to reach the network, these shots depend on whether a backend happens
+  // to be running somewhere, which is not what they are testing.
+  await page.route(/raw\.githubusercontent\.com/, (route) => route.abort())
 }
 
 async function stubConformingBackend(page) {
@@ -49,6 +68,7 @@ async function stubConformingBackend(page) {
 test('the site as a visitor sees it', async ({ page }) => {
   await isolateFromBackends(page)
   await page.goto('/')
+  await hideLoadingBar(page)
   await page.evaluate(() => document.fonts.ready)
   await expect(page).toHaveScreenshot('visitor.png', {
     fullPage: true,
@@ -62,6 +82,7 @@ test('the backend prompt', async ({ page }) => {
   await page.goto('/')
   await page.getByTestId('authoring-login-trigger').click()
   await expect(page.getByTestId('authoring-backend-url')).toBeVisible()
+  await hideLoadingBar(page)
   await page.evaluate(() => document.fonts.ready)
   await expect(page).toHaveScreenshot('connect.png', {
     animations: 'disabled',
@@ -75,6 +96,7 @@ test('the login step', async ({ page }) => {
   await page.goto(`/?backend=${encodeURIComponent(BACKEND)}`)
   await page.getByTestId('authoring-login-trigger').click()
   await expect(page.getByTestId('authoring-continue')).toBeVisible()
+  await hideLoadingBar(page)
   await page.evaluate(() => document.fonts.ready)
   await expect(page).toHaveScreenshot('login.png', {
     animations: 'disabled',

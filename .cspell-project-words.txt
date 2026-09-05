@@ -23,6 +23,7 @@ knip
 lando
 Lando
 Landofile
+langcode
 lcobucci
 libasound
 libfreetype
@@ -55,6 +56,8 @@ phpsab
 phpstan
 phpunit
 PKCE
+recognise
+recognised
 repository
 setuptools
 shivammathur
@@ -62,8 +65,14 @@ Stanislav
 starterkit
 startswith
 tokenless
+toolbarview
 trixie
 unparseable
+unstage
+unstaged
+untick
+unticked
+unticking
 valeryan
 vfox
 viewports

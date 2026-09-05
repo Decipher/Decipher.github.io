@@ -9,6 +9,7 @@
     "generate": "nuxt generate"
   },
   "dependencies": {
+    "@ckeditor/ckeditor5-build-classic": "^35.4.0",
     "@fontsource/archivo": "^5.3.0",
     "@fontsource/jetbrains-mono": "^5.3.0",
     "core-js": "3.25.1",
@@ -16,7 +17,8 @@
     "druxt-site": "^0.14.3",
     "nuxt": "2.15.8",
     "vue-server-renderer": "^2.7.14",
-    "vue-template-compiler": "^2.7.14"
+    "vue-template-compiler": "^2.7.14",
+    "vuedraggable": "^2.24.3"
   },
   "devDependencies": {
     "@nuxt/image": "^0.7.1",

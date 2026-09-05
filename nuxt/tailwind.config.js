@@ -32,7 +32,10 @@ module.exports = {
   ],
   variants: {
     extend: {
-      opacity: ['disabled'],
+      // Edit controls stay out of the way until pointed at, so the site reads
+      // as a site. `group-focus-within` so a keyboard reaches them too.
+      borderColor: ['group-focus-within'],
+      opacity: ['disabled', 'group-hover', 'group-focus-within'],
     },
   },
   theme: {

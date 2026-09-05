@@ -81,6 +81,7 @@ export default {
     // browser at runtime, and must not be baked into the generated HTML.
     '~/plugins/authoring.client.js',
     { src: '~/plugins/authoring-auth.js', mode: 'client' },
+    '~/plugins/authoring-github.client.js',
   ],
 
   // Values the authoring layer needs at runtime. For a static target these are
@@ -103,6 +104,12 @@ export default {
       // the right client id rather than an empty one, which fails login with a
       // confusing `invalid_client`.
       clientId: process.env.OAUTH_CLIENT_ID || 'dfdd3969-6fe2-4a6f-92bb-82b6f59013ed',
+      // Where a change request goes. Defaulted from the repository this site is
+      // built from, so a fork gets its own without editing anything, and
+      // overridable for a build that publishes somewhere else.
+      repository: process.env.CONTENT_REPOSITORY || process.env.GITHUB_REPOSITORY || '',
+      // The workflow that stands a backend up on demand.
+      workflow: process.env.AUTHORING_WORKFLOW || 'authoring.yml',
     },
   },
 

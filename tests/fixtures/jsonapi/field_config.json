@@ -1,0 +1,123 @@
+{
+  "jsonapi": {
+    "version": "1.1",
+    "meta": { "links": { "self": { "href": "https:\/\/jsonapi.org\/format\/1.1\/" } } }
+  },
+  "data": [
+    {
+      "type": "field_config--field_config",
+      "id": "89bc7586-4728-4595-a6ee-fc286a8440ac",
+      "links": {
+        "self": {
+          "href": "http:\/\/backend.test\/jsonapi\/field_config\/field_config\/89bc7586-4728-4595-a6ee-fc286a8440ac"
+        }
+      },
+      "attributes": {
+        "langcode": "en",
+        "status": true,
+        "dependencies": {
+          "config": ["field.storage.node.body", "node.type.article"],
+          "module": ["text"]
+        },
+        "drupal_internal__id": "node.article.body",
+        "field_name": "body",
+        "entity_type": "node",
+        "bundle": "article",
+        "label": "Body",
+        "description": "",
+        "required": false,
+        "translatable": true,
+        "default_value": [],
+        "default_value_callback": "",
+        "settings": { "display_summary": true, "required_summary": false, "allowed_formats": [] },
+        "field_type": "text_with_summary"
+      }
+    },
+    {
+      "type": "field_config--field_config",
+      "id": "5ce12094-db28-4c69-b547-dbd1577978d7",
+      "links": {
+        "self": {
+          "href": "http:\/\/backend.test\/jsonapi\/field_config\/field_config\/5ce12094-db28-4c69-b547-dbd1577978d7"
+        }
+      },
+      "attributes": {
+        "langcode": "en",
+        "status": true,
+        "dependencies": {
+          "config": ["field.storage.node.field_image", "node.type.article"],
+          "module": ["image"]
+        },
+        "drupal_internal__id": "node.article.field_image",
+        "field_name": "field_image",
+        "entity_type": "node",
+        "bundle": "article",
+        "label": "Image",
+        "description": "",
+        "required": false,
+        "translatable": true,
+        "default_value": [],
+        "default_value_callback": "",
+        "settings": {
+          "handler": "default:file",
+          "handler_settings": [],
+          "file_directory": "[date:custom:Y]-[date:custom:m]",
+          "file_extensions": "png gif jpg jpeg webp",
+          "max_filesize": "",
+          "max_resolution": "",
+          "min_resolution": "",
+          "alt_field": true,
+          "alt_field_required": true,
+          "title_field": false,
+          "title_field_required": false,
+          "default_image": { "uuid": null, "alt": "", "title": "", "width": null, "height": null }
+        },
+        "field_type": "image"
+      }
+    },
+    {
+      "type": "field_config--field_config",
+      "id": "5bfb7b57-ad51-43a8-bae0-a6eb87adbecd",
+      "links": {
+        "self": {
+          "href": "http:\/\/backend.test\/jsonapi\/field_config\/field_config\/5bfb7b57-ad51-43a8-bae0-a6eb87adbecd"
+        }
+      },
+      "attributes": {
+        "langcode": "en",
+        "status": true,
+        "dependencies": {
+          "config": [
+            "field.storage.node.field_tags",
+            "node.type.article",
+            "taxonomy.vocabulary.tags"
+          ]
+        },
+        "drupal_internal__id": "node.article.field_tags",
+        "field_name": "field_tags",
+        "entity_type": "node",
+        "bundle": "article",
+        "label": "Tags",
+        "description": "Enter a comma-separated list. For example: Amsterdam, Mexico City, \u0022Cleveland, Ohio\u0022",
+        "required": false,
+        "translatable": true,
+        "default_value": [],
+        "default_value_callback": "",
+        "settings": {
+          "handler": "default:taxonomy_term",
+          "handler_settings": {
+            "target_bundles": { "tags": "tags" },
+            "sort": { "field": "_none" },
+            "auto_create": true
+          }
+        },
+        "field_type": "entity_reference"
+      }
+    }
+  ],
+  "links": {
+    "self": {
+      "href": "http:\/\/backend.test\/jsonapi\/field_config\/field_config?filter%5Bentity_type%5D=node\u0026filter%5Bbundle%5D=article"
+    }
+  }
+}

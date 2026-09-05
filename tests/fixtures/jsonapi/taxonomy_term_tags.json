@@ -1,0 +1,171 @@
+{
+  "jsonapi": {
+    "version": "1.1",
+    "meta": { "links": { "self": { "href": "https:\/\/jsonapi.org\/format\/1.1\/" } } }
+  },
+  "data": [
+    {
+      "type": "taxonomy_term--tags",
+      "id": "54a244e6-702f-4f16-bec0-f68fe750b4d4",
+      "links": {
+        "self": {
+          "href": "http:\/\/backend.test\/jsonapi\/taxonomy_term\/tags\/54a244e6-702f-4f16-bec0-f68fe750b4d4?resourceVersion=id%3A1"
+        },
+        "working-copy": {
+          "href": "http:\/\/backend.test\/jsonapi\/taxonomy_term\/tags\/54a244e6-702f-4f16-bec0-f68fe750b4d4?resourceVersion=rel%3Aworking-copy"
+        }
+      },
+      "attributes": {
+        "drupal_internal__tid": 1,
+        "drupal_internal__revision_id": 1,
+        "langcode": "en",
+        "revision_created": "2026-09-04T13:56:40+00:00",
+        "revision_log_message": null,
+        "status": true,
+        "name": "Baking",
+        "description": null,
+        "weight": 0,
+        "changed": "2026-09-04T13:56:40+00:00",
+        "default_langcode": true,
+        "revision_translation_affected": true,
+        "path": { "alias": null, "pid": null, "langcode": "en" }
+      },
+      "relationships": {
+        "vid": {
+          "data": {
+            "type": "taxonomy_vocabulary--taxonomy_vocabulary",
+            "id": "99567e9b-30e8-4f03-9798-be21ad5a7682",
+            "meta": { "drupal_internal__target_id": "tags" }
+          },
+          "links": {
+            "related": {
+              "href": "http:\/\/backend.test\/jsonapi\/taxonomy_term\/tags\/54a244e6-702f-4f16-bec0-f68fe750b4d4\/vid?resourceVersion=id%3A1"
+            },
+            "self": {
+              "href": "http:\/\/backend.test\/jsonapi\/taxonomy_term\/tags\/54a244e6-702f-4f16-bec0-f68fe750b4d4\/relationships\/vid?resourceVersion=id%3A1"
+            }
+          }
+        },
+        "revision_user": {
+          "data": null,
+          "links": {
+            "related": {
+              "href": "http:\/\/backend.test\/jsonapi\/taxonomy_term\/tags\/54a244e6-702f-4f16-bec0-f68fe750b4d4\/revision_user?resourceVersion=id%3A1"
+            },
+            "self": {
+              "href": "http:\/\/backend.test\/jsonapi\/taxonomy_term\/tags\/54a244e6-702f-4f16-bec0-f68fe750b4d4\/relationships\/revision_user?resourceVersion=id%3A1"
+            }
+          }
+        },
+        "parent": {
+          "data": [
+            {
+              "type": "taxonomy_term--tags",
+              "id": "virtual",
+              "meta": {
+                "links": {
+                  "help": {
+                    "href": "https:\/\/www.drupal.org\/docs\/8\/modules\/json-api\/core-concepts#virtual",
+                    "meta": {
+                      "about": "Usage and meaning of the \u0027virtual\u0027 resource identifier."
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "links": {
+            "related": {
+              "href": "http:\/\/backend.test\/jsonapi\/taxonomy_term\/tags\/54a244e6-702f-4f16-bec0-f68fe750b4d4\/parent?resourceVersion=id%3A1"
+            },
+            "self": {
+              "href": "http:\/\/backend.test\/jsonapi\/taxonomy_term\/tags\/54a244e6-702f-4f16-bec0-f68fe750b4d4\/relationships\/parent?resourceVersion=id%3A1"
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "taxonomy_term--tags",
+      "id": "cf97bdbd-f6fa-4a2b-96b9-e8c1b3404c2f",
+      "links": {
+        "self": {
+          "href": "http:\/\/backend.test\/jsonapi\/taxonomy_term\/tags\/cf97bdbd-f6fa-4a2b-96b9-e8c1b3404c2f?resourceVersion=id%3A2"
+        },
+        "working-copy": {
+          "href": "http:\/\/backend.test\/jsonapi\/taxonomy_term\/tags\/cf97bdbd-f6fa-4a2b-96b9-e8c1b3404c2f?resourceVersion=rel%3Aworking-copy"
+        }
+      },
+      "attributes": {
+        "drupal_internal__tid": 2,
+        "drupal_internal__revision_id": 2,
+        "langcode": "en",
+        "revision_created": "2026-09-04T13:56:40+00:00",
+        "revision_log_message": null,
+        "status": true,
+        "name": "Bread",
+        "description": null,
+        "weight": 0,
+        "changed": "2026-09-04T13:56:40+00:00",
+        "default_langcode": true,
+        "revision_translation_affected": true,
+        "path": { "alias": null, "pid": null, "langcode": "en" }
+      },
+      "relationships": {
+        "vid": {
+          "data": {
+            "type": "taxonomy_vocabulary--taxonomy_vocabulary",
+            "id": "99567e9b-30e8-4f03-9798-be21ad5a7682",
+            "meta": { "drupal_internal__target_id": "tags" }
+          },
+          "links": {
+            "related": {
+              "href": "http:\/\/backend.test\/jsonapi\/taxonomy_term\/tags\/cf97bdbd-f6fa-4a2b-96b9-e8c1b3404c2f\/vid?resourceVersion=id%3A2"
+            },
+            "self": {
+              "href": "http:\/\/backend.test\/jsonapi\/taxonomy_term\/tags\/cf97bdbd-f6fa-4a2b-96b9-e8c1b3404c2f\/relationships\/vid?resourceVersion=id%3A2"
+            }
+          }
+        },
+        "revision_user": {
+          "data": null,
+          "links": {
+            "related": {
+              "href": "http:\/\/backend.test\/jsonapi\/taxonomy_term\/tags\/cf97bdbd-f6fa-4a2b-96b9-e8c1b3404c2f\/revision_user?resourceVersion=id%3A2"
+            },
+            "self": {
+              "href": "http:\/\/backend.test\/jsonapi\/taxonomy_term\/tags\/cf97bdbd-f6fa-4a2b-96b9-e8c1b3404c2f\/relationships\/revision_user?resourceVersion=id%3A2"
+            }
+          }
+        },
+        "parent": {
+          "data": [
+            {
+              "type": "taxonomy_term--tags",
+              "id": "virtual",
+              "meta": {
+                "links": {
+                  "help": {
+                    "href": "https:\/\/www.drupal.org\/docs\/8\/modules\/json-api\/core-concepts#virtual",
+                    "meta": {
+                      "about": "Usage and meaning of the \u0027virtual\u0027 resource identifier."
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "links": {
+            "related": {
+              "href": "http:\/\/backend.test\/jsonapi\/taxonomy_term\/tags\/cf97bdbd-f6fa-4a2b-96b9-e8c1b3404c2f\/parent?resourceVersion=id%3A2"
+            },
+            "self": {
+              "href": "http:\/\/backend.test\/jsonapi\/taxonomy_term\/tags\/cf97bdbd-f6fa-4a2b-96b9-e8c1b3404c2f\/relationships\/parent?resourceVersion=id%3A2"
+            }
+          }
+        }
+      }
+    }
+  ],
+  "links": { "self": { "href": "http:\/\/backend.test\/jsonapi\/taxonomy_term\/tags" } }
+}

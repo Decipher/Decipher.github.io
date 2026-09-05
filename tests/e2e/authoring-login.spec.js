@@ -7,6 +7,8 @@
 
 import { expect, test } from '@playwright/test'
 
+import { isolateFromPublishedSessions } from './isolate.js'
+
 const BACKEND = 'https://backend.test'
 
 /** Answer /jsonapi the way a conforming Drupal does. */
@@ -19,6 +21,11 @@ async function stubConformingBackend(page) {
     })
   )
 }
+
+// Every test in this file, not only the first describe: a build knows where
+// sessions publish themselves and looks there on load, so anything asserting
+// "no backend" would depend on whether one happens to be running.
+test.beforeEach(({ page }) => isolateFromPublishedSessions(page))
 
 test.describe('authoring login', () => {
   test('a visitor sees only a login control, and no backend', async ({ page }) => {
@@ -100,10 +107,15 @@ test.describe('authoring login', () => {
     await page.goto(`/?backend=${encodeURIComponent(BACKEND)}`)
     await page.getByTestId('authoring-login-trigger').click()
     await expect(page.getByTestId('authoring-disconnect')).toBeVisible()
-    await page.getByTestId('authoring-disconnect').click()
-
     // Disconnecting reloads, so the dialog closes with it: the built content
-    // only comes back on a fresh load. Reopen to see the state it left behind.
+    // only comes back on a fresh load. Wait for that load rather than racing
+    // it, or the click below lands on the page that is on its way out.
+    await Promise.all([
+      page.waitForLoadState('networkidle'),
+      page.getByTestId('authoring-disconnect').click(),
+    ])
+
+    // Reopen to see the state it left behind.
     await page.getByTestId('authoring-login-trigger').click()
     await expect(page.getByTestId('authoring-backend-url')).toBeVisible()
 
