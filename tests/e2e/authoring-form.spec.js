@@ -289,6 +289,50 @@ test.describe('the edit form', () => {
     await expect(page.getByTestId('unstaged-badge')).toHaveCount(0)
   })
 
+  test('a tag taken out again leaves nothing behind', async ({ page }) => {
+    await stubBackend(page)
+    await openForm(page)
+
+    const tags = page.getByTestId('reference-input').first()
+    await tags.fill('Sourdough')
+    await page.getByTestId('reference-create').click()
+    await expect(
+      page.getByTestId('reference-selected').filter({ hasText: 'Sourdough' })
+    ).toHaveCount(1)
+
+    // Changing your mind should not leave a term in the vocabulary, nor a
+    // change in the drawer that the author cannot see the point of.
+    await page
+      .getByTestId('reference-selected')
+      .filter({ hasText: 'Sourdough' })
+      .getByTestId('reference-remove')
+      .click()
+    const staged = await page.evaluate(() => window.$nuxt.$store.getters['authoringCart/resources'])
+    expect(staged.filter((r) => r.type === 'taxonomy_term--tags')).toHaveLength(0)
+  })
+
+  test('the same tag added twice is one tag', async ({ page }) => {
+    await stubBackend(page)
+    await openForm(page)
+
+    const tags = page.getByTestId('reference-input').first()
+    for (const _ of [1, 2]) {
+      await tags.fill('Sourdough')
+      await page.getByTestId('reference-create').click()
+      await page
+        .getByTestId('reference-selected')
+        .filter({ hasText: 'Sourdough' })
+        .getByTestId('reference-remove')
+        .click()
+    }
+    await tags.fill('Sourdough')
+    await page.getByTestId('reference-create').click()
+
+    const staged = await page.evaluate(() => window.$nuxt.$store.getters['authoringCart/resources'])
+    // Added, removed and added again is one change, not three.
+    expect(staged.filter((r) => r.type === 'taxonomy_term--tags')).toHaveLength(1)
+  })
+
   test('staging nothing stages nothing', async ({ page }) => {
     await stubBackend(page)
     await openForm(page)

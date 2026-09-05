@@ -128,6 +128,11 @@ export default {
       return Array.isArray(data) ? data : [data]
     },
 
+    /** The attribute a created resource would be named by. */
+    labelField() {
+      return labelFieldFor(String(this.createAs || '').split('--')[0])
+    },
+
     /** The resource type a typed-in value would be created as, if any. */
     createAs() {
       return autoCreateTarget(this.schema, this.index)
@@ -279,6 +284,12 @@ export default {
     remove(item) {
       this.selected = this.selected.filter((s) => s.id !== item.id)
       this.emit()
+      // A term invented here and now taken out has nothing left to be for. The
+      // cart decides, because another entity may still point at it.
+      this.$store.dispatch('authoringCart/discardIfUnreferenced', {
+        type: item.type,
+        id: item.id,
+      })
     },
 
     emit() {
@@ -297,12 +308,31 @@ export default {
       const label = this.query.trim()
       if (!label || !this.createAs) return
 
+      // Taken out and put back is one tag, not two. Without this, changing your
+      // mind twice leaves a vocabulary full of identical terms and a drawer
+      // claiming three changes where the author made one.
+      const existing = this.stagedWithLabel(label)
+      if (existing) return this.choose({ type: existing.type, id: existing.id, label })
+
       const id = await this.$store.dispatch('authoringCart/stageNew', {
         type: this.createAs,
-        attributes: { [labelFieldFor(String(this.createAs).split('--')[0])]: label },
+        attributes: { [this.labelField]: label },
+        // Nothing references it yet; taking the chip off again should leave
+        // nothing behind.
+        onlyIfReferenced: true,
       })
 
       this.choose({ type: this.createAs, id, label })
+    },
+
+    /** A term already staged under this name, if the author made one before. */
+    stagedWithLabel(label) {
+      const wanted = label.toLowerCase()
+      return this.$store.getters['authoringCart/stagedNew'].find(
+        (resource) =>
+          resource.type === this.createAs &&
+          String((resource.attributes || {})[this.labelField] || '').toLowerCase() === wanted
+      )
     },
 
     /**

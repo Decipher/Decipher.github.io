@@ -44,8 +44,12 @@ export function newResourceId() {
 export function changedFields(original = {}, edited = {}) {
   const changed = {}
   for (const [field, value] of Object.entries(edited)) {
-    if (!deepEqual(original[field], value)) {
-      changed[field] = withoutComputed(value)
+    // Both sides stripped, not just the one being kept. A value that has
+    // already been through here has no `processed`, and comparing that against
+    // a freshly fetched one that still has it makes every field look edited.
+    const next = withoutComputed(value)
+    if (!deepEqual(withoutComputed(original[field]), next)) {
+      changed[field] = next
     }
   }
   return changed
