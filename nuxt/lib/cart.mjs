@@ -144,8 +144,8 @@ function withoutReverted(staged, incoming, considered) {
 
 /** Drop the empty halves, so a resource carries no bare `attributes: {}`. */
 export function tidyResource(resource) {
-  // `isNew` is the cart's own bookkeeping, not part of the JSON:API document,
-  // so it never reaches the wire.
+  // `isNew`, `deleted` and `files` are the cart's own bookkeeping, not part of
+  // the JSON:API document, so they never reach the wire.
   const out = { type: resource.type, id: resource.id }
   if (resource.attributes && Object.keys(resource.attributes).length) {
     out.attributes = resource.attributes
@@ -158,6 +158,8 @@ export function tidyResource(resource) {
 
 /** True when there is nothing worth sending. */
 export function isEmptyResource(resource) {
+  // A removal changes everything about the thing, and carries no fields at all.
+  if (isDeletion(resource)) return false
   // Bytes waiting to be uploaded are a change, even though they are not part of
   // the document that gets sent.
   if (Object.keys((resource || {}).files || {}).length) return false
@@ -177,7 +179,19 @@ export function isNew(resource) {
 
 /** POST for something new, PATCH for an edit. */
 export function requestMethod(resource) {
+  if (isDeletion(resource)) return 'DELETE'
   return isNew(resource) ? 'POST' : 'PATCH'
+}
+
+/**
+ * Whether this staged change is a removal.
+ *
+ * Deleting is staged like everything else rather than done on the spot: an
+ * author should be able to change their mind, and a deletion nobody reviewed is
+ * the one edit that cannot be undone from a pull request.
+ */
+export function isDeletion(resource) {
+  return Boolean((resource || {}).deleted)
 }
 
 /**
@@ -187,6 +201,8 @@ export function requestMethod(resource) {
  * well as the URL or Drupal rejects the request.
  */
 export function patchBody(resource) {
+  // A DELETE carries nothing. Drupal answers 422 to a body it did not ask for.
+  if (isDeletion(resource)) return null
   return { data: tidyResource(resource) }
 }
 
@@ -206,7 +222,7 @@ export function collectionUrl(backendUrl, type) {
 
 /** Where one staged resource is sent, given what it is. */
 export function requestUrl(backendUrl, resource) {
-  return isNew(resource)
+  return isNew(resource) && !isDeletion(resource)
     ? collectionUrl(backendUrl, resource.type)
     : patchUrl(backendUrl, resource.type, resource.id)
 }

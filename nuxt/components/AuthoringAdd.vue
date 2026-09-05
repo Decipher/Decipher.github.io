@@ -33,6 +33,7 @@
         no fields on it.
       -->
       <AuthoringEntityForm
+        ref="form"
         :type="staged.type"
         :uuid="staged.id"
         :value="blank"
@@ -43,14 +44,28 @@
         only way out of a new article was to commit it or to find it in the
         drawer and work out which staged resource it was.
       -->
-      <button
-        type="button"
-        class="mt-3 rounded border border-hairline px-3 py-1.5 text-sm text-body hover:border-accent hover:text-accent"
-        data-testid="authoring-add-cancel"
-        @click="cancel"
-      >
-        Cancel
-      </button>
+      <div class="mt-3 flex gap-2">
+        <!--
+          Closing is not abandoning. Without this the only ways out of a new
+          article were to throw it away or to leave the form open forever.
+        -->
+        <button
+          type="button"
+          class="rounded border border-hairline px-3 py-1.5 text-sm text-body hover:border-ink"
+          data-testid="authoring-add-done"
+          @click="done"
+        >
+          Done
+        </button>
+        <button
+          type="button"
+          class="rounded border border-hairline px-3 py-1.5 text-sm text-body hover:border-accent hover:text-accent"
+          data-testid="authoring-add-cancel"
+          @click="cancel"
+        >
+          Cancel
+        </button>
+      </div>
     </div>
   </div>
 </template>
@@ -120,6 +135,19 @@ export default {
 
     onStaged() {
       this.message = 'Saved to the cart. Commit it when a backend is connected.'
+    },
+
+    /**
+     * Close the form, keeping the new content and whatever is typed into it.
+     *
+     * The same reading of "Done" as everywhere else: it means finished with
+     * this form, not finished with the idea.
+     */
+    done() {
+      const form = this.$refs.form
+      if (form && typeof form.saveDraft === 'function') form.saveDraft()
+      this.stagedId = null
+      this.message = 'Kept. Find it in the drawer.'
     },
 
     /**

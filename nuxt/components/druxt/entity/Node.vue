@@ -29,17 +29,36 @@
           :class="drafted ? 'border border-accent text-accent' : 'bg-accent text-accent-contrast'"
           :data-testid="drafted ? 'unstaged-badge' : 'staged-badge'"
         >
-          {{ drafted ? 'Unstaged' : 'Staged' }}
+          {{ deleted ? 'Deleting' : drafted ? 'Unstaged' : 'Staged' }}
         </span>
         <span v-else aria-hidden="true"></span>
 
         <button
+          v-if="!deleted"
           type="button"
-          class="authoring-edit rounded border border-hairline bg-surface px-2 py-0.5 font-mono text-[0.6875rem] uppercase tracking-eyebrow text-muted opacity-0 transition-opacity hover:border-accent hover:text-accent focus:opacity-100 group-hover:opacity-100 group-focus-within:opacity-100"
+          class="authoring-edit ml-auto rounded border border-hairline bg-surface px-2 py-0.5 font-mono text-[0.6875rem] uppercase tracking-eyebrow text-muted opacity-0 transition-opacity hover:border-accent hover:text-accent focus:opacity-100 group-hover:opacity-100 group-focus-within:opacity-100"
           :data-testid="`edit-${entity.type}-${entity.id}`"
           @click="open = true"
         >
           Edit
+        </button>
+        <button
+          v-if="!deleted"
+          type="button"
+          class="authoring-edit rounded border border-hairline bg-surface px-2 py-0.5 font-mono text-[0.6875rem] uppercase tracking-eyebrow text-muted opacity-0 transition-opacity hover:border-accent hover:text-accent focus:opacity-100 group-hover:opacity-100 group-focus-within:opacity-100"
+          :data-testid="`delete-${entity.type}-${entity.id}`"
+          @click="remove"
+        >
+          Delete
+        </button>
+        <button
+          v-else
+          type="button"
+          class="rounded border border-accent px-2 py-0.5 font-mono text-[0.6875rem] uppercase tracking-eyebrow text-accent"
+          :data-testid="`undelete-${entity.type}-${entity.id}`"
+          @click="keep"
+        >
+          Keep it
         </button>
       </div>
 
@@ -49,9 +68,24 @@
         listing of articles with no titles is not a listing, and an author
         editing a title could not see it change.
       -->
-      <h2 v-if="showLabel" class="mb-2 text-lg" data-testid="entity-label">{{ label }}</h2>
-
-      <slot />
+      <!-- Struck through rather than hidden: it is still here until committed. -->
+      <div :class="{ 'opacity-50 line-through': deleted }">
+        <!--
+          The label, which Drupal renders from the node template rather than as
+          a field, so it is not in the view display and Druxt never renders it.
+          A listing of articles with no titles is not a listing, and an author
+          editing a title could not see it change.
+        -->
+        <h2 v-if="showLabel" class="mb-2 text-lg" data-testid="entity-label">
+          <!--
+            A teaser with no way through to the thing it is teasing is a dead
+            end. On the full view there is nowhere to go, so it stays plain.
+          -->
+          <NuxtLink v-if="path" :to="path" data-testid="entity-link">{{ label }}</NuxtLink>
+          <template v-else>{{ label }}</template>
+        </h2>
+        <slot />
+      </div>
     </div>
 
     <!-- Its form, in the place the content was. -->
@@ -156,6 +190,21 @@ export default {
       return (this.merged.attributes || {})[this.labelField] || ''
     },
 
+    /**
+     * Where this entity lives on the site, when it is being summarised.
+     *
+     * The alias if it has one, and Drupal's own internal path if it does not,
+     * which is what Drupal falls back to as well.
+     */
+    path() {
+      if (this.mode === 'default' || this.mode === 'full') return null
+      const attributes = this.merged.attributes || {}
+      const alias = ((attributes.path || {}).alias || '').trim()
+      if (alias) return alias
+      const nid = attributes.drupal_internal__nid
+      return nid ? `/node/${nid}` : null
+    },
+
     /** Only when the display does not already have a field for it. */
     showLabel() {
       return Boolean(this.label) && !Object.keys(this.fields || {}).includes(this.labelField)
@@ -167,6 +216,10 @@ export default {
 
     drafted() {
       return Boolean(this.draft)
+    },
+
+    deleted() {
+      return Boolean((this.entry || {}).deleted)
     },
   },
 
@@ -200,6 +253,27 @@ export default {
   },
 
   methods: {
+    /**
+     * Stage the removal of this, rather than removing it.
+     *
+     * Reviewable and reversible like every other change. A deletion committed
+     * on the spot is the one edit a pull request cannot get back.
+     */
+    remove() {
+      this.open = false
+      this.$store.dispatch('authoringCart/stageDeletion', {
+        type: this.entity.type,
+        id: this.entity.id,
+      })
+    },
+
+    keep() {
+      this.$store.dispatch('authoringCart/discardOne', {
+        type: this.entity.type,
+        id: this.entity.id,
+      })
+    },
+
     /**
      * Close the form, keeping whatever was typed into it.
      *

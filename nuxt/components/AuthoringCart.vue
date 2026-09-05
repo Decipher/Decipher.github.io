@@ -56,7 +56,11 @@
               <span class="w-3 shrink-0 font-mono text-xs text-muted" aria-hidden="true">
                 {{ isExpanded(resource) ? '-' : '+' }}
               </span>
-              <span class="truncate text-ink">{{ labelFor(resource.id) }}</span>
+              <span
+                class="truncate"
+                :class="resource.deleted ? 'text-accent line-through' : 'text-ink'"
+                >{{ labelFor(resource.id) }}</span
+              >
               <span class="truncate text-muted">{{ fieldNames(resource) }}</span>
             </button>
             <button
@@ -256,7 +260,17 @@ export default {
       const resource = this.resources.find((r) => r.id === id)
       if (!resource) return id
       const attributes = resource.attributes || {}
-      return attributes.title || attributes.name || resource.type
+      // A deletion carries no fields at all, and an edit carries only what
+      // changed, so the title is often not among them. The page knows it.
+      const onPage = document.querySelector(
+        `[data-authoring-entity="${resource.type}:${resource.id}"] [data-testid="entity-label"]`
+      )
+      return (
+        attributes.title ||
+        attributes.name ||
+        (onPage && onPage.textContent.trim()) ||
+        resource.type
+      )
     },
 
     /**
@@ -334,7 +348,9 @@ export default {
     },
 
     fieldNames(resource) {
-      return Object.keys({ ...resource.attributes, ...resource.relationships }).join(', ')
+      if (resource.deleted) return 'will be deleted'
+      const fields = Object.keys({ ...resource.attributes, ...resource.relationships })
+      return fields.length ? fields.join(', ') : 'new'
     },
 
     errorFor(resource) {

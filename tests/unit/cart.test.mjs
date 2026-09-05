@@ -11,6 +11,8 @@ import {
   cartKey,
   changedFields,
   commitOrder,
+  requestUrl,
+  requestMethod,
   dependencyMap,
   requiredBy,
   withDependencies,
@@ -372,4 +374,44 @@ test('what would break is named, so the refusal can say why', () => {
 test('a resource referencing itself is not its own dependency', () => {
   const self = { type: 't--t', id: 'x', relationships: { r: { data: { type: 't--t', id: 'x' } } } }
   assert.deepEqual(dependencyMap([self]).get('x'), [])
+})
+
+// Deleting, staged like everything else.
+//
+// A deletion committed on the spot is the one edit a pull request cannot get
+// back, so it waits in the cart with the rest and can be called off.
+
+test('a staged deletion is sent as a DELETE, with no body', () => {
+  const gone = { type: 'node--article', id: 'abc', deleted: true }
+  assert.equal(requestMethod(gone), 'DELETE')
+  // Drupal answers 422 to a body it did not ask for.
+  assert.equal(patchBody(gone), null)
+  assert.equal(requestUrl('https://b.test', gone), 'https://b.test/jsonapi/node/article/abc')
+})
+
+test('a deletion is a change even though it carries no fields', () => {
+  // Otherwise the cart would decide nothing had happened and drop it.
+  assert.equal(isEmptyResource({ type: 'node--article', id: 'abc', deleted: true }), false)
+  assert.equal(isEmptyResource({ type: 'node--article', id: 'abc' }), true)
+})
+
+test('deleting something new goes to the collection, never to a missing id', () => {
+  // New content has an id the backend has never seen. This case is handled
+  // before it gets here, by dropping it outright, but the URL must not be the
+  // collection either: a DELETE there is not a delete of anything.
+  const gone = { type: 'node--article', id: 'abc', isNew: true, deleted: true }
+  assert.equal(requestUrl('https://b.test', gone), 'https://b.test/jsonapi/node/article/abc')
+})
+
+test('the cart bookkeeping never reaches the wire', () => {
+  const resource = {
+    type: 'node--article',
+    id: 'abc',
+    isNew: true,
+    deleted: false,
+    onlyIfReferenced: true,
+    files: { field_image: { dataUrl: 'data:...' } },
+    attributes: { title: 'A' },
+  }
+  assert.deepEqual(Object.keys(tidyResource(resource)), ['type', 'id', 'attributes'])
 })

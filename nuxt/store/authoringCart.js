@@ -16,6 +16,7 @@ import {
   cartKey,
   changedFields,
   commitOrder,
+  isDeletion,
   withDependencies,
   isEmptyResource,
   isNew,
@@ -318,6 +319,34 @@ export const actions = {
   },
 
   /**
+   * Stage the removal of something.
+   *
+   * Staged like any other change so it can be reviewed and reversed. Content
+   * the author created and never committed is simply dropped instead: there is
+   * nothing on the backend to delete, and asking it to remove something it has
+   * never heard of is a 404 the author cannot act on.
+   */
+  stageDeletion({ state, commit }, { type, id }) {
+    const key = cartKey(type, id)
+    const existing = state.entries[key]
+
+    if (isNew(existing)) {
+      commit('discardOne', key)
+      commit('clearDraft', key)
+      commit('setPersistent', writeStored(state.entries))
+      return 'dropped'
+    }
+
+    // Whatever was staged for it is replaced: editing a field and then deleting
+    // the thing means the edit was never going to matter.
+    commit('stage', { key, resource: { type, id, deleted: true } })
+    commit('clearDraft', key)
+    commit('setPersistent', writeStored(state.entries))
+    if (Object.keys(state.entries).length === 1) commit('setDrawerOpen', true)
+    return 'staged'
+  },
+
+  /**
    * Move a staged change back to being merely unsaved.
    *
    * The two states already exist, so unstaging is moving between them rather
@@ -328,6 +357,13 @@ export const actions = {
     const key = cartKey(type, id)
     const entry = state.entries[key]
     if (!entry) return false
+
+    // A removal has no fields to keep, so unstaging one is calling it off.
+    if (isDeletion(entry)) {
+      commit('discardOne', key)
+      commit('setPersistent', writeStored(state.entries))
+      return true
+    }
 
     const existing = state.drafts[key] || {}
     commit('setDraft', {
@@ -445,6 +481,7 @@ export const actions = {
         }
         const ready = uploaded.resource
 
+        const body = patchBody(ready)
         const response = await request(requestUrl(backendUrl, ready), {
           method: requestMethod(ready),
           headers: {
@@ -454,7 +491,7 @@ export const actions = {
             Accept: 'application/vnd.api+json',
             Authorization: `Bearer ${token}`,
           },
-          body: JSON.stringify(patchBody(ready)),
+          ...(body ? { body: JSON.stringify(body) } : {}),
         })
 
         if (!response.ok) {

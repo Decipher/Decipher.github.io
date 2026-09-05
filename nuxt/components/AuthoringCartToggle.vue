@@ -1,6 +1,6 @@
 <template>
   <button
-    v-if="count || open"
+    v-if="editing || count || unstagedCount || open"
     type="button"
     class="font-mono text-xs uppercase tracking-eyebrow underline transition-colors"
     :class="open ? 'text-accent' : 'text-muted hover:text-accent'"
@@ -8,17 +8,21 @@
     :aria-expanded="String(open)"
     @click="toggle"
   >
-    Staged {{ count }}
+    Edits{{ tally }}
   </button>
 </template>
 
 <script>
 /**
- * Open and close the staged-changes drawer.
+ * Open and close the edits drawer.
  *
- * Hidden until something is staged, so a visitor never sees a control for a
- * thing they have none of. Stays visible while the drawer is open, or closing
- * an empty cart would remove the only way to shut it.
+ * Shown whenever edit mode is on, not only when something is staged. Counting
+ * staged changes alone left an author who had edited things and staged none of
+ * them with a drawer full of work and no way to open it.
+ *
+ * Still hidden from a visitor, who has no edits and no way to make any, and
+ * still shown while the drawer is open, or closing an empty one would remove
+ * the only way to shut it.
  */
 export default {
   name: 'AuthoringCartToggle',
@@ -26,6 +30,19 @@ export default {
   computed: {
     count() {
       return this.$store.getters['authoringCart/count']
+    },
+    editing() {
+      return this.$store.getters['authoringCart/editing']
+    },
+    unstagedCount() {
+      return Object.keys(this.$store.state.authoringCart.drafts || {}).length
+    },
+    /** Staged, and a mark for anything edited and not staged. */
+    tally() {
+      const parts = []
+      if (this.count) parts.push(String(this.count))
+      if (this.unstagedCount) parts.push(`+${this.unstagedCount}`)
+      return parts.length ? ` ${parts.join(' ')}` : ''
     },
     open() {
       return this.$store.getters['authoringCart/drawerOpen']
