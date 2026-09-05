@@ -1,5 +1,9 @@
 <template>
-  <div class="authoring-entity" :class="{ 'is-staged': staged, group: editable }">
+  <div
+    class="authoring-entity"
+    :class="{ 'is-staged': staged, group: editable }"
+    :data-authoring-entity="`${entity.type}:${entity.id}`"
+  >
     <!-- The entity as the site renders it, edit mode or not. -->
     <div v-if="!open">
       <!--
@@ -12,7 +16,7 @@
       -->
       <div
         v-if="editable"
-        class="mb-2 flex items-baseline justify-between gap-3 border-b border-transparent pb-1 transition-colors group-hover:border-hairline group-focus-within:border-hairline"
+        class="mb-2 flex items-baseline justify-between gap-3"
       >
         <!--
           Two states worth telling apart. Staged is going to be sent; unstaged
@@ -31,7 +35,7 @@
 
         <button
           type="button"
-          class="authoring-edit font-mono text-[0.6875rem] uppercase tracking-eyebrow text-muted underline opacity-0 transition-opacity hover:text-accent focus:opacity-100 group-hover:opacity-100 group-focus-within:opacity-100"
+          class="authoring-edit rounded border border-hairline bg-surface px-2 py-0.5 font-mono text-[0.6875rem] uppercase tracking-eyebrow text-muted opacity-0 transition-opacity hover:border-accent hover:text-accent focus:opacity-100 group-hover:opacity-100 group-focus-within:opacity-100"
           :data-testid="`edit-${entity.type}-${entity.id}`"
           @click="open = true"
         >
@@ -235,6 +239,12 @@ export default {
 </script>
 
 <style>
+/* Briefly marked when the drawer points at it, so "Show" lands somewhere. */
+.authoring-entity.is-revealed {
+  outline: 2px solid rgb(var(--c-accent));
+  outline-offset: 4px;
+}
+
 /*
  * A pointer that cannot hover has no way to reveal a hover-only control, so on
  * a touch screen the Edit control is simply there. Written as a media query

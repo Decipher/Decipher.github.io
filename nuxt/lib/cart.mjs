@@ -289,3 +289,58 @@ export function commitOrder(resources = []) {
   resources.forEach(visit)
   return ordered
 }
+
+/**
+ * What each staged resource needs sent with it.
+ *
+ * Only staged resources count. Almost every reference is to content that
+ * already exists on the backend, and waiting for those would mean never
+ * sending anything.
+ */
+export function dependencyMap(resources = []) {
+  const staged = new Set(resources.map((resource) => resource.id))
+  const map = new Map()
+  for (const resource of resources) {
+    const needs = new Set()
+    for (const relationship of Object.values(resource.relationships || {})) {
+      const data = (relationship || {}).data
+      if (!data) continue
+      for (const item of Array.isArray(data) ? data : [data]) {
+        if (item && item.id !== resource.id && staged.has(item.id)) needs.add(item.id)
+      }
+    }
+    map.set(resource.id, [...needs])
+  }
+  return map
+}
+
+/**
+ * A selection, plus everything it cannot be sent without.
+ *
+ * Choosing an article that references a tag which does not exist yet is
+ * choosing the tag too, whether or not the author ticked it. The alternative is
+ * a commit that fails on a reference the author cannot see.
+ */
+export function withDependencies(selected = [], resources = []) {
+  const map = dependencyMap(resources)
+  const out = new Set()
+  const visit = (id) => {
+    if (out.has(id)) return
+    out.add(id)
+    for (const needed of map.get(id) || []) visit(needed)
+  }
+  selected.forEach(visit)
+  return [...out]
+}
+
+/**
+ * Which selected resources would break if this one were left behind.
+ *
+ * Used to refuse rather than to correct: silently re-ticking something the
+ * author just unticked is its own kind of wrong, and the reason is worth
+ * saying.
+ */
+export function requiredBy(id, selected = [], resources = []) {
+  const map = dependencyMap(resources)
+  return selected.filter((other) => other !== id && (map.get(other) || []).includes(id))
+}

@@ -1,7 +1,7 @@
 <template>
   <div class="authoring-cart p-5" data-testid="authoring-cart">
     <div class="mb-3 flex items-baseline justify-between">
-      <p class="eyebrow">Staged</p>
+      <p class="eyebrow">Edits</p>
       <button
         type="button"
         class="font-mono text-xs text-muted underline hover:text-accent"
@@ -12,49 +12,144 @@
       </button>
     </div>
 
-    <p v-if="!count" class="text-sm text-muted" data-testid="authoring-cart-empty">
-      Nothing staged yet. Turn on Edit and change something.
+    <p
+      v-if="!count && !unstaged.length"
+      class="text-sm text-muted"
+      data-testid="authoring-cart-empty"
+    >
+      Nothing edited yet. Turn on Edit and change something.
     </p>
     <p v-if="count" class="mb-3 text-sm text-body" data-testid="authoring-cart-count">
-      {{ count }} {{ count === 1 ? 'change' : 'changes' }}, not yet sent anywhere.
+      {{ count }} {{ count === 1 ? 'change' : 'changes' }} staged, not yet sent anywhere.
     </p>
 
     <p v-if="!persistent" class="text-sm text-muted mb-3" data-testid="authoring-cart-volatile">
       This browser will not keep them past a reload.
     </p>
 
-    <ul v-if="count" class="mb-3 space-y-2">
-      <li v-for="resource in resources" :key="resource.type + resource.id" class="text-sm">
-        <button
-          type="button"
-          class="flex w-full items-baseline gap-1 text-left"
-          :aria-expanded="String(isExpanded(resource))"
-          data-testid="authoring-cart-expand"
-          @click="toggle(resource)"
-        >
-          <span class="w-3 shrink-0 font-mono text-xs text-muted" aria-hidden="true">
-            {{ isExpanded(resource) ? '-' : '+' }}
+    <!--
+      Two sections, the way `git status` has two. The cart already holds both
+      states; showing them as one list made an unstaged edit look like something
+      that was about to be sent.
+    -->
+    <section v-if="resources.length" class="mb-4">
+      <p class="eyebrow mb-2">Staged</p>
+      <ul class="space-y-2">
+        <li v-for="resource in resources" :key="resource.type + resource.id" class="text-sm">
+          <div class="flex items-baseline gap-2">
+            <input
+              :id="`pick-${resource.type}-${resource.id}`"
+              type="checkbox"
+              class="authoring-check"
+              checked
+              :aria-label="`Staged: ${labelFor(resource.id)}`"
+              :data-testid="`cart-select-${resource.id}`"
+              @change="unstage(resource, $event)"
+            />
+            <button
+              type="button"
+              class="flex min-w-0 flex-1 items-baseline gap-1 text-left"
+              :aria-expanded="String(isExpanded(resource))"
+              data-testid="authoring-cart-expand"
+              @click="toggle(resource)"
+            >
+              <span class="w-3 shrink-0 font-mono text-xs text-muted" aria-hidden="true">
+                {{ isExpanded(resource) ? '-' : '+' }}
+              </span>
+              <span class="truncate text-ink">{{ labelFor(resource.id) }}</span>
+              <span class="truncate text-muted">{{ fieldNames(resource) }}</span>
+            </button>
+            <button
+              type="button"
+              class="shrink-0 font-mono text-[0.6875rem] uppercase tracking-eyebrow text-muted underline hover:text-accent"
+              :data-testid="`cart-show-${resource.id}`"
+              @click="reveal(resource)"
+            >
+              Show
+            </button>
+          </div>
+
+          <p
+            v-if="dependsOn(resource).length"
+            class="ml-6 font-mono text-[0.6875rem] text-muted"
+            data-testid="cart-depends"
+          >
+            needs {{ dependsOn(resource).join(', ') }}
+          </p>
+
+          <!-- What is actually going to be sent, rather than a summary of it. -->
+          <AuthoringJsonTree
+            v-if="isExpanded(resource)"
+            :value="resource"
+            class="ml-6 mt-1 border-l border-hairline pl-2"
+          />
+
+          <div class="ml-6 mt-1">
+            <button
+              type="button"
+              class="font-mono text-[0.6875rem] uppercase tracking-eyebrow text-muted underline hover:text-accent"
+              :data-testid="`cart-discard-${resource.id}`"
+              @click="discardOne(resource)"
+            >
+              Discard
+            </button>
+          </div>
+
+          <span
+            v-if="errorFor(resource)"
+            class="ml-6 block text-accent"
+            data-testid="authoring-cart-error"
+          >
+            {{ errorFor(resource) }}
           </span>
-          <code class="font-mono text-ink">{{ resource.type }}</code>
-          <span class="text-muted">{{ fieldNames(resource) }}</span>
-        </button>
+        </li>
+      </ul>
+    </section>
 
-        <!-- What is actually going to be sent, rather than a summary of it. -->
-        <AuthoringJsonTree
-          v-if="isExpanded(resource)"
-          :value="resource"
-          class="ml-4 mt-1 border-l border-hairline pl-2"
-        />
-
-        <span
-          v-if="errorFor(resource)"
-          class="block text-accent"
-          data-testid="authoring-cart-error"
+    <section v-if="unstaged.length" class="mb-4">
+      <p class="eyebrow mb-2">Unstaged</p>
+      <ul class="space-y-1">
+        <li
+          v-for="item in unstaged"
+          :key="item.key"
+          class="flex items-baseline gap-2 text-sm"
+          data-testid="cart-unstaged-row"
         >
-          {{ errorFor(resource) }}
-        </span>
-      </li>
-    </ul>
+          <input
+            type="checkbox"
+            class="authoring-check"
+            :aria-label="`Stage ${item.label}`"
+            :data-testid="`cart-stage-${item.id}`"
+            @change="stageDraft(item)"
+          />
+          <span class="min-w-0 flex-1 truncate">
+            <span class="text-ink">{{ item.label }}</span>
+            <span class="text-muted"> {{ item.fields }}</span>
+          </span>
+          <button
+            type="button"
+            class="shrink-0 font-mono text-[0.6875rem] uppercase tracking-eyebrow text-muted underline hover:text-accent"
+            :data-testid="`cart-show-draft-${item.id}`"
+            @click="reveal(item)"
+          >
+            Show
+          </button>
+          <button
+            type="button"
+            class="shrink-0 font-mono text-[0.6875rem] uppercase tracking-eyebrow text-muted underline hover:text-accent"
+            :data-testid="`cart-discard-draft-${item.id}`"
+            @click="discardDraft(item)"
+          >
+            Discard
+          </button>
+        </li>
+      </ul>
+      <p class="mt-2 text-sm text-muted">
+        Kept, and not sent. Tick one to stage it.
+      </p>
+    </section>
+
+    <p v-if="refusal" class="mb-3 text-sm text-accent" data-testid="cart-refusal">{{ refusal }}</p>
 
     <div v-if="count" class="flex flex-wrap gap-2">
       <button
@@ -94,15 +189,13 @@
 </template>
 
 <script>
-import { exportCart, exportSummary } from '../lib/cart.mjs'
+import { dependencyMap, exportCart, exportSummary, requiredBy } from '../lib/cart.mjs'
 
 export default {
   name: 'AuthoringCart',
 
-  data: () => ({ result: null }),
-
   data() {
-    return { expanded: {} }
+    return { result: null, expanded: {}, refusal: null }
   },
 
   computed: {
@@ -127,6 +220,22 @@ export default {
     canCommit() {
       return Boolean(this.backendUrl && this.token)
     },
+    /** Edits kept but not staged, listed apart from what is going to be sent. */
+    unstaged() {
+      const drafts = this.$store.state.authoringCart.drafts || {}
+      return Object.entries(drafts).map(([key, draft]) => {
+        const [type, id] = key.split(':')
+        const attributes = draft.attributes || {}
+        return {
+          key,
+          type,
+          id,
+          label: attributes.title || attributes.name || type,
+          fields: Object.keys({ ...attributes, ...(draft.relationships || {}) }).join(', '),
+        }
+      })
+    },
+
     // Says which half is missing, because "cannot commit" on its own sends
     // people looking in the wrong place.
     blockedReason() {
@@ -137,6 +246,78 @@ export default {
   },
 
   methods: {
+    /** What this change cannot be sent without, named rather than by id. */
+    dependsOn(resource) {
+      const map = dependencyMap(this.resources)
+      return (map.get(resource.id) || []).map((id) => this.labelFor(id))
+    },
+
+    labelFor(id) {
+      const resource = this.resources.find((r) => r.id === id)
+      if (!resource) return id
+      const attributes = resource.attributes || {}
+      return attributes.title || attributes.name || resource.type
+    },
+
+    /**
+     * Unstage, unless something staged still needs it.
+     *
+     * Said, not silently corrected: re-ticking a box the author just unticked
+     * teaches them the control does not work. The refusal names what needs it.
+     */
+    unstage(resource, event) {
+      this.refusal = null
+      const staged = this.resources.map((r) => r.id)
+      const needed = requiredBy(resource.id, staged, this.resources)
+      if (needed.length) {
+        this.refusal = `${this.labelFor(needed[0])} references this, so it stays staged.`
+        // The browser has already ticked the box off. Nothing else changed, so
+        // Vue will not re-render it, and the box would sit there claiming a
+        // state the cart does not have.
+        if (event && event.target) event.target.checked = true
+        return
+      }
+      this.$store.dispatch('authoringCart/unstage', {
+        type: resource.type,
+        id: resource.id,
+      })
+    },
+
+    stageDraft(item) {
+      this.refusal = null
+      this.$store.dispatch('authoringCart/stageDraft', { type: item.type, id: item.id })
+    },
+
+    discardOne(resource) {
+      this.refusal = null
+      this.$store.dispatch('authoringCart/discardOne', {
+        type: resource.type,
+        id: resource.id,
+      })
+    },
+
+    discardDraft(item) {
+      this.$store.dispatch('authoringCart/clearDraft', { type: item.type, id: item.id })
+    },
+
+    /**
+     * Take the reader to the thing the row is about.
+     *
+     * The drawer sits beside a page that may be long, and a list of changes you
+     * then have to go and find is most of a navigation problem.
+     */
+    reveal(item) {
+      const target = document.querySelector(`[data-authoring-entity="${item.type}:${item.id}"]`)
+      if (!target) {
+        this.refusal = 'That content is not on this page.'
+        return
+      }
+      this.refusal = null
+      target.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      target.classList.add('is-revealed')
+      window.setTimeout(() => target.classList.remove('is-revealed'), 1600)
+    },
+
     /** One resource's own tree, open or shut. Shut by default: the drawer is a
      * list first, and a reader opens the one they care about. */
     isExpanded(resource) {
@@ -199,3 +380,57 @@ export default {
   },
 }
 </script>
+
+<style>
+/*
+ * The drawer is monospace and square, and a native checkbox is neither: it
+ * arrives rounded, blue and sized to whatever the browser thinks, which reads
+ * as a form control dropped into a design rather than part of one.
+ *
+ * Drawn rather than tinted, because `accent-color` cannot change the shape and
+ * the shape is most of the problem.
+ */
+.authoring-check {
+  appearance: none;
+  -webkit-appearance: none;
+  flex: none;
+  width: 0.875rem;
+  height: 0.875rem;
+  margin: 0;
+  border: 1px solid rgb(var(--c-hairline));
+  background: rgb(var(--c-paper));
+  cursor: pointer;
+  position: relative;
+  top: 0.125rem;
+  transition:
+    border-color 120ms,
+    background-color 120ms;
+}
+
+.authoring-check:hover {
+  border-color: rgb(var(--c-accent));
+}
+
+.authoring-check:focus-visible {
+  outline: 2px solid rgb(var(--c-accent));
+  outline-offset: 1px;
+}
+
+.authoring-check:checked {
+  background: var(--accent);
+  border-color: rgb(var(--c-accent));
+}
+
+/* A tick, drawn as two borders rotated, so it needs no font and no image. */
+.authoring-check:checked::after {
+  content: '';
+  position: absolute;
+  left: 0.25rem;
+  top: 0.0625rem;
+  width: 0.25rem;
+  height: 0.5rem;
+  border: solid rgb(var(--c-accent-contrast));
+  border-width: 0 1.5px 1.5px 0;
+  transform: rotate(45deg);
+}
+</style>

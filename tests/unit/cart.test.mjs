@@ -11,6 +11,9 @@ import {
   cartKey,
   changedFields,
   commitOrder,
+  dependencyMap,
+  requiredBy,
+  withDependencies,
   deepEqual,
   exportCart,
   exportSummary,
@@ -315,4 +318,58 @@ test("Drupal's own rendering is not a change the author made", () => {
   const staged = { body: { value: 'new', format: 'basic_html' } }
   const fromBackend = { body: { value: 'new', format: 'basic_html', processed: '<p>new</p>' } }
   assert.deepEqual(changedFields(staged, fromBackend), {})
+})
+
+// Choosing what to send, when some of it cannot be sent alone.
+//
+// A drawer that lets an author tick an article and untick the tag it references
+// is offering them a commit that will fail on something they cannot see.
+
+test('only staged references count as dependencies', () => {
+  const article = {
+    type: 'node--article',
+    id: 'article',
+    relationships: {
+      field_tags: { data: [{ type: 'taxonomy_term--tags', id: 'new-tag' }] },
+      uid: { data: { type: 'user--user', id: 'someone-real' } },
+    },
+  }
+  const tag = { type: 'taxonomy_term--tags', id: 'new-tag' }
+
+  // The author is staged nowhere, so waiting for them would mean never sending.
+  assert.deepEqual(dependencyMap([article, tag]).get('article'), ['new-tag'])
+})
+
+test('choosing something chooses what it cannot be sent without', () => {
+  const article = {
+    type: 'node--article',
+    id: 'article',
+    relationships: { field_tags: { data: [{ type: 't--t', id: 'tag' }] } },
+  }
+  const tag = { type: 't--t', id: 'tag' }
+  assert.deepEqual(withDependencies(['article'], [article, tag]).sort(), ['article', 'tag'])
+})
+
+test('a chain is followed all the way down', () => {
+  const a = { type: 't--t', id: 'a' }
+  const b = { type: 't--t', id: 'b', relationships: { r: { data: { type: 't--t', id: 'a' } } } }
+  const c = { type: 'n--n', id: 'c', relationships: { r: { data: { type: 't--t', id: 'b' } } } }
+  assert.deepEqual(withDependencies(['c'], [a, b, c]).sort(), ['a', 'b', 'c'])
+})
+
+test('what would break is named, so the refusal can say why', () => {
+  const article = {
+    type: 'node--article',
+    id: 'article',
+    relationships: { field_tags: { data: [{ type: 't--t', id: 'tag' }] } },
+  }
+  const tag = { type: 't--t', id: 'tag' }
+  assert.deepEqual(requiredBy('tag', ['article', 'tag'], [article, tag]), ['article'])
+  // Nothing depends on the article, so it can be left out on its own.
+  assert.deepEqual(requiredBy('article', ['article', 'tag'], [article, tag]), [])
+})
+
+test('a resource referencing itself is not its own dependency', () => {
+  const self = { type: 't--t', id: 'x', relationships: { r: { data: { type: 't--t', id: 'x' } } } }
+  assert.deepEqual(dependencyMap([self]).get('x'), [])
 })

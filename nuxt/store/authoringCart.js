@@ -16,6 +16,7 @@ import {
   cartKey,
   changedFields,
   commitOrder,
+  withDependencies,
   isEmptyResource,
   isNew,
   mergeEntry,
@@ -264,6 +265,57 @@ export const actions = {
   },
 
   /**
+   * Move a staged change back to being merely unsaved.
+   *
+   * The two states already exist, so unstaging is moving between them rather
+   * than a third thing. The edit is not lost and the page still shows it; it
+   * simply stops being part of what the next commit sends.
+   */
+  unstage({ state, commit }, { type, id }) {
+    const key = cartKey(type, id)
+    const entry = state.entries[key]
+    if (!entry) return false
+
+    const existing = state.drafts[key] || {}
+    commit('setDraft', {
+      key,
+      draft: {
+        attributes: { ...(entry.attributes || {}), ...(existing.attributes || {}) },
+        relationships: { ...(entry.relationships || {}), ...(existing.relationships || {}) },
+      },
+    })
+    commit('discardOne', key)
+    commit('setPersistent', writeStored(state.entries))
+    return true
+  },
+
+  /**
+   * Move an unstaged edit into the cart.
+   *
+   * The mirror of `unstage`. A draft already holds the difference from what the
+   * backend has, so staging it is moving it between the two maps rather than
+   * working anything out again.
+   */
+  stageDraft({ state, commit }, { type, id }) {
+    const key = cartKey(type, id)
+    const draft = state.drafts[key]
+    if (!draft) return false
+
+    const existing = state.entries[key]
+    const resource = mergeEntry(existing, {
+      type,
+      id,
+      isNew: isNew(existing),
+      attributes: draft.attributes || {},
+      relationships: draft.relationships || {},
+    })
+    commit('clearDraft', key)
+    commit('stage', { key, resource })
+    commit('setPersistent', writeStored(state.entries))
+    return true
+  },
+
+  /**
    * Drop a staged resource that only existed to be referenced.
    *
    * A tag typed into a field and then taken out again should leave nothing
@@ -309,18 +361,25 @@ export const actions = {
    * a partial failure leaves the author with exactly the work still to do
    * rather than an all-or-nothing retry.
    */
-  async commit({ state, commit, getters }, { backendUrl, token, fetch: fetchImpl } = {}) {
+  async commit({ state, commit, getters }, { backendUrl, token, fetch: fetchImpl, ids } = {}) {
     if (!backendUrl) return { ok: false, reason: 'No backend connected.' }
     if (!token) return { ok: false, reason: 'Not signed in to that backend.' }
     if (getters.isEmpty) return { ok: false, reason: 'Nothing staged.' }
 
     const request = fetchImpl || window.fetch.bind(window)
+    const all = Object.values(state.entries)
+    // A selection is expanded to what it cannot be sent without, so choosing an
+    // article that references a new tag chooses the tag as well.
+    const chosen = ids ? new Set(withDependencies(ids, all)) : null
+    const sending = chosen ? all.filter((resource) => chosen.has(resource.id)) : all
+    if (!sending.length) return { ok: false, reason: 'Nothing selected.' }
+
     commit('setCommitting', true)
 
     const results = { sent: 0, failed: 0 }
     // Ordered, not just iterated: a new resource another one references has to
     // reach the backend first.
-    for (const resource of commitOrder(Object.values(state.entries))) {
+    for (const resource of commitOrder(sending)) {
       const key = cartKey(resource.type, resource.id)
       try {
         const response = await request(requestUrl(backendUrl, resource), {
