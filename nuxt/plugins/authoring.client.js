@@ -61,13 +61,31 @@ function writeStored(value) {
  * build time, and nothing written since appears at all.
  */
 function pointClientAt(context, url) {
-  const client = (context.app && context.app.$druxt) || context.$druxt
-  if (!client) return
-  if (client.options) client.options.baseUrl = url
-  if (client.axios) client.axios.defaults.baseURL = url
-  // Druxt caches the JSON:API index per client. It describes a different site
-  // now, so it has to be discarded or the first request uses the old one.
-  client.index = {}
+  for (const client of druxtClients(context)) {
+    if (client.options) client.options.baseUrl = url
+    if (client.axios) client.axios.defaults.baseURL = url
+    // Druxt caches the JSON:API index per client. It describes a different site
+    // now, so it has to be discarded or the first request uses the old one.
+    client.index = {}
+  }
+}
+
+/**
+ * Every Druxt client in the app, because there is more than one.
+ *
+ * `druxt` injects `$druxt`, and `druxt-router` injects a `$druxtRouter` built
+ * around a second `DruxtClient` of its own, with the build-time base URL baked
+ * into it. Repointing only the first leaves route lookups going to whichever
+ * machine ran `nuxt generate`, which is a localhost that means nothing here.
+ */
+function druxtClients(context) {
+  const app = (context.app || context) || {}
+  const found = [app.$druxt || context.$druxt]
+  const router = app.$druxtRouter || context.$druxtRouter
+  // Injected as a function returning the instance, not as the instance.
+  const instance = typeof router === 'function' ? router() : router
+  if (instance) found.push(instance.druxt || instance)
+  return found.filter(Boolean)
 }
 
 /**
@@ -97,28 +115,78 @@ function holdClientUntilConnected(context, state) {
 }
 
 /**
- * Make Nuxt re-run the page's own data fetching instead of hydrating.
+ * Throw away what the build baked in, and fetch it again from the backend.
  *
- * A full static build ships the rendered result in `window.__NUXT__`, and Nuxt
- * hydrates straight from it: `asyncData` and `fetch` never run again on the
- * client, so nothing written since the build can appear no matter what the
- * client is pointed at. Clearing Druxt's caches does not help, because nothing
- * asks it for anything.
+ * A full static build ships its rendered result in `window.__NUXT__`, and Nuxt
+ * hydrates from it: `fetch()` never runs again, so nothing written since the
+ * build can appear no matter what the client is pointed at. Druxt's own Vuex
+ * caches are baked in too, and they hold the *build machine's* URLs, so even a
+ * component that did refetch would be handed a route pointing at localhost.
  *
- * Plugins run before the app mounts, which is the last moment this can be
- * changed. Dropping `serverRendered` makes Nuxt treat the page as un-rendered
- * and fetch it properly.
+ * Clearing `__NUXT__` instead does not work, and failed quietly: Nuxt decides
+ * whether it is hydrating from a `data-fetch-key` attribute in the HTML, not
+ * from the payload, so it still hydrates, finds nothing where the fetch state
+ * should be, and leaves the component with no model and no pending state. Its
+ * `fetch()` then never runs at all. DruxtRouter renders nothing from there, and
+ * throws reading `model.error` on the way past.
  *
- * Only when a backend is connected. A visitor with none keeps the static
- * payload, which is the whole point of the build.
+ * So let it hydrate, then empty the caches and ask every component to fetch
+ * again. The page briefly shows what was built, which is the correct thing to
+ * show until a backend answers.
  */
-function bypassStaticPayload() {
-  const payload = window.__NUXT__
-  if (!payload || payload.serverRendered === false) return false
-  payload.serverRendered = false
-  delete payload.data
-  delete payload.fetch
-  return true
+/**
+ * Run something once the app has mounted, or straight away if it already has.
+ *
+ * `onNuxtReady` only fires once, so anything registered after it has already
+ * run would otherwise never happen. Connecting a backend by hand is exactly
+ * that case.
+ */
+let nuxtIsReady = false
+let readyRegistered = false
+const waitingForReady = []
+function whenReady(fn) {
+  if (nuxtIsReady) return fn()
+  waitingForReady.push(fn)
+  if (readyRegistered) return
+  readyRegistered = true
+  const flush = () => {
+    nuxtIsReady = true
+    waitingForReady.splice(0).forEach((waiting) => waiting())
+  }
+  if (typeof window.onNuxtReady === 'function') window.onNuxtReady(flush)
+  else flush()
+}
+
+function refreshFromBackend() {
+  // `window.$nuxt`, not the plugin's `context.app`: the refresh walks mounted
+  // components, and the context's app is the root options object rather than
+  // the instance built from them.
+  const app = window.$nuxt
+  if (!app) return
+  const store = app.$store
+  // No mutations exist for this: the stores only ever add. Assigning the whole
+  // object keeps it reactive, because the property itself already is.
+  const router = (store || {}).state && store.state.druxtRouter
+  if (router) {
+    router.routes = {}
+    router.entities = {}
+    router.route = {}
+    router.redirect = null
+  }
+  const druxt = (store || {}).state && store.state.druxt
+  if (druxt) {
+    druxt.collections = {}
+    druxt.resources = {}
+  }
+  // The JSON:API index is held on the client rather than in the store, and it
+  // is a map of the old backend's URLs.
+  if (app.$druxt) app.$druxt.index = {}
+
+  const refetch = (vm) => {
+    if (typeof vm.$fetch === 'function' && vm.$options.fetch) vm.$fetch()
+    vm.$children.forEach(refetch)
+  }
+  refetch(app)
 }
 
 export default async function (context, inject) {
@@ -164,6 +232,9 @@ export default async function (context, inject) {
       state.status = 'connected'
       pointClientAt(context, state.url)
       writeStored({ url: state.url, clientId: state.clientId, expiresAt: state.expiresAt })
+      // What is on screen came from the build. Replace it with what this
+      // backend says, now that there is one to ask.
+      whenReady(refreshFromBackend)
       return true
     },
 
@@ -192,9 +263,7 @@ export default async function (context, inject) {
   // The store ended up holding the right entries while the page rendered as
   // though it held none.
   if (context.store) {
-    const restore = () => context.store.dispatch('authoringCart/restore')
-    if (typeof window.onNuxtReady === 'function') window.onNuxtReady(restore)
-    else restore()
+    whenReady(() => context.store.dispatch('authoringCart/restore'))
   }
 
   const params = new URLSearchParams(window.location.search)
@@ -210,10 +279,6 @@ export default async function (context, inject) {
 
   if (chosen.expiresAt) state.expiresAt = chosen.expiresAt
   if (chosen.clientId) state.clientId = chosen.clientId
-
-  // Before connecting, so the app has not mounted yet and the page will fetch
-  // rather than hydrate.
-  bypassStaticPayload()
 
   await authoring.connect(chosen.url, chosen.source)
 }
