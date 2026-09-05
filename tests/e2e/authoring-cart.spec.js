@@ -12,11 +12,17 @@ import { expect, test } from '@playwright/test'
 // restore would overwrite an edit staged a moment too early.
 
 /** Stage a change directly through the store, as the form does. */
-async function stage(page, { type, id, original, edited }) {
+async function stage(page, { type, id, original, edited, relationships }) {
   return page.evaluate(
-    ([type, id, original, edited]) =>
-      window.$nuxt.$store.dispatch('authoringCart/stage', { type, id, original, edited }),
-    [type, id, original, edited]
+    ([type, id, original, edited, relationships]) =>
+      window.$nuxt.$store.dispatch('authoringCart/stage', {
+        type,
+        id,
+        original,
+        edited,
+        relationships,
+      }),
+    [type, id, original, edited, relationships]
   )
 }
 
@@ -119,5 +125,81 @@ test.describe('adding content', () => {
     await page.getByTestId('authoring-add-cancel').click()
     await expect(page.getByTestId('authoring-add-cancel')).toHaveCount(0)
     expect(await count(page)).toBe(0)
+  })
+})
+
+test.describe('the drawer as a review surface', () => {
+  test('staged and unstaged are shown apart', async ({ page }) => {
+    await page.goto('/', { waitUntil: 'networkidle' })
+    await stage(page, {
+      type: 'node--article',
+      id: 'staged-one',
+      original: { title: 'Was' },
+      edited: { title: 'Is' },
+    })
+    await page.evaluate(() =>
+      window.$nuxt.$store.dispatch('authoringCart/saveDraft', {
+        type: 'node--article',
+        id: 'draft-one',
+        attributes: { title: 'Typed, not staged' },
+      })
+    )
+    await page.evaluate(() => window.$nuxt.$store.dispatch('authoringCart/setDrawerOpen', true))
+
+    // One list made an unstaged edit look like something about to be sent.
+    await expect(page.getByTestId('authoring-cart-expand')).toHaveCount(1)
+    await expect(page.getByTestId('cart-unstaged-row')).toHaveCount(1)
+    // And the count is still only what will be sent.
+    expect(await count(page)).toBe(1)
+  })
+
+  test('the checkbox moves a change between staged and unstaged', async ({ page }) => {
+    await page.goto('/', { waitUntil: 'networkidle' })
+    await stage(page, {
+      type: 'node--article',
+      id: 'abc',
+      original: { title: 'Was' },
+      edited: { title: 'Is' },
+    })
+    await page.evaluate(() => window.$nuxt.$store.dispatch('authoringCart/setDrawerOpen', true))
+
+    // One control for one idea. A checkbox that only scoped the commit was a
+    // third state on top of the two the cart already had.
+    await page.getByTestId('cart-select-abc').click()
+    expect(await count(page)).toBe(0)
+    await expect(page.getByTestId('cart-unstaged-row')).toHaveCount(1)
+
+    // And back again.
+    await page.getByTestId('cart-stage-abc').click()
+    expect(await count(page)).toBe(1)
+    await expect(page.getByTestId('cart-unstaged-row')).toHaveCount(0)
+  })
+
+  test('a reference cannot be left out of a commit that needs it', async ({ page }) => {
+    await page.goto('/', { waitUntil: 'networkidle' })
+    const tagId = await page.evaluate(() =>
+      window.$nuxt.$store.dispatch('authoringCart/stageNew', {
+        type: 'taxonomy_term--tags',
+        attributes: { name: 'Rye' },
+        onlyIfReferenced: true,
+      })
+    )
+    await stage(page, {
+      type: 'node--article',
+      id: 'article',
+      original: {},
+      edited: { title: 'Tagged' },
+      relationships: { field_tags: { data: [{ type: 'taxonomy_term--tags', id: tagId }] } },
+    })
+    await page.evaluate(() => window.$nuxt.$store.dispatch('authoringCart/setDrawerOpen', true))
+
+    // Said, not silently corrected: re-ticking what someone just unticked is
+    // its own kind of wrong.
+    await expect(page.getByTestId('cart-depends')).toContainText('Rye')
+    await page.getByTestId(`cart-select-${tagId}`).click()
+    await expect(page.getByTestId('cart-refusal')).toContainText('references this')
+    // Refused, so it is still staged and the box is still ticked.
+    expect(await count(page)).toBe(2)
+    await expect(page.getByTestId(`cart-select-${tagId}`)).toBeChecked()
   })
 })

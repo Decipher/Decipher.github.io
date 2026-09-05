@@ -68,6 +68,10 @@ tokenless
 toolbarview
 trixie
 unparseable
+unstage
+unstaged
+untick
+unticked
 valeryan
 vfox
 viewports
