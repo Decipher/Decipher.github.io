@@ -69,7 +69,7 @@ test.describe('authoring cart', () => {
 
     // The drawer starts closed on a fresh load: whether a panel is open is a
     // property of this visit, not of the work. The header says what is held.
-    await expect(page.getByTestId('authoring-cart-toggle')).toContainText('Staged 1')
+    await expect(page.getByTestId('authoring-cart-toggle')).toContainText('Edits 1')
     expect(await count(page)).toBe(1)
 
     await page.getByTestId('authoring-cart-toggle').click()
@@ -125,6 +125,34 @@ test.describe('adding content', () => {
     await page.getByTestId('authoring-add-cancel').click()
     await expect(page.getByTestId('authoring-add-cancel')).toHaveCount(0)
     expect(await count(page)).toBe(0)
+  })
+
+  test('a new article can be put down without being thrown away', async ({ page }) => {
+    await page.goto('/authoring', { waitUntil: 'networkidle' })
+    await page.getByTestId('authoring-edit-toggle').click()
+    await page.getByTestId('authoring-add').click()
+
+    // "Done" means finished with the form, not finished with the idea. Without
+    // it the only ways out were to discard the work or leave the form open.
+    await page.getByTestId('authoring-add-done').click()
+    await expect(page.getByTestId('authoring-add-done')).toHaveCount(0)
+    expect(await count(page)).toBe(1)
+  })
+
+  test('the drawer can be opened with nothing staged in it', async ({ page }) => {
+    await page.goto('/', { waitUntil: 'networkidle' })
+    await page.getByTestId('authoring-edit-toggle').click()
+
+    // Counting staged changes alone left an author who had edited things and
+    // staged none of them with a drawer full of work and no way to open it.
+    await expect(page.getByTestId('authoring-cart-toggle')).toBeVisible()
+    await page.getByTestId('authoring-cart-toggle').click()
+    await expect(page.getByTestId('authoring-cart')).toBeVisible()
+  })
+
+  test('a visitor is offered no drawer at all', async ({ page }) => {
+    await page.goto('/', { waitUntil: 'networkidle' })
+    await expect(page.getByTestId('authoring-cart-toggle')).toHaveCount(0)
   })
 })
 

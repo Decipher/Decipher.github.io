@@ -49,12 +49,35 @@ export default {
     images() {
       return this.items
         .map((item) => {
+          const alt = (item.meta || {}).alt || ''
+          // A picture chosen in this browser and not yet committed has an id
+          // the backend has never heard of, so there is nothing to fetch. Its
+          // own bytes are the preview, the same way a staged title is the
+          // title.
+          const pending = this.pendingFiles[item.id]
+          if (pending) return { src: pending.dataUrl, alt }
+
           const file = this.files[item.id]
           const url = (((file || {}).attributes || {}).uri || {}).url
           if (!url) return null
-          return { src: this.absolute(url), alt: (item.meta || {}).alt || '' }
+          return { src: this.absolute(url), alt }
         })
         .filter(Boolean)
+    },
+
+    /**
+     * Every file the cart is holding bytes for, by id.
+     *
+     * Read from the cart rather than passed in, because this component is
+     * rendered by Druxt from a slot and has no parent to take a prop from.
+     */
+    pendingFiles() {
+      const entries = this.$store.state.authoringCart.entries || {}
+      const found = {}
+      for (const resource of Object.values(entries)) {
+        for (const file of Object.values(resource.files || {})) found[file.id] = file
+      }
+      return found
     },
   },
 
@@ -66,6 +89,8 @@ export default {
     async loadFiles() {
       for (const item of this.items) {
         if (this.files[item.id] || item.type !== 'file--file') continue
+        // Nothing to look up for bytes that have not been sent anywhere.
+        if (this.pendingFiles[item.id]) continue
         try {
           // Positional on the client. The Vuex action is the one that takes an
           // object, and passing one here fetches `/jsonapi/[object Object]`.
