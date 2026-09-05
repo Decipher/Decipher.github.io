@@ -280,8 +280,13 @@
       this is for getting the work reviewed and published, and needs neither a
       backend nor a session.
     -->
-    <div v-if="count" class="mt-4">
-      <p class="eyebrow mb-2">Without a backend</p>
+    <!--
+      Always, not only once something is staged. Signing in is what lets an
+      author start a backend, so requiring an edit first meant arriving at an
+      empty site with no way to get one.
+    -->
+    <div class="mt-4">
+      <p class="eyebrow mb-2">GitHub</p>
       <AuthoringGithub />
       <p v-if="pullRequest" class="mt-2 text-sm text-body" data-testid="authoring-cart-pr-open">
         Opened

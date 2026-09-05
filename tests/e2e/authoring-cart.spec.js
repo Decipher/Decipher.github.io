@@ -28,6 +28,10 @@ async function stage(page, { type, id, original, edited, relationships }) {
 
 const count = (page) => page.evaluate(() => window.$nuxt.$store.getters['authoringCart/count'])
 
+/** Edits made and not staged, which is where new content starts. */
+const drafts = (page) =>
+  page.evaluate(() => Object.keys(window.$nuxt.$store.state.authoringCart.drafts).length)
+
 test.describe('authoring cart', () => {
   test('a visitor sees no cart', async ({ page }) => {
     await page.goto('/', { waitUntil: 'networkidle' })
@@ -120,14 +124,16 @@ test.describe('adding content', () => {
     await page.getByTestId('cart-tab-add').click()
     await page.getByTestId('authoring-add').click()
     await expect(page.getByTestId('authoring-add-cancel')).toBeVisible()
-    expect(await count(page)).toBe(1)
+    // Pressing Add is opening a form, not deciding to send anything, so it is
+    // unstaged until it is staged.
+    expect(await count(page)).toBe(0)
+    expect(await drafts(page)).toBe(1)
 
-    // Starting something is not committing to finishing it, and the staged
-    // resource has to go too: a nameless article left in the drawer is worse
-    // than no cancel button at all.
+    // And abandoning it leaves nothing behind at all.
     await page.getByTestId('authoring-add-cancel').click()
     await expect(page.getByTestId('authoring-add-cancel')).toHaveCount(0)
     expect(await count(page)).toBe(0)
+    expect(await drafts(page)).toBe(0)
   })
 
   test('a new article can be put down without being thrown away', async ({ page }) => {
@@ -432,12 +438,39 @@ test.describe('adding content', () => {
     // the layout. A wide render zoomed down looks like a phone and is not one.
     await page.getByTestId('preview-width').selectOption({ label: 'Phone' })
     await expect(page.getByTestId('preview-width-note')).toContainText('375px')
-    const frame = page.locator('[data-testid="authoring-preview"] > div')
+    const frame = page.getByTestId('preview-frame')
     expect(await frame.evaluate((el) => Math.round(el.getBoundingClientRect().width))).toBe(375)
 
     // Free is the default, and returning to it is not a fixed size at all.
     await page.getByTestId('preview-width').selectOption({ label: 'Free' })
     await expect(page.getByTestId('preview-width-note')).toHaveCount(0)
+  })
+
+  test('the controls keep their own width whatever the page is set to', async ({ page }) => {
+    await page.goto('/', { waitUntil: 'networkidle' })
+    await page.getByTestId('authoring-edit-toggle').click()
+    await stage(page, {
+      type: 'node--article',
+      id: 'abc',
+      original: { title: 'Was' },
+      edited: { title: 'Is' },
+    })
+    await page.getByTestId('cart-preview-abc').click()
+
+    // The toolbar used to live inside the frame, so choosing a phone gave four
+    // controls 375px to fit into, and they wrapped. The thing being resized is
+    // the page, not the controls for it.
+    const toolbarWidth = () =>
+      page
+        .getByTestId('authoring-preview')
+        .locator('.border-b')
+        .first()
+        .evaluate((el) => Math.round(el.getBoundingClientRect().width))
+
+    const wide = await toolbarWidth()
+    await page.getByTestId('preview-width').selectOption({ label: 'Phone' })
+    await expect(page.getByTestId('preview-frame')).toHaveAttribute('style', /375px/)
+    expect(await toolbarWidth()).toBe(wide)
   })
 
   test('the preview covers the page rather than sitting inside the drawer', async ({ page }) => {

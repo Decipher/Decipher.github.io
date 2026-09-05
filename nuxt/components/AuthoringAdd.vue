@@ -111,15 +111,21 @@ export default {
     editing() {
       return this.$store.getters['authoringCart/editing']
     },
+    /**
+     * The content being written, staged or not.
+     *
+     * Not from the staged entries alone: pressing Add begins a draft rather
+     * than staging anything, so for most of a form's life this is unstaged.
+     */
     staged() {
       if (!this.stagedId) return null
-      return this.$store.getters['authoringCart/resources'].find((r) => r.id === this.stagedId)
+      return this.$store.getters['authoringCart/stagedNew'].find((r) => r.id === this.stagedId)
     },
   },
 
   methods: {
     async add() {
-      this.stagedId = await this.$store.dispatch('authoringCart/stageNew', {
+      this.stagedId = await this.$store.dispatch('authoringCart/draftNew', {
         type: this.chosen,
         // Empty rather than invented: the form is where it gets filled in, and
         // a placeholder title would be indistinguishable from one somebody meant.
@@ -134,7 +140,7 @@ export default {
         attributes: {},
         relationships: {},
       }
-      this.message = 'Staged as new. Fill it in below; nothing is sent yet.'
+      this.message = 'Started. Fill it in below; nothing is staged or sent yet.'
       this.$emit('added', this.stagedId)
     },
 
@@ -166,6 +172,10 @@ export default {
      * staged resources was the one they had already decided against.
      */
     cancel() {
+      this.$store.dispatch('authoringCart/clearDraft', {
+        type: this.staged.type,
+        id: this.staged.id,
+      })
       this.$store.dispatch('authoringCart/discardOne', {
         type: this.staged.type,
         id: this.staged.id,

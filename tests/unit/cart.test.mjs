@@ -482,3 +482,11 @@ test('an exported document is already in an order that can be applied', () => {
     ['tag', 'article']
   )
 })
+
+test('content that does not exist yet is a change even with nothing in it', () => {
+  // Pressing Add and then Done means the article should exist. Treating it as
+  // nothing loses the intention, and Drupal is the thing that says whether a
+  // title is missing.
+  assert.equal(isEmptyResource({ type: 'node--article', id: 'a', isNew: true }), false)
+  assert.equal(isEmptyResource({ type: 'node--article', id: 'a' }), true)
+})

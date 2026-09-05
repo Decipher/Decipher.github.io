@@ -8,18 +8,19 @@
     @click.self="$emit('close')"
     @keydown.escape="$emit('close')"
   >
-    <div
-      class="flex max-h-full flex-col rounded border border-hairline bg-paper"
-      :style="frameStyle"
-    >
-      <div class="flex items-baseline justify-between gap-4 border-b border-hairline px-5 py-3">
+    <!--
+      The chrome keeps its own width. It used to live inside the frame, so
+      choosing a phone gave the toolbar 375px to fit four controls into and it
+      wrapped: the thing being resized is the page, not the controls for it.
+    -->
+    <div class="flex max-h-full w-full max-w-5xl flex-col rounded border border-hairline bg-paper">
+      <div class="flex flex-wrap items-baseline gap-x-4 gap-y-2 border-b border-hairline px-5 py-3">
         <p class="eyebrow">Preview</p>
 
         <!--
-          A width, because a teaser at 1200px and the same teaser at 375px are
-          different designs, and the point of previewing is to see the one that
-          will be read. Free is the default: a fixed size is a thing to switch
-          to deliberately.
+          A real width, because a teaser at 1200px and the same teaser at 375px
+          are different designs, and the point of previewing is to see the one
+          that will be read. Free is the default: a fixed size is deliberate.
         -->
         <label class="ml-auto flex items-baseline gap-2">
           <span class="eyebrow">Width</span>
@@ -60,20 +61,27 @@
         </button>
       </div>
 
-      <p
-        v-if="width"
-        class="border-b border-hairline px-5 py-1 font-mono text-[0.6875rem] text-muted"
-        data-testid="preview-width-note"
-      >
-        {{ width }}px wide
-      </p>
+      <!-- The canvas. Only this takes the chosen width. -->
+      <div class="flex justify-center overflow-auto bg-elevated px-5 py-4">
+        <div
+          class="w-full rounded bg-paper p-4"
+          :style="frameStyle"
+          data-testid="preview-frame"
+        >
+          <p
+            v-if="width"
+            class="mb-3 border-b border-hairline pb-1 font-mono text-[0.6875rem] text-muted"
+            data-testid="preview-width-note"
+          >
+            {{ width }}px wide
+          </p>
 
-      <div class="overflow-y-auto px-5 py-4">
-        <!--
-          Keyed by mode, so switching rebuilds rather than trying to patch one
-          display's markup into another's.
-        -->
-        <DruxtEntity :key="mode" :type="type" :uuid="uuid" :mode="mode" />
+          <!--
+            Keyed by mode, so switching rebuilds rather than trying to patch one
+            display's markup into another's.
+          -->
+          <DruxtEntity :key="mode" :type="type" :uuid="uuid" :mode="mode" />
+        </div>
       </div>
     </div>
   </div>
@@ -138,8 +146,10 @@ export default {
      * every breakpoint would still be the desktop's.
      */
     frameStyle() {
-      if (!this.width) return { width: '100%', maxWidth: '48rem' }
-      return { width: `${this.width}px`, maxWidth: '100%' }
+      if (!this.width) return { maxWidth: '48rem' }
+      // `flex: none` so the flex parent cannot shrink it back: a 1440 frame in
+      // a narrower window should scroll sideways, not quietly become the window.
+      return { width: `${this.width}px`, flex: 'none' }
     },
   },
 
