@@ -21,7 +21,7 @@
  *
  * `main` and `aside` sit side by side; the rest are full width.
  */
-export const BANDS = ['top', 'hero', 'above', 'main', 'aside', 'below', 'bottom']
+export const BANDS = ['top', 'bar', 'hero', 'above', 'main', 'aside', 'below', 'bottom']
 
 /**
  * Which band a region belongs in.
@@ -32,10 +32,14 @@ export const BANDS = ['top', 'hero', 'above', 'main', 'aside', 'below', 'bottom'
  */
 const RULES = [
   [/^footer/, 'bottom'],
+  // Its own band, and not part of `above`, because it is a second sticky layer
+  // under the header rather than something at the top of the content. The page
+  // title sits in `above` and must scroll away; this must not.
+  [/^breadcrumb/, 'bar'],
   [/^(header|nav|primary_menu|secondary_menu|top_|pre_header)/, 'top'],
   [/^(hero|banner|highlighted|help)/, 'hero'],
   [/^(sidebar|social|complementary|aside)/, 'aside'],
-  [/^(content_above|breadcrumb|title|above)/, 'above'],
+  [/^(content_above|title|above)/, 'above'],
   [/^(content_below|below|post_content)/, 'below'],
   [/^content$|^main$/, 'main'],
 ]
