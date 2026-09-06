@@ -62,12 +62,6 @@
         </button>
       </div>
 
-      <!--
-        The label, which Drupal renders from the node template rather than as a
-        field, so it is not in the view display and Druxt never renders it. A
-        listing of articles with no titles is not a listing, and an author
-        editing a title could not see it change.
-      -->
       <!-- Struck through rather than hidden: it is still here until committed. -->
       <div :class="{ 'opacity-50 line-through': deleted }">
         <!--
@@ -137,6 +131,16 @@ import { labelFieldFor } from '../../../lib/reference.mjs'
 
 export default {
   name: 'DruxtEntityNode',
+
+  /**
+   * Whether something is rendering this in place of a page.
+   *
+   * Injected rather than passed, because the component that knows is the
+   * preview and what sits between them is Druxt's own resolution.
+   */
+  inject: {
+    druxtPreview: { default: false },
+  },
 
   props: {
     entity: { type: Object, default: () => ({}) },
@@ -210,7 +214,6 @@ export default {
       return nid ? `/node/${nid}` : null
     },
 
-    /** Only when the display does not already have a field for it. */
     /**
      * Whether to draw the entity's own title.
      *
@@ -220,12 +223,17 @@ export default {
      * the Page title block in the content_above region prints it. Drawing it
      * again here made three of them, one under another.
      *
+     * The preview is the exception. It renders the entity on its own, with none
+     * of the page around it, so the block that would have printed the title is
+     * not there and an author previewing a retitle saw it change nowhere.
+     *
      * Also skipped when the display does render the title as a field, which
      * some do, because then Druxt is already drawing it.
      */
     showLabel() {
       if (!this.label) return false
-      if (this.mode === 'default' || this.mode === 'full') return false
+      const page = this.mode === 'default' || this.mode === 'full'
+      if (page && !this.druxtPreview) return false
       return !Object.keys(this.fields || {}).includes(this.labelField)
     },
 
