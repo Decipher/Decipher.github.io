@@ -61,6 +61,7 @@ phpstan
 phpunit
 recognise
 recognised
+recognises
 repository
 setuptools
 shivammathur
@@ -72,6 +73,8 @@ travelled
 trixie
 unmatch
 unparseable
+unranked
+unrecognised
 unstage
 unstaged
 unstaging
