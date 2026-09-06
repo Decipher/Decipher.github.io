@@ -31,14 +31,8 @@
  * so it throws before it subscribes to the editor's change events: the editor
  * appears, and every keystroke in it is silently dropped.
  */
+import { loadCkeditor, pluginsForToolbar } from '../lib/ckeditor.mjs'
 import { FALLBACK_TOOLBAR, toolbarFor } from '../lib/editor.mjs'
-
-/**
- * Builds already extended, so a second editor on the page does not push the
- * same plugin on again. `builtinPlugins` is static: it belongs to the build,
- * not to an instance.
- */
-const CODE_ADDED = new WeakSet()
 
 // Shared across every field on the page: one request, however many editors.
 let editorConfigPromise = null
@@ -76,10 +70,9 @@ export default {
   },
 
   async mounted() {
-    const ClassicEditor = await this.loadEditor()
-    if (!ClassicEditor) return
-    const extra = (await this.addCode(ClassicEditor)) ? ['code'] : []
-    await this.create(ClassicEditor, await this.loadToolbar(extra))
+    const [namespace, toolbar] = await Promise.all([loadCkeditor(), this.loadToolbar()])
+    if (!namespace) return
+    await this.create(namespace, toolbar)
   },
 
   beforeDestroy() {
@@ -87,52 +80,13 @@ export default {
   },
 
   methods: {
-    async loadEditor() {
+    async create(namespace, toolbar) {
       try {
-        return (await import('@ckeditor/ckeditor5-build-classic')).default
-      } catch {
-        // The textarea stays. An edit is still possible without the toolbar.
-        return null
-      }
-    },
-
-    /**
-     * Add inline code to the build, if it will take it.
-     *
-     * The classic build ships no `Code` plugin, so a format configured for the
-     * button in Drupal loses it on the way here: the toolbar is read from
-     * Drupal and then filtered down to what can actually be rendered. Inline
-     * code is the one missing button this site's own writing needs.
-     *
-     * As it stands this does not succeed, and the reason is worth recording.
-     * The plugin's source is bundled, but importing it evaluates a second copy
-     * of CKEditor's core, which finds `window.CKEDITOR_VERSION` already set by
-     * the prebuilt bundle and throws `ckeditor-duplicated-modules`. A prebuilt
-     * build cannot be extended from outside; the button needs a build that
-     * contains it, either a custom bundle or the DLL builds Drupal itself uses.
-     *
-     * Left in place, guarded, because it costs one caught import and starts
-     * working the day such a build lands. The editor is unaffected either way:
-     * the return value decides only whether the button may be offered, and an
-     * offered button whose plugin is missing takes the whole editor down.
-     */
-    async addCode(ClassicEditor) {
-      if (!ClassicEditor || CODE_ADDED.has(ClassicEditor)) return CODE_ADDED.has(ClassicEditor)
-      try {
-        const { Code } = await import('@ckeditor/ckeditor5-basic-styles')
-        if (!Code || ClassicEditor.builtinPlugins.includes(Code)) return false
-        ClassicEditor.builtinPlugins.push(Code)
-        CODE_ADDED.add(ClassicEditor)
-        return true
-      } catch {
-        return false
-      }
-    },
-
-    async create(ClassicEditor, toolbar) {
-      try {
-        const editor = await ClassicEditor.create(this.$refs.host, {
+        const editor = await namespace.editorClassic.ClassicEditor.create(this.$refs.host, {
           toolbar: { items: toolbar },
+          // Only what this toolbar needs. A plugin nobody configured a button
+          // for is weight on the page and a behaviour nobody asked for.
+          plugins: pluginsForToolbar(namespace, toolbar),
           initialData: this.value || '',
         })
         // The same class the rendered field carries, so what is typed looks
@@ -152,8 +106,8 @@ export default {
         })
         this.editor = editor
       } catch {
-        // A toolbar item the build does not have throws here. The textarea
-        // stays rather than leaving the author with no field at all.
+        // A toolbar item with no plugin throws here. The textarea stays rather
+        // than leaving the author with no field at all.
       }
     },
 
@@ -163,7 +117,7 @@ export default {
      * `editor--editor` needs `administer filters`, so an anonymous visitor gets
      * an empty collection rather than an error, and keeps the fallback.
      */
-    async loadToolbar(extra = []) {
+    async loadToolbar() {
       const backend = this.$authoring && this.$authoring.state.url
       if (!backend || !this.format) return [...FALLBACK_TOOLBAR]
 
@@ -180,7 +134,7 @@ export default {
           .catch(() => [])
       }
 
-      return toolbarFor(await editorConfigPromise, this.format, extra)
+      return toolbarFor(await editorConfigPromise, this.format)
     },
   },
 }

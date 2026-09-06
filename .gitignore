@@ -144,3 +144,6 @@ Temporary Items
 # Scratch space, kept in the repository so it is easy to find, never committed.
 .artifacts/
 nuxt/static/files
+
+# CKEditor's DLL builds, copied out of node_modules by nuxt.config.js.
+nuxt/static/ckeditor5

@@ -1,3 +1,4 @@
+import { CKEDITOR_PACKAGES } from './lib/ckeditor.mjs'
 import { repositoryFromRemotes } from './lib/github.mjs'
 
 require('dotenv').config({ path: '../.env' })
@@ -58,6 +59,41 @@ const copyDrupalFiles = function () {
     // a static host and confuses the ones that read it.
     filter: (path) => !path.endsWith('.htaccess'),
   })
+}
+
+/**
+ * Put CKEditor's DLL builds where the deployed site can fetch them.
+ *
+ * The editor is assembled at runtime from one script per plugin package rather
+ * than from a prebuilt bundle, so that the toolbar Drupal is configured for is
+ * the toolbar that renders. See `lib/ckeditor.mjs` for why it has to be done
+ * this way rather than with an import.
+ *
+ * Copied out of `node_modules` at build time, and gitignored for that reason.
+ */
+const copyCkeditor = function () {
+  const { copyFileSync, existsSync, mkdirSync, rmSync } = require('fs')
+  const { dirname, join } = require('path')
+  const to = join(__dirname, 'static', 'ckeditor5')
+  const resolve = (request) => {
+    try {
+      return dirname(require.resolve(`${request}/package.json`))
+    } catch {
+      return null
+    }
+  }
+
+  const core = resolve('ckeditor5')
+  if (!core) return
+  rmSync(to, { recursive: true, force: true })
+  mkdirSync(to, { recursive: true })
+  copyFileSync(join(core, 'build', 'ckeditor5-dll.js'), join(to, 'ckeditor5-dll.js'))
+
+  for (const name of CKEDITOR_PACKAGES) {
+    const from = resolve(`@ckeditor/ckeditor5-${name}`)
+    const file = from && join(from, 'build', `${name}.js`)
+    if (file && existsSync(file)) copyFileSync(file, join(to, `${name}.js`))
+  }
 }
 
 const localhostListenURL = function () {
@@ -214,6 +250,7 @@ export default async () => ({
   // druxt.js monorepo's own example placement.
   modules: [
     copyDrupalFiles,
+    copyCkeditor,
     // Before druxt-site, because it reads `druxt.baseUrl` and writes the
     // settings into the runtime config the rest of the build then uses.
     //

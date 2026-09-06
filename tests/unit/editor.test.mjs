@@ -70,21 +70,32 @@ test('no configuration at all falls back', () => {
 
 test('a toolbar of only unsupported buttons falls back', () => {
   // Better a working editor with the wrong buttons than an empty toolbar.
-  const only = [editor('basic_html', ['drupalInsertImage', 'sourceEditing'])]
+  const only = [editor('basic_html', ['drupalInsertImage', 'drupalMedia'])]
   assert.deepEqual(toolbarFor(only, 'basic_html'), FALLBACK_TOOLBAR)
 })
 
-test('a button is only offered when its plugin was loaded', () => {
-  // `code` is configured on this site's full_html but is not in the classic
-  // build, so it is dropped unless the caller says it managed to add it.
-  const configured = [editor('full_html', ['bold', 'code', 'italic'])]
-  assert.ok(!toolbarFor(configured, 'full_html').includes('code'))
-  assert.ok(toolbarFor(configured, 'full_html', ['code']).includes('code'))
+test('a button with no plugin behind it is dropped', () => {
+  // `drupalInsertImage` is Drupal's own button. Passing it to CKEditor throws
+  // and takes the editor down, so it never reaches the toolbar.
+  const configured = [editor('full_html', ['bold', 'drupalInsertImage', 'code'])]
+  const toolbar = toolbarFor(configured, 'full_html')
+  assert.ok(!toolbar.includes('drupalInsertImage'))
+  assert.deepEqual(toolbar, ['bold', 'code'])
 })
 
-test('a loaded plugin cannot conjure a button Drupal did not configure', () => {
-  // The configuration decides what is offered. Loading a plugin only decides
-  // whether a configured button can be honoured.
-  const configured = [editor('full_html', ['bold', 'italic'])]
-  assert.ok(!toolbarFor(configured, 'full_html', ['code']).includes('code'))
+test('the buttons the classic build lacked are offered now', () => {
+  // The whole point of assembling the editor from DLL builds: every one of
+  // these is configured on this site's full_html and used to be filtered out.
+  const gained = [
+    'code',
+    'codeBlock',
+    'strikethrough',
+    'superscript',
+    'subscript',
+    'removeFormat',
+    'horizontalLine',
+    'sourceEditing',
+  ]
+  const toolbar = toolbarFor([editor('full_html', gained)], 'full_html')
+  assert.deepEqual(toolbar, gained)
 })
