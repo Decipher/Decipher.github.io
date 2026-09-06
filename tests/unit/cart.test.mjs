@@ -14,6 +14,11 @@ import {
   requestUrl,
   requestMethod,
   dependencyMap,
+  newResourceId,
+  withoutComputed,
+  isDeletion,
+  collectionUrl,
+  valuesBefore,
   requiredBy,
   withDependencies,
   deepEqual,
@@ -489,4 +494,67 @@ test('content that does not exist yet is a change even with nothing in it', () =
   // title is missing.
   assert.equal(isEmptyResource({ type: 'node--article', id: 'a', isNew: true }), false)
   assert.equal(isEmptyResource({ type: 'node--article', id: 'a' }), true)
+})
+
+// The pieces every other decision rests on, which had no test of their own.
+
+test('a new resource gets an id the backend will accept as given', () => {
+  // Client-generated, because a relationship has to be able to point at
+  // something that does not exist yet. Drupal keeps the id it is sent, which is
+  // what makes an offline reference resolve once the request goes out.
+  const id = newResourceId()
+  assert.match(id, /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/)
+  assert.notEqual(newResourceId(), newResourceId())
+})
+
+test('a computed value is never sent back as if it were the field', () => {
+  // Drupal returns `processed` beside `value` on a formatted field. Sending it
+  // back is sending Drupal its own rendering as input, and comparing against it
+  // makes an unchanged field look changed.
+  assert.deepEqual(withoutComputed({ value: 'x', format: 'basic_html', processed: '<p>x</p>' }), {
+    value: 'x',
+    format: 'basic_html',
+  })
+  assert.deepEqual(withoutComputed([{ value: 'a', processed: 'A' }]), [{ value: 'a' }])
+  assert.equal(withoutComputed('plain'), 'plain')
+  assert.equal(withoutComputed(null), null)
+})
+
+test('a deletion is recognised however little it carries', () => {
+  assert.equal(isDeletion({ deleted: true }), true)
+  assert.equal(isDeletion({ type: 'node--article', id: 'a' }), false)
+  assert.equal(isDeletion(undefined), false)
+})
+
+test('new content is posted to the collection, and an edit patched to itself', () => {
+  assert.equal(
+    collectionUrl('https://backend.test', 'node--article'),
+    'https://backend.test/jsonapi/node/article'
+  )
+  // An entity type with no bundle is one path segment, not two.
+  assert.equal(collectionUrl('https://backend.test/', 'user'), 'https://backend.test/jsonapi/user')
+
+  const created = { type: 'node--article', id: 'a', isNew: true }
+  assert.equal(
+    requestUrl('https://backend.test', created),
+    'https://backend.test/jsonapi/node/article'
+  )
+  // Deleting something new never reaches the backend, but if it did it would be
+  // the resource, not the collection.
+  assert.match(
+    requestUrl('https://backend.test', { ...created, deleted: true }),
+    /\/node\/article\/a$/
+  )
+})
+
+test('the drawer can say what a field was, not only what it will be', () => {
+  // A staged resource is a delta, so on its own it says what a field will be
+  // without saying what it was, and a diff of one side is not a diff.
+  const original = { title: 'Before', body: { value: 'b', processed: '<p>b</p>' } }
+  assert.deepEqual(valuesBefore(original, { title: 'After' }), { title: 'Before' })
+  // Computed values are stripped here too, or the "before" shows Drupal's
+  // rendering against the author's markup and every body looks changed.
+  assert.deepEqual(valuesBefore(original, { body: { value: 'c' } }), { body: { value: 'b' } })
+  // A field the backend never had reads as absent rather than inventing a value.
+  assert.deepEqual(valuesBefore(original, { field_new: 'x' }), { field_new: undefined })
 })

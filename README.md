@@ -209,6 +209,14 @@ Your environment contains a pre-installed, pre-configured and running instance o
 
 In a Development Container (VS Code, Codespaces, DevPod), forwarded ports are accessible via your editor's **Ports** panel, or Codespaces' own URL pattern for forwarded ports.
 
+## Editing the site
+
+The site can be edited in place by anyone who may push to the repository, with
+no backend running: changes are held in the browser and leave either to a live
+Drupal or to the repository as a pull request.
+
+See [docs/authoring.md](docs/authoring.md).
+
 ## Services
 
 | Port   | Service                                                                               |

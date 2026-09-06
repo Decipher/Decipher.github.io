@@ -11,6 +11,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 
 import {
+  TOKEN_KEY,
   apiUrl,
   base64FromDataUrl,
   branchName,
@@ -19,8 +20,10 @@ import {
   headers,
   parseRepository,
   pullRequestBody,
+  readStoredToken,
   requestDocument,
   requestPaths,
+  writeStoredToken,
 } from '../../nuxt/lib/github.mjs'
 
 test('a repository is recognised however it is written', () => {
@@ -133,4 +136,43 @@ test('the pull request says what it carries', () => {
   assert.match(body, /1 file/)
   // And says the branch is not the content, which is the surprising part.
   assert.match(body, /A job applies it/)
+})
+
+test('the sign-in is kept where both plugins agree to look', () => {
+  // One definition, because two plugins use it: the one that writes a sign-in,
+  // and the one that reads the session record and loads before it. A second
+  // copy of the key would work until one of them was renamed.
+  assert.equal(TOKEN_KEY, 'authoring.github')
+
+  const store = new Map()
+  const storage = {
+    getItem: (k) => (store.has(k) ? store.get(k) : null),
+    setItem: (k, v) => store.set(k, v),
+    removeItem: (k) => store.delete(k),
+  }
+
+  assert.equal(readStoredToken(storage), null)
+  writeStoredToken(storage, { token: 't', repository: 'o/r' })
+  assert.deepEqual(readStoredToken(storage), { token: 't', repository: 'o/r' })
+  writeStoredToken(storage, null)
+  assert.equal(readStoredToken(storage), null)
+})
+
+test('a browser that refuses to store anything still works', () => {
+  // Private windows and blocked site data make these throw on access rather
+  // than return null. A sign-in that cannot be remembered is a sign-in that
+  // does not survive a reload, not a broken page.
+  const refuses = {
+    getItem: () => {
+      throw new Error('denied')
+    },
+    setItem: () => {
+      throw new Error('denied')
+    },
+    removeItem: () => {
+      throw new Error('denied')
+    },
+  }
+  assert.equal(readStoredToken(refuses), null)
+  assert.doesNotThrow(() => writeStoredToken(refuses, { token: 't' }))
 })
