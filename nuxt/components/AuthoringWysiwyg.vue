@@ -31,7 +31,8 @@
  * so it throws before it subscribes to the editor's change events: the editor
  * appears, and every keystroke in it is silently dropped.
  */
-import { imageUploadAdapter } from '../lib/ckeditor-upload.mjs'
+import { DrupalImageCompatibility, imageUploadAdapter } from '../lib/ckeditor-upload.mjs'
+import { fromEditorCaptions, toEditorCaptions } from '../lib/captions.mjs'
 import { absoluteFileUrls, relativeFileUrls } from '../lib/files.mjs'
 import { editorPlugins, loadCkeditor } from '../lib/ckeditor.mjs'
 import { FALLBACK_TOOLBAR, toolbarFor } from '../lib/editor.mjs'
@@ -87,8 +88,8 @@ export default {
       this.model = to
       // Only push into CKEditor when the change came from somewhere else;
       // setData on every keystroke would move the caret to the start.
-      if (this.editor && relativeFileUrls(this.editor.getData(), this.backendUrl) !== to) {
-        this.editor.setData(absoluteFileUrls(to || '', this.backendUrl))
+      if (this.editor && this.outOfEditor(this.editor.getData()) !== to) {
+        this.editor.setData(this.intoEditor(to))
       }
     },
     model(to) {
@@ -108,6 +109,22 @@ export default {
 
   methods: {
     /**
+     * Drupal's stored markup, in the shape CKEditor edits.
+     *
+     * Two differences, both of which cost content if left: the file path is one
+     * this origin does not serve, and a caption lives in an attribute the
+     * editor's schema does not know and would drop.
+     */
+    intoEditor(value) {
+      return absoluteFileUrls(toEditorCaptions(value || ''), this.backendUrl)
+    },
+
+    /** And back, so what is staged is what Drupal would have written. */
+    outOfEditor(data) {
+      return fromEditorCaptions(relativeFileUrls(data, this.backendUrl))
+    },
+
+    /**
      * Drop the image button when there is nowhere to send an image.
      *
      * The backend decides the toolbar and the form decides whether this bundle
@@ -126,6 +143,8 @@ export default {
           // Everything, not just what the toolbar shows: see `editorPlugins`.
           plugins: [
             ...editorPlugins(namespace),
+            // Always: it is what makes Drupal's own markup survive a round trip.
+            DrupalImageCompatibility,
             ...(this.uploadOptions ? [imageUploadAdapter(this.uploadOptions)] : []),
           ],
           // What appears when an image is selected. Left empty, CKEditor warns
@@ -141,7 +160,7 @@ export default {
               'imageStyle:side',
             ],
           },
-          initialData: absoluteFileUrls(this.value || '', this.backendUrl),
+          initialData: this.intoEditor(this.value),
         })
         // The same class the rendered field carries, so what is typed looks
         // like what will be published. Editing in a box styled differently from
@@ -156,7 +175,7 @@ export default {
         })
 
         editor.model.document.on('change:data', () => {
-          this.model = relativeFileUrls(editor.getData(), this.backendUrl)
+          this.model = this.outOfEditor(editor.getData())
         })
         this.editor = editor
       } catch (error) {
