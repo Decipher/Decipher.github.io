@@ -71,6 +71,12 @@ typings/
 # Nuxt generate
 dist
 
+# ...except a vendored module's build, which is the module. It is not on npm,
+# and a git dependency would break the CI install and fail lint:private, so the
+# built files are committed. See vendor/decoupled-settings/README.md.
+!vendor/*/dist/
+!vendor/*/dist/**
+
 # Nuxt Storybook
 .nuxt-storybook
 
