@@ -92,6 +92,7 @@
         v-else-if="isTypeWysiwyg"
         v-model="richText"
         :format="richTextFormat"
+        :upload="uploadTarget"
       />
 
       <!-- Select -->
@@ -220,6 +221,11 @@ export default {
   },
 
   mounted() {
+    // An image field is a route bytes can be posted to, which is what an image
+    // in the body needs. The form collects them; only it can see them all.
+    if (this.isTypeImage && this.authoringForm) {
+      this.authoringForm.registerFileField(this.schema.id)
+    }
     this.enhanceProse()
   },
 
@@ -357,6 +363,19 @@ export default {
     pendingFile() {
       const form = this.authoringForm
       return form && form.pendingFiles ? form.pendingFiles[this.schema.id] || null : null
+    },
+
+    /**
+     * Where an image dropped into the body should be posted.
+     *
+     * Null until the form has seen a field that takes files, which is also the
+     * signal to stop offering the button: an insert with nowhere to put the
+     * bytes is an insert that fails.
+     */
+    uploadTarget() {
+      const form = this.authoringForm
+      if (!form || !form.uploadField || !form.type) return null
+      return { resourceType: form.type, field: form.uploadField }
     },
 
     isTypeImage() {

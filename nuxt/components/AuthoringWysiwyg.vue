@@ -31,7 +31,9 @@
  * so it throws before it subscribes to the editor's change events: the editor
  * appears, and every keystroke in it is silently dropped.
  */
-import { loadCkeditor, pluginsForToolbar } from '../lib/ckeditor.mjs'
+import { imageUploadAdapter } from '../lib/ckeditor-upload.mjs'
+import { absoluteFileUrls, relativeFileUrls } from '../lib/files.mjs'
+import { editorPlugins, loadCkeditor } from '../lib/ckeditor.mjs'
 import { FALLBACK_TOOLBAR, toolbarFor } from '../lib/editor.mjs'
 
 // Shared across every field on the page: one request, however many editors.
@@ -44,6 +46,13 @@ export default {
     value: { type: String, default: '' },
     /** The text format this value belongs to, e.g. `basic_html`. */
     format: { type: String, default: null },
+    /**
+     * Where an inserted image's bytes should be posted, if anywhere.
+     *
+     * `{ resourceType, field }`. Null means no route was found, and the image
+     * button is withdrawn rather than offered and left to fail.
+     */
+    upload: { type: Object, default: null },
   },
 
   data() {
@@ -51,6 +60,22 @@ export default {
   },
 
   computed: {
+    /** The backend this session is connected to, if any. */
+    backendUrl() {
+      return (this.$authoring && this.$authoring.state.url) || null
+    },
+
+    /** What the upload adapter needs, or nothing if it cannot work. */
+    uploadOptions() {
+      if (!this.backendUrl || !this.upload || !this.upload.field) return null
+      return {
+        backendUrl: this.backendUrl,
+        token: (this.$authoringAuth && this.$authoringAuth.token) || null,
+        resourceType: this.upload.resourceType,
+        field: this.upload.field,
+      }
+    },
+
     ready() {
       return Boolean(this.editor)
     },
@@ -62,7 +87,9 @@ export default {
       this.model = to
       // Only push into CKEditor when the change came from somewhere else;
       // setData on every keystroke would move the caret to the start.
-      if (this.editor && this.editor.getData() !== to) this.editor.setData(to || '')
+      if (this.editor && relativeFileUrls(this.editor.getData(), this.backendUrl) !== to) {
+        this.editor.setData(absoluteFileUrls(to || '', this.backendUrl))
+      }
     },
     model(to) {
       this.$emit('input', to)
@@ -70,9 +97,9 @@ export default {
   },
 
   async mounted() {
-    const [namespace, toolbar] = await Promise.all([loadCkeditor(), this.loadToolbar()])
+    const [namespace, configured] = await Promise.all([loadCkeditor(), this.loadToolbar()])
     if (!namespace) return
-    await this.create(namespace, toolbar)
+    await this.create(namespace, this.withoutUnusableImage(configured))
   },
 
   beforeDestroy() {
@@ -80,14 +107,41 @@ export default {
   },
 
   methods: {
+    /**
+     * Drop the image button when there is nowhere to send an image.
+     *
+     * The backend decides the toolbar and the form decides whether this bundle
+     * has a field to post through. Both have to agree before the button is
+     * worth offering.
+     */
+    withoutUnusableImage(toolbar) {
+      if (this.uploadOptions) return toolbar
+      return (toolbar || []).filter((item) => item !== 'uploadImage')
+    },
+
     async create(namespace, toolbar) {
       try {
         const editor = await namespace.editorClassic.ClassicEditor.create(this.$refs.host, {
           toolbar: { items: toolbar },
-          // Only what this toolbar needs. A plugin nobody configured a button
-          // for is weight on the page and a behaviour nobody asked for.
-          plugins: pluginsForToolbar(namespace, toolbar),
-          initialData: this.value || '',
+          // Everything, not just what the toolbar shows: see `editorPlugins`.
+          plugins: [
+            ...editorPlugins(namespace),
+            ...(this.uploadOptions ? [imageUploadAdapter(this.uploadOptions)] : []),
+          ],
+          // What appears when an image is selected. Left empty, CKEditor warns
+          // `widget-toolbar-no-items` and a selected image offers nothing at
+          // all, alt text included, which the field requires.
+          image: {
+            toolbar: [
+              'imageTextAlternative',
+              'toggleImageCaption',
+              '|',
+              'imageStyle:inline',
+              'imageStyle:block',
+              'imageStyle:side',
+            ],
+          },
+          initialData: absoluteFileUrls(this.value || '', this.backendUrl),
         })
         // The same class the rendered field carries, so what is typed looks
         // like what will be published. Editing in a box styled differently from
@@ -102,12 +156,17 @@ export default {
         })
 
         editor.model.document.on('change:data', () => {
-          this.model = editor.getData()
+          this.model = relativeFileUrls(editor.getData(), this.backendUrl)
         })
         this.editor = editor
-      } catch {
-        // A toolbar item with no plugin throws here. The textarea stays rather
-        // than leaving the author with no field at all.
+      } catch (error) {
+        // A toolbar item with no plugin throws here, and so does a plugin that
+        // will not load. The textarea stays rather than leaving the author with
+        // no field at all.
+        //
+        // Said out loud, because a silent fallback looks identical to an editor
+        // nobody configured: the difference only showed up as a missing toolbar.
+        console.warn('The rich text editor could not start; using a plain field.', error)
       }
     },
 

@@ -24,6 +24,18 @@ import { SUPPORTED_BUTTONS } from './ckeditor.mjs'
  */
 export const SUPPORTED = new Set([...SUPPORTED_BUTTONS, '|'])
 
+/**
+ * Drupal's name for a button, where CKEditor calls it something else.
+ *
+ * `drupalInsertImage` is the button Drupal's own module registers for inserting
+ * an image. The thing it does is CKEditor's `uploadImage`, so the name is
+ * translated rather than the button dropped: the site is configured to offer
+ * image insertion, and it can be offered.
+ */
+export const ALIASES = {
+  drupalInsertImage: 'uploadImage',
+}
+
 /** Used when Drupal's configuration cannot be read, which is the anonymous case. */
 export const FALLBACK_TOOLBAR = [
   'heading', '|', 'bold', 'italic', 'link', '|', 'bulletedList', 'numberedList',
@@ -58,7 +70,8 @@ export function toolbarFor(resources, format) {
   const configured = Array.isArray((items || {}).items) ? items.items : null
   if (!configured || !configured.length) return [...FALLBACK_TOOLBAR]
 
-  const supported = configured.filter((item) => SUPPORTED.has(item))
+  const named = configured.map((item) => ALIASES[item] || item)
+  const supported = named.filter((item) => SUPPORTED.has(item))
   const tidied = supported.filter(
     (item, i, all) => !(item === '|' && (i === 0 || all[i - 1] === '|'))
   )
