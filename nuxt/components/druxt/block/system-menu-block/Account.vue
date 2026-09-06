@@ -31,14 +31,5 @@ export default {
     block: { type: Object, default: () => ({}) },
   },
 
-  // Tells the toolbar to stand down while this is on the page, so there is one
-  // account control rather than two.
-  created() {
-    if (this.$authoring) this.$authoring.claimAccountMenu(true)
-  },
-
-  beforeDestroy() {
-    if (this.$authoring) this.$authoring.claimAccountMenu(false)
-  },
 }
 </script>

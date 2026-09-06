@@ -300,16 +300,6 @@ export default async function (context, inject) {
     source: null,
     status: 'idle',
     error: null,
-    // Whether Drupal's own account menu is on the page and rendering the
-    // account control. When it is, the toolbar stops offering a second one.
-    //
-    // Counted rather than flagged, because a theme can place the block in more
-    // than one region and the last one unmounting must not clear it while the
-    // first is still there.
-    accountMenus: 0,
-    // Same again for site branding: when Drupal's header region is naming the
-    // site, the toolbar stops doing it too.
-    brandings: 0,
     // Whether the sign-in dialog is open. Shared, not local to a component,
     // because the control that opens it and the dialog itself are no longer in
     // the same place: Drupal's account menu carries the trigger, and a region
@@ -321,35 +311,12 @@ export default async function (context, inject) {
   const authoring = {
     state,
 
-    /**
-     * Drupal's account menu is rendering the account control, or has stopped.
-     *
-     * The toolbar keeps its own control for the case this exists for: with no
-     * backend there are no regions, so no menu, so nothing else on the page
-     * would let anybody connect one.
-     */
-    claimAccountMenu(claimed) {
-      state.accountMenus = Math.max(0, state.accountMenus + (claimed ? 1 : -1))
-    },
-
-    get accountMenuPresent() {
-      return state.accountMenus > 0
-    },
-
     openLogin() {
       state.loginDialog = true
     },
 
     closeLogin() {
       state.loginDialog = false
-    },
-
-    claimBranding(claimed) {
-      state.brandings = Math.max(0, state.brandings + (claimed ? 1 : -1))
-    },
-
-    get brandingPresent() {
-      return state.brandings > 0
     },
 
     get connected() {

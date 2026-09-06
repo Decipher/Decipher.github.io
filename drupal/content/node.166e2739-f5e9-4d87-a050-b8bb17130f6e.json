@@ -1,0 +1,98 @@
+{
+    "uuid": [
+        {
+            "value": "166e2739-f5e9-4d87-a050-b8bb17130f6e"
+        }
+    ],
+    "langcode": [
+        {
+            "value": "en"
+        }
+    ],
+    "type": [
+        {
+            "target_id": "article",
+            "target_type": "node_type",
+            "target_uuid": "33408964-a862-4afa-bc88-09120668d2c9"
+        }
+    ],
+    "revision_timestamp": [
+        {
+            "value": "2026-09-06T07:14:44+00:00"
+        }
+    ],
+    "revision_uid": [
+        {
+            "target_type": "user",
+            "target_uuid": "27a72419-c5b9-44d0-8b2d-6f9b0cca9354"
+        }
+    ],
+    "revision_log": [],
+    "status": [
+        {
+            "value": true
+        }
+    ],
+    "uid": [
+        {
+            "target_type": "user",
+            "target_uuid": "27a72419-c5b9-44d0-8b2d-6f9b0cca9354"
+        }
+    ],
+    "title": [
+        {
+            "value": "Serverless Drupal on GitHub Pages"
+        }
+    ],
+    "created": [
+        {
+            "value": "2026-09-06T07:14:44+00:00"
+        }
+    ],
+    "changed": [
+        {
+            "value": "2026-09-06T07:14:44+00:00"
+        }
+    ],
+    "promote": [
+        {
+            "value": true
+        }
+    ],
+    "sticky": [
+        {
+            "value": false
+        }
+    ],
+    "default_langcode": [
+        {
+            "value": true
+        }
+    ],
+    "revision_translation_affected": [
+        {
+            "value": true
+        }
+    ],
+    "path": [
+        {
+            "alias": "\/serverless-drupal-on-github-pages",
+            "langcode": null
+        }
+    ],
+    "body": [
+        {
+            "value": "<p>This site is a Drupal site. There is no Drupal running behind it.<\/p>\n\n<p>Everything you are reading was rendered by Nuxt at build time, from a Drupal\nthat existed for the length of that build and was then thrown away. The pages\nare static files on GitHub Pages. When somebody wants to write, a Drupal is\nstarted on demand, held open for as long as they need it, and destroyed\nagain.<\/p>\n\n<figure>\n  <img src=\"\/images\/serverless-drupal\/site.png\" alt=\"The site's front page, rendered from Drupal's own regions: site branding on the left, a log in link on the right, and the page content below\" \/>\n  <figcaption>The page is static. The layout is Drupal's.<\/figcaption>\n<\/figure>\n\n<h2>Why bother<\/h2>\n\n<p>A small Drupal site spends almost all of its life idle and all of its life\nbeing a server: patched, backed up, watched, and paid for. The reason it has to\nbe up is that a visitor might arrive, and Drupal decides what a visitor sees.<\/p>\n\n<p>Decoupling moves that decision to build time. Druxt reads Drupal over JSON:API\nand Nuxt renders the result to files, so what a visitor sees is decided once,\nwhen the site is built. After that, Drupal is only needed by the person\nwriting.<\/p>\n\n<p>That is the whole idea. The rest is arranging for Drupal to be there when\nsomebody writes, and gone when nobody is.<\/p>\n\n<h2>The three pieces<\/h2>\n\n<ul>\n  <li><strong>Drupal<\/strong>, with its content and configuration committed to\n    the repository by <a href=\"https:\/\/www.drupal.org\/project\/tome\">Tome<\/a>.\n    It is installed from those files, used, and deleted.<\/li>\n  <li><strong>Nuxt with Druxt<\/strong>, which reads Drupal over JSON:API and\n    builds the static site.<\/li>\n  <li><strong>GitHub Actions<\/strong>, which builds and deploys, and which can\n    stand a Drupal up on request.<\/li>\n<\/ul>\n\n<p>Nothing here is persistent except the repository. The database is created\nfrom committed files every time, which means the repository is the site: clone\nit and you have everything, including the content.<\/p>\n\n<h2>Build it yourself<\/h2>\n\n<p>The starter kit installs the frontend, Composer, and a local Drupal 11 on\nSQLite, straight from committed config and content:<\/p>\n\n<pre><code>npx giget@1 gh:druxt\/quickstart-druxt-serverless#develop my-site --install\ncd my-site\nnpm run generate<\/code><\/pre>\n\n<p>It needs PHP 8.3 or newer and Composer. The install provisions Drupal, starts\nit, and leaves you with a backend on <code>127.0.0.1:8888<\/code> and a static\nbuild in <code>nuxt\/dist<\/code>.<\/p>\n\n<p>Point a browser at <code>nuxt\/dist<\/code> and stop Drupal. The site keeps\nworking, because nothing it serves needed Drupal after the build:<\/p>\n\n<pre><code>cd drupal &amp;&amp; .\/.devtools\/stop\nnpx serve -s nuxt\/dist<\/code><\/pre>\n\n<h2>Deploying to Pages<\/h2>\n\n<p>The deploy workflow does what the install did, then publishes what it built.\nThe Drupal it provisions lives and dies inside the job:<\/p>\n\n<pre><code>- name: Provision Drupal\n  working-directory: drupal\n  run: |\n    .devtools\/assemble\n    .devtools\/provision\n    .devtools\/start\n\n- name: Generate the static site\n  working-directory: nuxt\n  env:\n    ROUTER_BASE: \/\n    CONTENT_REPOSITORY: ${{ github.repository }}\n  run: npm run generate<\/code><\/pre>\n\n<p>A user site at <code>&lt;name&gt;.github.io<\/code> serves from the domain\nroot and needs no base path. A project site needs\n<code>ROUTER_BASE: \/&lt;repo&gt;\/<\/code>, because a static build bakes its asset\npaths in.<\/p>\n\n<h2>Editing it<\/h2>\n\n<p>Turn on <strong>Edit<\/strong> and every entity on the page gains a control.\nThis is the frontend's own editing layer, not Drupal's: the site is static, and\nwhat you change is held in the browser.<\/p>\n\n<figure>\n  <img src=\"\/images\/serverless-drupal\/edit-mode.png\" alt=\"The site in edit mode, with an edit control on the content and an Edits counter in the toolbar\" \/>\n  <figcaption>Edit mode. Nothing has been sent anywhere yet.<\/figcaption>\n<\/figure>\n\n<p>Changes go into a cart. They are held in the browser, they survive a reload,\nand nothing is written until you say so. The page renders them as you type, so\nthe site reads the way it will read once the change is merged rather than\nshowing you a badge and asking you to imagine it.<\/p>\n\n<figure>\n  <img src=\"\/images\/serverless-drupal\/cart.png\" alt=\"The editing drawer open beside the site, showing one staged change with controls to show, preview or discard it\" \/>\n  <figcaption>One change, staged and not yet sent.<\/figcaption>\n<\/figure>\n\n<p><strong>Preview<\/strong> shows a change as the site will render it, in\nwhichever view mode you ask for and at a real device width. The widths are real\nrather than a zoom, so the site's own media queries decide the layout. A page\nwider than the window is scaled down to fit, and the scale is a control.<\/p>\n\n<figure>\n  <img src=\"\/images\/serverless-drupal\/preview.png\" alt=\"The preview modal showing a staged article at a phone width of 375 pixels, with view mode, zoom and width controls\" \/>\n  <figcaption>A phone is 375 pixels, not a zoom level.<\/figcaption>\n<\/figure>\n\n<h2>Sending the work<\/h2>\n\n<p>There are two destinations, and they answer different questions.<\/p>\n\n<figure>\n  <img src=\"\/images\/serverless-drupal\/send.png\" alt=\"The Send tab, offering Commit to backend, Open a pull request, Download for a change request, and a GitHub sign-in\" \/>\n  <figcaption>Two destinations. Only one of them needs a backend.<\/figcaption>\n<\/figure>\n\n<p><strong>Commit to backend<\/strong> sends the cart to a running Drupal over\nJSON:API, one request per resource, in dependency order. This is the short loop,\nand it validates against the site's real field definitions.<\/p>\n\n<p><strong>Open a pull request<\/strong> needs no backend at all. The cart becomes\na document in a branch: the JSON:API resources, the bytes of any picture, and an\nexplicit list of deletions. A job on that pull request stands a Drupal up,\napplies the document through the entity API, and commits back the content Tome\nwrites, so review sees the real content diff rather than a description of\none.<\/p>\n\n<p>The conversion happens in Drupal on purpose. Tome writes Drupal's own\nnormalisation: references by <code>target_uuid<\/code>, an image's width and\nheight read off the file, the processed body. Reproducing that in JavaScript\nmeans keeping a copy of Drupal's normalisers in step with a Drupal that moves,\nwhich fails quietly and produces pull requests that review cleanly and break the\nnext build.<\/p>\n\n<h2>Starting a backend<\/h2>\n\n<p>When you do want Drupal, a workflow starts one. It provisions the site,\nexposes it through a Cloudflare Quick Tunnel, publishes where it is, and holds\nit open:<\/p>\n\n<pre><code>on:\n  workflow_dispatch:\n    inputs:\n      minutes:\n        description: 'How long to hold the backend open'\n        default: '55'<\/code><\/pre>\n\n<p><code>workflow_dispatch<\/code> is restricted to people with write access to\nthe repository, which is the access control the whole thing rests on. There is\nno other way to start a session, and no push, pull request or schedule can.<\/p>\n\n<p>The session publishes its address to a branch, and the frontend reads it.\nWhen the job ends, the tunnel closes and the record is deleted. Nothing is left\nrunning.<\/p>\n\n<h2>What it costs you<\/h2>\n\n<p>Honestly, some things are worse this way.<\/p>\n\n<ul>\n  <li><strong>Publishing is a build.<\/strong> Content is live when the site\n    rebuilds, not when you press save. For a site that publishes a few times a\n    week that is fine. For a newsroom it is not.<\/li>\n  <li><strong>Anything Drupal does per request is gone.<\/strong> Personalisation,\n    forms that write on submit, anything reading the current user. What is left\n    is what can be decided at build time.<\/li>\n  <li><strong>Starting a backend takes a few minutes.<\/strong> Provisioning\n    Drupal from scratch is not instant, and you wait for it.<\/li>\n<\/ul>\n\n<p>What you get back is a site with no server to keep up, no database to back up,\nno security releases to chase on a schedule somebody else sets, and a full copy\nof everything in one repository.<\/p>\n\n<p>The code is at\n<a href=\"https:\/\/github.com\/druxt\/quickstart-druxt-serverless\">druxt\/quickstart-druxt-serverless<\/a>,\nand this site is at\n<a href=\"https:\/\/github.com\/Decipher\/Decipher.github.io\">Decipher\/Decipher.github.io<\/a>.<\/p>\n",
+            "format": "full_html",
+            "processed": "<p>This site is a Drupal site. There is no Drupal running behind it.<\/p>\n\n<p>Everything you are reading was rendered by Nuxt at build time, from a Drupal\nthat existed for the length of that build and was then thrown away. The pages\nare static files on GitHub Pages. When somebody wants to write, a Drupal is\nstarted on demand, held open for as long as they need it, and destroyed\nagain.<\/p>\n\n<figure>\n  <img src=\"\/images\/serverless-drupal\/site.png\" alt=\"The site's front page, rendered from Drupal's own regions: site branding on the left, a log in link on the right, and the page content below\">\n  <figcaption>The page is static. The layout is Drupal's.<\/figcaption>\n<\/figure>\n\n<h2>Why bother<\/h2>\n\n<p>A small Drupal site spends almost all of its life idle and all of its life\nbeing a server: patched, backed up, watched, and paid for. The reason it has to\nbe up is that a visitor might arrive, and Drupal decides what a visitor sees.<\/p>\n\n<p>Decoupling moves that decision to build time. Druxt reads Drupal over JSON:API\nand Nuxt renders the result to files, so what a visitor sees is decided once,\nwhen the site is built. After that, Drupal is only needed by the person\nwriting.<\/p>\n\n<p>That is the whole idea. The rest is arranging for Drupal to be there when\nsomebody writes, and gone when nobody is.<\/p>\n\n<h2>The three pieces<\/h2>\n\n<ul>\n  <li><strong>Drupal<\/strong>, with its content and configuration committed to\n    the repository by <a href=\"https:\/\/www.drupal.org\/project\/tome\">Tome<\/a>.\n    It is installed from those files, used, and deleted.<\/li>\n  <li><strong>Nuxt with Druxt<\/strong>, which reads Drupal over JSON:API and\n    builds the static site.<\/li>\n  <li><strong>GitHub Actions<\/strong>, which builds and deploys, and which can\n    stand a Drupal up on request.<\/li>\n<\/ul>\n\n<p>Nothing here is persistent except the repository. The database is created\nfrom committed files every time, which means the repository is the site: clone\nit and you have everything, including the content.<\/p>\n\n<h2>Build it yourself<\/h2>\n\n<p>The starter kit installs the frontend, Composer, and a local Drupal 11 on\nSQLite, straight from committed config and content:<\/p>\n\n<pre><code>npx giget@1 gh:druxt\/quickstart-druxt-serverless#develop my-site --install\ncd my-site\nnpm run generate<\/code><\/pre>\n\n<p>It needs PHP 8.3 or newer and Composer. The install provisions Drupal, starts\nit, and leaves you with a backend on <code>127.0.0.1:8888<\/code> and a static\nbuild in <code>nuxt\/dist<\/code>.<\/p>\n\n<p>Point a browser at <code>nuxt\/dist<\/code> and stop Drupal. The site keeps\nworking, because nothing it serves needed Drupal after the build:<\/p>\n\n<pre><code>cd drupal &amp;&amp; .\/.devtools\/stop\nnpx serve -s nuxt\/dist<\/code><\/pre>\n\n<h2>Deploying to Pages<\/h2>\n\n<p>The deploy workflow does what the install did, then publishes what it built.\nThe Drupal it provisions lives and dies inside the job:<\/p>\n\n<pre><code>- name: Provision Drupal\n  working-directory: drupal\n  run: |\n    .devtools\/assemble\n    .devtools\/provision\n    .devtools\/start\n\n- name: Generate the static site\n  working-directory: nuxt\n  env:\n    ROUTER_BASE: \/\n    CONTENT_REPOSITORY: ${{ github.repository }}\n  run: npm run generate<\/code><\/pre>\n\n<p>A user site at <code>&lt;name&gt;.github.io<\/code> serves from the domain\nroot and needs no base path. A project site needs\n<code>ROUTER_BASE: \/&lt;repo&gt;\/<\/code>, because a static build bakes its asset\npaths in.<\/p>\n\n<h2>Editing it<\/h2>\n\n<p>Turn on <strong>Edit<\/strong> and every entity on the page gains a control.\nThis is the frontend's own editing layer, not Drupal's: the site is static, and\nwhat you change is held in the browser.<\/p>\n\n<figure>\n  <img src=\"\/images\/serverless-drupal\/edit-mode.png\" alt=\"The site in edit mode, with an edit control on the content and an Edits counter in the toolbar\">\n  <figcaption>Edit mode. Nothing has been sent anywhere yet.<\/figcaption>\n<\/figure>\n\n<p>Changes go into a cart. They are held in the browser, they survive a reload,\nand nothing is written until you say so. The page renders them as you type, so\nthe site reads the way it will read once the change is merged rather than\nshowing you a badge and asking you to imagine it.<\/p>\n\n<figure>\n  <img src=\"\/images\/serverless-drupal\/cart.png\" alt=\"The editing drawer open beside the site, showing one staged change with controls to show, preview or discard it\">\n  <figcaption>One change, staged and not yet sent.<\/figcaption>\n<\/figure>\n\n<p><strong>Preview<\/strong> shows a change as the site will render it, in\nwhichever view mode you ask for and at a real device width. The widths are real\nrather than a zoom, so the site's own media queries decide the layout. A page\nwider than the window is scaled down to fit, and the scale is a control.<\/p>\n\n<figure>\n  <img src=\"\/images\/serverless-drupal\/preview.png\" alt=\"The preview modal showing a staged article at a phone width of 375 pixels, with view mode, zoom and width controls\">\n  <figcaption>A phone is 375 pixels, not a zoom level.<\/figcaption>\n<\/figure>\n\n<h2>Sending the work<\/h2>\n\n<p>There are two destinations, and they answer different questions.<\/p>\n\n<figure>\n  <img src=\"\/images\/serverless-drupal\/send.png\" alt=\"The Send tab, offering Commit to backend, Open a pull request, Download for a change request, and a GitHub sign-in\">\n  <figcaption>Two destinations. Only one of them needs a backend.<\/figcaption>\n<\/figure>\n\n<p><strong>Commit to backend<\/strong> sends the cart to a running Drupal over\nJSON:API, one request per resource, in dependency order. This is the short loop,\nand it validates against the site's real field definitions.<\/p>\n\n<p><strong>Open a pull request<\/strong> needs no backend at all. The cart becomes\na document in a branch: the JSON:API resources, the bytes of any picture, and an\nexplicit list of deletions. A job on that pull request stands a Drupal up,\napplies the document through the entity API, and commits back the content Tome\nwrites, so review sees the real content diff rather than a description of\none.<\/p>\n\n<p>The conversion happens in Drupal on purpose. Tome writes Drupal's own\nnormalisation: references by <code>target_uuid<\/code>, an image's width and\nheight read off the file, the processed body. Reproducing that in JavaScript\nmeans keeping a copy of Drupal's normalisers in step with a Drupal that moves,\nwhich fails quietly and produces pull requests that review cleanly and break the\nnext build.<\/p>\n\n<h2>Starting a backend<\/h2>\n\n<p>When you do want Drupal, a workflow starts one. It provisions the site,\nexposes it through a Cloudflare Quick Tunnel, publishes where it is, and holds\nit open:<\/p>\n\n<pre><code>on:\n  workflow_dispatch:\n    inputs:\n      minutes:\n        description: 'How long to hold the backend open'\n        default: '55'<\/code><\/pre>\n\n<p><code>workflow_dispatch<\/code> is restricted to people with write access to\nthe repository, which is the access control the whole thing rests on. There is\nno other way to start a session, and no push, pull request or schedule can.<\/p>\n\n<p>The session publishes its address to a branch, and the frontend reads it.\nWhen the job ends, the tunnel closes and the record is deleted. Nothing is left\nrunning.<\/p>\n\n<h2>What it costs you<\/h2>\n\n<p>Honestly, some things are worse this way.<\/p>\n\n<ul>\n  <li><strong>Publishing is a build.<\/strong> Content is live when the site\n    rebuilds, not when you press save. For a site that publishes a few times a\n    week that is fine. For a newsroom it is not.<\/li>\n  <li><strong>Anything Drupal does per request is gone.<\/strong> Personalisation,\n    forms that write on submit, anything reading the current user. What is left\n    is what can be decided at build time.<\/li>\n  <li><strong>Starting a backend takes a few minutes.<\/strong> Provisioning\n    Drupal from scratch is not instant, and you wait for it.<\/li>\n<\/ul>\n\n<p>What you get back is a site with no server to keep up, no database to back up,\nno security releases to chase on a schedule somebody else sets, and a full copy\nof everything in one repository.<\/p>\n\n<p>The code is at\n<a href=\"https:\/\/github.com\/druxt\/quickstart-druxt-serverless\">druxt\/quickstart-druxt-serverless<\/a>,\nand this site is at\n<a href=\"https:\/\/github.com\/Decipher\/Decipher.github.io\">Decipher\/Decipher.github.io<\/a>.<\/p>\n",
+            "summary": "A Drupal site with no Drupal running behind it: static pages on GitHub Pages, and a backend started on demand only while somebody is writing."
+        }
+    ],
+    "field_canonical_url": [
+        {
+            "value": "https:\/\/stuar.tc\/serverless-drupal-on-github-pages"
+        }
+    ],
+    "field_image": [],
+    "field_tags": []
+}

@@ -19,27 +19,31 @@
       <header class="sticky top-0 z-20 border-b border-hairline bg-paper">
         <div class="mx-auto flex w-full max-w-5xl items-baseline gap-6 px-6 py-5">
           <!--
-            Only when Drupal is not already branding the page. `DruxtSite`
-            renders the branding block in the header region, and two site names
-            one above the other is the toolbar competing with the site.
+            The toolbar says what it is, not what the site is. Drupal's header
+            region brands the page, and two site names one above the other is
+            the toolbar competing with the site it is a tool for.
           -->
-          <NuxtLink v-if="!brandingPresent" to="/" class="no-underline">
-            <span class="font-mono text-sm uppercase tracking-eyebrow text-ink">{{
-              siteName
-            }}</span>
-          </NuxtLink>
-          <span v-if="!brandingPresent && slogan" class="eyebrow hidden sm:inline">{{ slogan }}</span>
-          <span v-if="brandingPresent" class="eyebrow">Editing</span>
+          <span class="eyebrow">Editing</span>
           <div class="ml-auto flex items-baseline gap-4">
             <AuthoringEditToggle />
             <AuthoringCartToggle />
             <!--
-              Always rendered, because it hosts the sign-in dialog and that has
-              to outlive the region Drupal's account menu sits in. Its own
-              button is hidden when that menu is carrying one, so there is one
-              control rather than two.
+              The dialog, never the button. Drupal's account menu carries the
+              button, and this hosts the dialog because the region that menu
+              sits in is re-rendered the moment a backend connects.
+
+              Not conditional on whether that menu is present. It was, and the
+              condition could not be answered in time: Vue renders a parent
+              before its children, so the toolbar decided before the block had
+              claimed anything, and the built HTML shipped with two sign-in
+              buttons that collapsed to one after hydration.
+
+              A site whose theme places no account menu has no button. It can
+              still be pointed at a backend with `?backend=`, and a build with
+              no regions at all has no content either, so it is a broken build
+              rather than a state to design for.
             -->
-            <AuthoringLogin :trigger="!accountMenuPresent" />
+            <AuthoringLogin :trigger="false" />
           </div>
         </div>
       </header>
@@ -114,14 +118,6 @@ export default {
 
     slogan() {
       return this.identity.slogan
-    },
-
-    brandingPresent() {
-      return Boolean(this.$authoring && this.$authoring.brandingPresent)
-    },
-
-    accountMenuPresent() {
-      return Boolean(this.$authoring && this.$authoring.accountMenuPresent)
     },
 
     identity() {
