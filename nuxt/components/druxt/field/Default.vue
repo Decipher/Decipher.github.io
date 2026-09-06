@@ -202,6 +202,7 @@ import Draggable from 'vuedraggable'
 import { fromDateInput, toDateInput } from '../../../lib/datetime.mjs'
 import { rewriteFileUrls } from '../../../lib/files.mjs'
 import { addCopyButtons, markZoomable } from '../../../lib/prose.mjs'
+import { applyCaptionFilter } from '../../../lib/captions.mjs'
 import { isTrimmed, teaserHtml } from '../../../lib/teaser.mjs'
 
 export default {
@@ -308,8 +309,12 @@ export default {
           trimLength: ((this.schema.settings || {}).display || {}).trim_length,
         })
       }
-      if (typeof model === 'string') return model
-      return (model || {}).processed || (model || {}).value || ''
+      if (typeof model === 'string') return applyCaptionFilter(model)
+      // `processed` has been through Drupal's filters and has its figures
+      // already. A value staged in the browser has not, so the caption filter
+      // is run here instead, or a preview of an edit loses every caption.
+      const value = (model || {}).processed
+      return value || applyCaptionFilter((model || {}).value || '')
     },
 
     inputType() {

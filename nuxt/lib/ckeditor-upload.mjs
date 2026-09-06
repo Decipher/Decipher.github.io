@@ -68,7 +68,18 @@ export function absolute(url, backendUrl) {
 }
 
 /**
- * The CKEditor plugin that wires all of it together.
+ * What the editor needs to understand Drupal's images at all.
+ *
+ * Always loaded, whether or not anything can be uploaded, because this is about
+ * reading and writing existing content rather than adding to it. Left out, an
+ * author who opens an article loses its `data-entity-uuid` attributes simply by
+ * saving, and nothing says so.
+ *
+ * Captions are not done here. They are a shape difference rather than a missing
+ * attribute, and `lib/captions.mjs` translates them on the way in and out,
+ * where it can be tested without an editor. Doing it as a downcast converter
+ * meant overriding the one that builds the image's figure, and CKEditor
+ * answered `conversion-slot-filter-incomplete`.
  *
  * A class rather than a function, for `afterInit`. The image elements are
  * registered by the image plugins' own `init`, so extending the schema from
@@ -76,6 +87,22 @@ export function absolute(url, backendUrl) {
  * `schema-cannot-extend-missing-item` and the editor never opens. `afterInit`
  * runs once every plugin has registered what it owns, and still before the
  * document's data is loaded, which is the window this needs.
+ */
+export class DrupalImageCompatibility {
+  constructor(editor) {
+    this.editor = editor
+  }
+
+  afterInit() {
+    allowEntityAttributes(this.editor)
+  }
+}
+
+/**
+ * Where the bytes go, which only exists when there is a backend to send to.
+ *
+ * Separate from the compatibility plugin on purpose: uploading is the optional
+ * half, and understanding what is already there is not.
  */
 export function imageUploadAdapter(options) {
   return class DecoupledImageUpload {
@@ -94,7 +121,6 @@ export function imageUploadAdapter(options) {
     }
 
     afterInit() {
-      allowEntityAttributes(this.editor)
       recordUploadedUuid(this.editor)
     }
   }
@@ -157,3 +183,4 @@ function recordUploadedUuid(editor) {
     })
   })
 }
+
