@@ -17,4 +17,15 @@ export default [
       globals: globals.node,
     },
   },
+  {
+    /*
+     * Files that drive a browser.
+     *
+     * The callbacks passed to `page.evaluate` are serialised and run in the
+     * page, so the globals they use are the page's rather than this process's.
+     * Node globals stay, because the same file is a Node script around them.
+     */
+    files: ['scripts/screenshots.mjs', 'tests/e2e/**/*.js'],
+    languageOptions: { globals: { ...globals.node, ...globals.browser } },
+  },
 ]

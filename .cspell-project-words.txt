@@ -6,6 +6,7 @@ appserver
 behaviour
 bmewburn
 bootstrapvue
+colour
 commitlint
 davidanson
 dbaeumer
@@ -55,14 +56,17 @@ olivero
 opcache
 openssl
 openvscode
+optimise
 pathspec
 phpsab
 phpstan
 phpunit
+quantisation
 recognise
 recognised
 recognises
 repository
+serialised
 setuptools
 shivammathur
 starterkit
@@ -72,6 +76,7 @@ toolbarview
 travelled
 trixie
 unmatch
+unoptimised
 unparseable
 unranked
 unrecognised
@@ -85,3 +90,4 @@ valeryan
 vfox
 viewports
 xauth
+zoomable

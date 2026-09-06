@@ -132,29 +132,66 @@ a {
 }
 
 /*
- * A code block scrolls rather than wrapping. A wrapped command is a command
- * somebody copies wrongly.
+ * A code block, after `@stuartclark/ui`'s CodeBlock: a bordered box, a dark
+ * ground, and type a size down from the prose so a long command still fits.
+ *
+ * It scrolls rather than wrapping. A wrapped command is a command somebody
+ * copies wrongly.
  */
 .prose-body pre {
-  @apply overflow-x-auto rounded border border-hairline bg-elevated p-4;
+  @apply relative overflow-hidden rounded-md border border-hairline;
 }
 
 .prose-body pre code {
-  @apply bg-transparent p-0 text-sm;
+  @apply block overflow-x-auto bg-ink p-5 font-mono text-[13px] leading-relaxed text-paper;
 
   white-space: pre;
+}
+
+/*
+ * The copy button, put there by the field component after the field renders.
+ *
+ * Visible on hover and on focus, because a control nobody can reach with a
+ * keyboard is a control some people do not have.
+ */
+.prose-body .code-copy {
+  @apply absolute right-2 top-2 rounded border border-hairline bg-surface px-2 py-1 font-mono text-[0.6875rem] uppercase tracking-eyebrow text-muted opacity-0 transition-opacity;
+}
+
+.prose-body pre:hover .code-copy,
+.prose-body .code-copy:focus {
+  @apply opacity-100;
+}
+
+.prose-body .code-copy:hover {
+  @apply border-ink text-ink;
 }
 
 .prose-body blockquote {
   @apply border-l-2 border-hairline pl-4 text-muted;
 }
 
+/*
+ * A figure, after `@stuartclark/ui`'s ImageLightbox: the image in a bordered,
+ * rounded box, and the caption centred underneath in smaller muted type.
+ */
 .prose-body figure {
   @apply mt-8;
 }
 
+.prose-body figure img,
+.prose-body p > img {
+  @apply w-full rounded-lg border border-hairline object-contain;
+}
+
 .prose-body figcaption {
-  @apply mt-2 text-sm text-muted;
+  @apply mt-2.5 text-center text-[0.84375rem] text-muted;
+}
+
+/* Clickable, because a screenshot at column width is a screenshot nobody can
+ * read. The handler is added by the field component. */
+.prose-body .zoomable {
+  cursor: zoom-in;
 }
 
 /*

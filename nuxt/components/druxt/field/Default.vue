@@ -10,7 +10,7 @@
         />
       </div>
       <!-- eslint-disable-next-line vue/no-v-html -->
-      <div v-else class="prose-body" v-html="rewritten" />
+      <div v-else ref="prose" class="prose-body" v-html="rewritten" />
     </template>
 
     <!-- ===== Form displays ===== -->
@@ -200,6 +200,7 @@ import Draggable from 'vuedraggable'
 
 import { fromDateInput, toDateInput } from '../../../lib/datetime.mjs'
 import { rewriteFileUrls } from '../../../lib/files.mjs'
+import { addCopyButtons, markZoomable } from '../../../lib/prose.mjs'
 import { isTrimmed, teaserHtml } from '../../../lib/teaser.mjs'
 
 export default {
@@ -216,6 +217,16 @@ export default {
      * reason the form's buttons live in a wrapper component.
      */
     authoringForm: { from: 'authoringForm', default: null },
+  },
+
+  mounted() {
+    this.enhanceProse()
+  },
+
+  updated() {
+    // The field re-renders whenever the cart changes, and `v-html` replaces the
+    // markup wholesale each time, taking the listeners with it.
+    this.enhanceProse()
   },
 
   created() {
@@ -235,6 +246,22 @@ export default {
   },
 
   methods: {
+    /**
+     * Attach what rendered HTML cannot carry.
+     *
+     * A body field is markup from Drupal put in with `v-html`, so nothing in it
+     * is a component and nothing in it can hold a Vue handler.
+     */
+    enhanceProse() {
+      const root = this.$refs.prose
+      if (!root) return
+      addCopyButtons(root)
+      for (const image of markZoomable(root)) {
+        if (image.dataset.zoomBound) continue
+        image.dataset.zoomBound = '1'
+        image.addEventListener('click', () => this.$emit('zoom', image.src))
+      }
+    },
 
     onFile(chosen) {
       if (this.authoringForm) this.authoringForm.setPendingFile(this.schema.id, chosen)
