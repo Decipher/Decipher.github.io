@@ -81,6 +81,83 @@ a {
 }
 
 /*
+ * Body text out of Drupal.
+ *
+ * Tailwind's reset strips headings, lists and code back to plain text, which is
+ * right for an interface and wrong for an article: `field/Default.vue` has been
+ * putting a `prose-body` class on every rendered body field, and nothing ever
+ * defined it, so a thousand words of headings, lists and code blocks all
+ * rendered as one undifferentiated block.
+ *
+ * Written out rather than pulled from a typography plugin, because it is a
+ * short list and the design system already decides every value in it.
+ */
+.prose-body > * + * {
+  @apply mt-4;
+}
+
+.prose-body h2 {
+  @apply mt-10 text-xl font-semibold text-ink;
+}
+
+.prose-body h3 {
+  @apply mt-8 text-lg font-semibold text-ink;
+}
+
+.prose-body p,
+.prose-body li {
+  @apply text-body;
+
+  /* A measure, so a line is a length the eye can track back from. */
+  max-width: 68ch;
+}
+
+.prose-body ul,
+.prose-body ol {
+  @apply pl-6;
+
+  list-style: revert;
+}
+
+.prose-body li + li {
+  @apply mt-1;
+}
+
+.prose-body strong {
+  @apply font-semibold text-ink;
+}
+
+.prose-body code {
+  @apply rounded bg-elevated px-1 py-0.5 font-mono text-[0.8125em] text-ink;
+}
+
+/*
+ * A code block scrolls rather than wrapping. A wrapped command is a command
+ * somebody copies wrongly.
+ */
+.prose-body pre {
+  @apply overflow-x-auto rounded border border-hairline bg-elevated p-4;
+}
+
+.prose-body pre code {
+  @apply bg-transparent p-0 text-sm;
+
+  white-space: pre;
+}
+
+.prose-body blockquote {
+  @apply border-l-2 border-hairline pl-4 text-muted;
+}
+
+.prose-body figure {
+  @apply mt-8;
+}
+
+.prose-body figcaption {
+  @apply mt-2 text-sm text-muted;
+}
+
+/*
  * Content images come from Drupal at their original size, which is usually far
  * larger than the column they land in. Cap the height as well as the width, so
  * a tall image cannot push the rest of the page off the screen.
