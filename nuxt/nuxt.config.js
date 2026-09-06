@@ -1,4 +1,33 @@
+import { repositoryFromRemotes } from './lib/github.mjs'
+
 require('dotenv').config({ path: '../.env' })
+
+/**
+ * Which repository this build belongs to.
+ *
+ * Set explicitly, given by Actions, or asked of git. The last one is what makes
+ * a plain `npm run generate` in a clone produce a site that can find its own
+ * sessions: without it the build carries no session record address, so it gives
+ * up before fetching anything and waits forever on a backend that is already
+ * running. Nothing about that failure names the variable that was missing.
+ *
+ * A consumer's tarball has no `.git` at all, which is the documented install
+ * route, so this has to be allowed to find nothing.
+ */
+function contentRepository() {
+  if (process.env.CONTENT_REPOSITORY) return process.env.CONTENT_REPOSITORY
+  if (process.env.GITHUB_REPOSITORY) return process.env.GITHUB_REPOSITORY
+  try {
+    const remotes = require('child_process')
+      .execSync('git remote -v', { stdio: ['ignore', 'pipe', 'ignore'] })
+      .toString()
+    return repositoryFromRemotes(remotes)
+  } catch {
+    return ''
+  }
+}
+
+const CONTENT_REPOSITORY = contentRepository()
 
 const baseUrl = process.env.BASE_URL || 'http://quickstart-druxt-serverless.ddev.site'
 
@@ -104,10 +133,10 @@ export default {
       // such variable, so that was every deployed build.
       sessionRecordUrl:
         process.env.SESSION_RECORD_URL ||
-        (process.env.CONTENT_REPOSITORY || process.env.GITHUB_REPOSITORY
-          ? `https://raw.githubusercontent.com/${
-              process.env.CONTENT_REPOSITORY || process.env.GITHUB_REPOSITORY
-            }/${process.env.SESSION_BRANCH || 'session'}/session.json`
+        (CONTENT_REPOSITORY
+          ? `https://raw.githubusercontent.com/${CONTENT_REPOSITORY}/${
+              process.env.SESSION_BRANCH || 'session'
+            }/session.json`
           : ''),
       // The OAuth consumer. Provisioning pins this so it is stable across
       // sessions, which is the whole reason the frontend can hold it at build
@@ -119,7 +148,7 @@ export default {
       // Where a change request goes. Defaulted from the repository this site is
       // built from, so a fork gets its own without editing anything, and
       // overridable for a build that publishes somewhere else.
-      repository: process.env.CONTENT_REPOSITORY || process.env.GITHUB_REPOSITORY || '',
+      repository: CONTENT_REPOSITORY,
       // The workflow that stands a backend up on demand.
       workflow: process.env.AUTHORING_WORKFLOW || 'authoring.yml',
     },

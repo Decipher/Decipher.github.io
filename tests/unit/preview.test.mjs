@@ -150,3 +150,32 @@ test('a field the cart never staged is unknown, not false', () => {
   const article = { type: 'node--article', id: 'a', isNew: true, attributes: { title: 'x' } }
   assert.equal(failsFilters(FRONTPAGE, article), false)
 })
+
+test('what a listing accepts does not depend on what was added to it first', () => {
+  // Rows added by a previous pass are marked, and they used to count towards
+  // the types a listing accepts. So the front page took a page when a page was
+  // staged into it first, and refused the same page when an article had been
+  // staged before it. Which happened came down to the order somebody typed in.
+  const article = { type: 'node--article', id: 'a', isNew: true, attributes: {} }
+  const page = { type: 'node--page', id: 'p', isNew: true, attributes: {} }
+
+  const emptyView = []
+  const afterArticle = [{ type: 'node--article', id: 'a', __staged: true }]
+
+  assert.deepEqual(
+    previewsFor(emptyView, [article, page], FRONTPAGE)
+      .map((r) => r.id)
+      .sort(),
+    ['a', 'p']
+  )
+  // The same answer once the article is already on the page.
+  assert.deepEqual(
+    previewsFor(afterArticle, [article, page], FRONTPAGE).map((r) => r.id),
+    ['p']
+  )
+
+  // A row the backend really returned still narrows it, which is the point:
+  // evidence about what this listing holds beats inference from its filters.
+  const realRow = [{ type: 'taxonomy_term--tags', id: 't' }]
+  assert.deepEqual(previewsFor(realRow, [article, page], FRONTPAGE), [])
+})

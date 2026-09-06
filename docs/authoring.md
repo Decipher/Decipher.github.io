@@ -88,6 +88,20 @@ It cannot evaluate a view's filters properly; that needs Drupal. It reads plain
 boolean filters where the content actually carries the field, and otherwise
 shows the content and marks it as not published.
 
+That last part is a real limitation, not a rounding error. Whether a new node is
+promoted depends on the bundle: an Article is, a Basic page is not. That default
+lives in `core.base_field_override.node.<bundle>.promote`, which JSON:API does
+not expose and `druxt-schema` does not carry, so nothing the browser can reach
+knows it. A new page therefore appears on a front page preview that the real
+front page would not show.
+
+Showing it is the deliberate choice between two wrongs. The other one is hiding
+a new article from the front page, and an author who writes the site's first
+article and sees no change concludes the work was lost, which is the failure
+this exists to prevent. A build could read those config files off disk and bake
+the defaults in; that is not done, because it would tie the frontend build to
+Drupal's config file layout.
+
 ### Looking at a change before sending it
 
 **Show** points at what changed, on the field where it can be found rather than

@@ -32,6 +32,27 @@ export function parseRepository(value) {
   return { owner, name, full: `${owner}/${name}` }
 }
 
+/**
+ * The GitHub repository a clone belongs to, read from `git remote -v` output.
+ *
+ * So that a plain `npm run generate` in a clone produces a site that can find
+ * its own sessions. Without it the build has no session record address, gives
+ * up before fetching anything, and the interface waits forever on a backend
+ * that came up minutes ago. Nothing about that says which step was missed, and
+ * the step is easy to miss: it is an environment variable nobody has to set for
+ * the site to build and look right.
+ *
+ * Any remote on github.com, not `origin`. This repository's `origin` is a
+ * GitLab mirror, which is not unusual and is not what a change request is
+ * opened against.
+ */
+export function repositoryFromRemotes(remotes) {
+  const match = String(remotes || '').match(
+    /github\.com[:/]([^/\s]+)\/([^/\s]+?)(?:\.git)?(?:\s|$)/i
+  )
+  return match ? `${match[1]}/${match[2]}` : ''
+}
+
 export function apiUrl(repository, path = '') {
   const repo = parseRepository(repository)
   if (!repo) return null
