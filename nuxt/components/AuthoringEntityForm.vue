@@ -44,9 +44,14 @@ export default {
     value: { type: Object, default: undefined },
   },
 
-  data: () => ({ message: null, original: null, pendingFiles: {} }),
+  data: () => ({ message: null, original: null, pendingFiles: {}, fileFields: [] }),
 
   computed: {
+    /** A field bytes can be posted through, if this bundle has one. */
+    uploadField() {
+      return this.fileFields[0] || null
+    },
+
     /** Whether the cart holds anything at all for this entity. */
     held() {
       const id = (this.original || {}).id
@@ -107,6 +112,22 @@ export default {
      */
     onFieldInput() {
       this.saveDraft()
+    },
+
+    /**
+     * Note that this bundle has a field files can be posted to.
+     *
+     * JSON:API has no route for creating a file on its own: every upload route
+     * belongs to a field. An image put in the body is not going in a field at
+     * all, so it is posted through one of these and never attached, which is
+     * the only way in that JSON:API offers.
+     *
+     * Registered by the fields themselves as they render, because the form is
+     * given a resource and not a schema, and so has no other way to know which
+     * of its fields takes a file.
+     */
+    registerFileField(field) {
+      if (field && !this.fileFields.includes(field)) this.fileFields.push(field)
     },
 
     /**

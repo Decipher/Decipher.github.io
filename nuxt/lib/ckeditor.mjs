@@ -60,17 +60,49 @@ export const CKEDITOR_PACKAGES = [
 ]
 
 /**
- * Plugins with no button, needed for the rest to work.
+ * Every plugin, loaded whatever the toolbar says.
+ *
+ * Not derived from the configured buttons, and the difference is not academic.
+ * A CKEditor plugin decides what the editor *understands*; the toolbar only
+ * decides what it *offers*. Markup the schema does not know about is stripped
+ * on the way in, silently: opening this site's own article with the image
+ * plugins left out emptied all five pictures out of the body, and staging that
+ * would have deleted them.
+ *
+ * So the plugin set is fixed and the toolbar is filtered separately. The
+ * scripts are all fetched anyway, so this costs nothing but instantiation.
  *
  * Written as `namespace.Export` pairs against `window.CKEditor5`, because that
  * is the only handle a DLL build gives you.
  */
-const ALWAYS = [
+const PLUGINS = [
   'essentials.Essentials',
   'paragraph.Paragraph',
   'autoformat.Autoformat',
   'pasteFromOffice.PasteFromOffice',
   'indent.Indent',
+  'basicStyles.Bold',
+  'basicStyles.Italic',
+  'basicStyles.Code',
+  'basicStyles.Strikethrough',
+  'basicStyles.Subscript',
+  'basicStyles.Superscript',
+  'removeFormat.RemoveFormat',
+  'link.Link',
+  'list.List',
+  'blockQuote.BlockQuote',
+  'table.Table',
+  'table.TableToolbar',
+  'horizontalLine.HorizontalLine',
+  'heading.Heading',
+  'codeBlock.CodeBlock',
+  'sourceEditing.SourceEditing',
+  'image.Image',
+  'image.ImageToolbar',
+  'image.ImageCaption',
+  'image.ImageStyle',
+  'image.ImageResize',
+  'image.ImageUpload',
 ]
 
 /**
@@ -80,9 +112,8 @@ const ALWAYS = [
  * `bulletedList` where CKEditor wants the `List` plugin, and `insertTable`
  * needs `TableToolbar` as well or the table has no controls.
  *
- * `drupalInsertImage` is deliberately absent. It is Drupal's own button, and
- * the CKEditor equivalent needs somewhere to put the bytes, which is a separate
- * problem to this one.
+ * Keyed by CKEditor's names, after `lib/editor.mjs` has renamed the few Drupal
+ * calls something else.
  */
 export const BUTTON_PLUGINS = {
   bold: ['basicStyles.Bold'],
@@ -101,6 +132,14 @@ export const BUTTON_PLUGINS = {
   heading: ['heading.Heading'],
   codeBlock: ['codeBlock.CodeBlock'],
   sourceEditing: ['sourceEditing.SourceEditing'],
+  uploadImage: [
+    'image.Image',
+    'image.ImageToolbar',
+    'image.ImageCaption',
+    'image.ImageStyle',
+    'image.ImageResize',
+    'image.ImageUpload',
+  ],
   indent: ['indent.Indent'],
   outdent: ['indent.Indent'],
   undo: ['essentials.Essentials'],
@@ -167,19 +206,7 @@ export function resolvePlugins(namespace, names) {
   return found
 }
 
-/**
- * Everything needed to render a given toolbar.
- *
- * The always-on plugins first, then whatever the buttons ask for, de-duplicated
- * because `bulletedList` and `numberedList` are one plugin and asking for it
- * twice is an error CKEditor reports at creation time.
- */
-export function pluginsForToolbar(namespace, toolbar) {
-  const names = [...ALWAYS]
-  for (const item of toolbar || []) {
-    for (const name of BUTTON_PLUGINS[item] || []) {
-      if (!names.includes(name)) names.push(name)
-    }
-  }
-  return resolvePlugins(namespace, names)
+/** Everything the editor should understand, which is everything that loaded. */
+export function editorPlugins(namespace) {
+  return resolvePlugins(namespace, PLUGINS)
 }

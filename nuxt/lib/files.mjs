@@ -44,3 +44,32 @@ export function rewriteFileUrls(html, { from = DRUPAL_FILES, to = STATIC_FILES }
 export function isDrupalFile(url) {
   return String(url || '').includes(DRUPAL_FILES)
 }
+
+/**
+ * The same file, addressed for the editor rather than for the page.
+ *
+ * A body image is stored as `/sites/default/files/...`, which is Drupal's path
+ * and not one the frontend serves. On the built page that does not matter,
+ * because `rewriteFileUrls` points the markup at the copies. Inside CKEditor it
+ * matters a lot: the editable is showing the stored markup as-is, so every
+ * image in an article an author opens is a broken picture, and one they have
+ * just uploaded is a broken picture too.
+ *
+ * So the markup is made absolute against the backend on the way into the
+ * editor, and put back on the way out. What gets staged and committed is the
+ * relative path Drupal writes itself, which is the only portable form: an
+ * absolute URL here would bake this session's backend address into the content,
+ * and that address belongs to a backend that stops existing.
+ */
+export function absoluteFileUrls(html, backendUrl) {
+  if (!html || !backendUrl) return html
+  const origin = String(backendUrl).replace(/\/+$/, '')
+  return rewriteFileUrls(html, { from: DRUPAL_FILES, to: `${origin}${DRUPAL_FILES}` })
+}
+
+/** The reverse, for anything on its way back out of the editor. */
+export function relativeFileUrls(html, backendUrl) {
+  if (!html || !backendUrl) return html
+  const origin = String(backendUrl).replace(/\/+$/, '')
+  return rewriteFileUrls(html, { from: `${origin}${DRUPAL_FILES}`, to: DRUPAL_FILES })
+}

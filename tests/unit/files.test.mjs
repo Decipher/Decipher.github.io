@@ -8,7 +8,13 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { DRUPAL_FILES, isDrupalFile, rewriteFileUrls } from '../../nuxt/lib/files.mjs'
+import {
+  DRUPAL_FILES,
+  absoluteFileUrls,
+  isDrupalFile,
+  relativeFileUrls,
+  rewriteFileUrls,
+} from '../../nuxt/lib/files.mjs'
 
 test('an inserted image points at the copy the build made', () => {
   assert.equal(
@@ -44,4 +50,35 @@ test('the path being rewritten is the one Drupal serves from', () => {
   assert.equal(isDrupalFile('/sites/default/files/x.png'), true)
   assert.equal(isDrupalFile('/images/x.png'), false)
   assert.equal(isDrupalFile(undefined), false)
+})
+
+test('a body image is addressed at the backend for the editor', () => {
+  // The editable shows stored markup as-is, and the frontend does not serve
+  // Drupal's files path, so every image would be a broken picture.
+  const html = '<p><img src="/sites/default/files/inline-images/a.png"></p>'
+  assert.equal(
+    absoluteFileUrls(html, 'https://backend.test'),
+    '<p><img src="https://backend.test/sites/default/files/inline-images/a.png"></p>'
+  )
+})
+
+test('and put back before it is staged', () => {
+  // An absolute URL here would bake this session's backend into the content,
+  // and that backend stops existing.
+  const html = '<p><img src="https://backend.test/sites/default/files/inline-images/a.png"></p>'
+  assert.equal(
+    relativeFileUrls(html, 'https://backend.test/'),
+    '<p><img src="/sites/default/files/inline-images/a.png"></p>'
+  )
+})
+
+test('with no backend connected, the markup is left alone', () => {
+  const html = '<p><img src="/sites/default/files/a.png"></p>'
+  assert.equal(absoluteFileUrls(html, null), html)
+  assert.equal(relativeFileUrls(html, ''), html)
+})
+
+test('a link to another site is not touched', () => {
+  const html = '<p><img src="https://example.test/sites/default/files/a.png"></p>'
+  assert.equal(relativeFileUrls(html, 'https://backend.test'), html)
 })

@@ -70,17 +70,23 @@ test('no configuration at all falls back', () => {
 
 test('a toolbar of only unsupported buttons falls back', () => {
   // Better a working editor with the wrong buttons than an empty toolbar.
-  const only = [editor('basic_html', ['drupalInsertImage', 'drupalMedia'])]
+  const only = [editor('basic_html', ['drupalMedia', 'drupalInsertVideo'])]
   assert.deepEqual(toolbarFor(only, 'basic_html'), FALLBACK_TOOLBAR)
 })
 
 test('a button with no plugin behind it is dropped', () => {
-  // `drupalInsertImage` is Drupal's own button. Passing it to CKEditor throws
-  // and takes the editor down, so it never reaches the toolbar.
-  const configured = [editor('full_html', ['bold', 'drupalInsertImage', 'code'])]
-  const toolbar = toolbarFor(configured, 'full_html')
-  assert.ok(!toolbar.includes('drupalInsertImage'))
-  assert.deepEqual(toolbar, ['bold', 'code'])
+  // Passing CKEditor a button it has no plugin for throws and takes the editor
+  // down, so it never reaches the toolbar.
+  const configured = [editor('full_html', ['bold', 'drupalMedia', 'code'])]
+  assert.deepEqual(toolbarFor(configured, 'full_html'), ['bold', 'code'])
+})
+
+test("Drupal's image button is renamed, not dropped", () => {
+  // Drupal registers `drupalInsertImage`; the thing it does is CKEditor's
+  // `uploadImage`. The site is configured to offer image insertion, so it is
+  // offered, under the name the editor answers to.
+  const configured = [editor('full_html', ['bold', 'drupalInsertImage'])]
+  assert.deepEqual(toolbarFor(configured, 'full_html'), ['bold', 'uploadImage'])
 })
 
 test('the buttons the classic build lacked are offered now', () => {
