@@ -2,6 +2,7 @@
   <div class="authoring-login">
     <button
       type="button"
+      v-if="trigger"
       class="font-mono text-xs uppercase tracking-eyebrow text-muted hover:text-accent underline transition-colors"
       data-testid="authoring-login-trigger"
       @click="open"
@@ -106,14 +107,29 @@
 export default {
   name: 'AuthoringLogin',
 
+  props: {
+    /**
+     * Whether to render the button that opens the dialog.
+     *
+     * The dialog itself always renders here, wherever "here" is. Drupal's
+     * account menu carries the trigger when it is on the page, and that block
+     * is inside a region Druxt re-renders the moment a backend connects: a
+     * dialog living there would be destroyed by the thing it was opened to do.
+     */
+    trigger: { type: Boolean, default: true },
+  },
+
   data: () => ({
-    dialog: false,
     url: '',
     checking: false,
     error: null,
   }),
 
   computed: {
+    dialog() {
+      return Boolean(this.$authoring && this.$authoring.state.loginDialog)
+    },
+
     // Both plugins are client-only, so neither exists while `nuxt generate`
     // renders these pages. Without the guards the static build fails on every
     // route.
@@ -152,11 +168,11 @@ export default {
     open() {
       this.error = null
       this.url = (this.state && this.state.url) || ''
-      this.dialog = true
+      this.$authoring.openLogin()
     },
 
     close() {
-      this.dialog = false
+      this.$authoring.closeLogin()
     },
 
     async verify() {

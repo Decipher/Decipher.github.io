@@ -9,9 +9,19 @@
     <slot v-if="!regions.length" />
 
     <template v-else>
+      <!--
+        A bar, not a stack. The first region is the branding and the rest are
+        menus, which is the shape every Drupal theme's header has: `header`
+        first in the theme's own declared order, then the menus. So the first
+        one leads and the others are pushed to the far end, rather than every
+        region being given a row of its own.
+      -->
       <header v-if="band.top.length" class="druxt-region-top border-b border-hairline">
         <div class="mx-auto flex w-full max-w-5xl flex-wrap items-center gap-x-6 gap-y-2 px-6 py-4">
-          <slot v-for="region of band.top" :name="region" />
+          <slot :name="band.top[0]" />
+          <div class="ml-auto flex flex-wrap items-center gap-x-6 gap-y-2">
+            <slot v-for="region of band.top.slice(1)" :name="region" />
+          </div>
         </div>
       </header>
 

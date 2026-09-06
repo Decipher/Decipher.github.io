@@ -50,13 +50,29 @@ test('a region nobody recognises is shown, not dropped', () => {
   assert.deepEqual(layoutFor(['whatever_this_is']).above, ['whatever_this_is'])
 })
 
-test("the theme's own order is kept within a band", () => {
-  // Drupal declares regions in the order the theme lists them, which is the
-  // closest thing to an opinion the theme has given us.
+test('a band is ordered by what its regions are, not by when they arrived', () => {
+  // The order they arrive in is not the theme's. Druxt derives the region list
+  // from the blocks that are placed, so it follows that query: the account menu
+  // arrived before the branding, and the header rendered backwards.
   assert.deepEqual(layoutFor(['footer_bottom', 'footer_top']).bottom, [
-    'footer_bottom',
     'footer_top',
+    'footer_bottom',
   ])
+  assert.deepEqual(layoutFor(['secondary_menu', 'header', 'primary_menu']).top, [
+    'header',
+    'primary_menu',
+    'secondary_menu',
+  ])
+})
+
+test('a region nobody ranked keeps its place, after the ones that are', () => {
+  // Sorting an unrecognised region to the front would put something the
+  // convention does not describe ahead of the branding. `nav_extra` is in the
+  // top band by name and ranked by nothing, so it follows the header.
+  assert.deepEqual(layoutFor(['nav_extra', 'header']).top, ['header', 'nav_extra'])
+  // And two unranked regions keep the order they arrived in, rather than being
+  // shuffled by a comparison that has nothing to compare.
+  assert.deepEqual(layoutFor(['b_thing', 'a_thing']).above, ['b_thing', 'a_thing'])
 })
 
 test('a page with nothing beside the content is not laid out around a sidebar', () => {

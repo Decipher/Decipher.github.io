@@ -49,16 +49,37 @@ export function bandFor(region) {
 }
 
 /**
- * A theme's regions, grouped into bands.
+ * Where a region sits within its band.
  *
- * The theme's own order is kept within each band: Drupal declares regions in
- * the order the theme lists them, and that order is the closest thing to an
- * opinion the theme has given us.
+ * The order regions arrive in is not the theme's. Druxt derives them from the
+ * blocks that are placed, so it follows whatever order that query returned:
+ * the account menu came before the branding, and the header rendered backwards.
+ * Ranked by name instead, which is the same convention the bands rest on.
+ *
+ * Everything unmatched sorts last, keeping the order it arrived in, so a region
+ * this does not recognise is put after the ones it does rather than in front.
+ */
+const RANK = [/branding/, /^header/, /^pre_?header/, /primary/, /secondary/, /^footer_top/, /^footer/]
+
+export function rankOf(region) {
+  const index = RANK.findIndex((pattern) => pattern.test(String(region || '')))
+  return index === -1 ? RANK.length : index
+}
+
+/**
+ * A theme's regions, grouped into bands and ordered within them.
  */
 export function layoutFor(regions = []) {
   const layout = Object.fromEntries(BANDS.map((band) => [band, []]))
-  for (const region of regions) layout[bandFor(region)].push(region)
-  return layout
+  regions.forEach((region, arrived) => layout[bandFor(region)].push({ region, arrived }))
+  return Object.fromEntries(
+    Object.entries(layout).map(([band, entries]) => [
+      band,
+      entries
+        .sort((a, b) => rankOf(a.region) - rankOf(b.region) || a.arrived - b.arrived)
+        .map((entry) => entry.region),
+    ])
+  )
 }
 
 /**
