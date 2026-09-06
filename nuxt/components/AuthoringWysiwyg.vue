@@ -33,6 +33,13 @@
  */
 import { FALLBACK_TOOLBAR, toolbarFor } from '../lib/editor.mjs'
 
+/**
+ * Builds already extended, so a second editor on the page does not push the
+ * same plugin on again. `builtinPlugins` is static: it belongs to the build,
+ * not to an instance.
+ */
+const CODE_ADDED = new WeakSet()
+
 // Shared across every field on the page: one request, however many editors.
 let editorConfigPromise = null
 
@@ -69,9 +76,10 @@ export default {
   },
 
   async mounted() {
-    const [ClassicEditor, toolbar] = await Promise.all([this.loadEditor(), this.loadToolbar()])
+    const ClassicEditor = await this.loadEditor()
     if (!ClassicEditor) return
-    await this.create(ClassicEditor, toolbar)
+    const extra = (await this.addCode(ClassicEditor)) ? ['code'] : []
+    await this.create(ClassicEditor, await this.loadToolbar(extra))
   },
 
   beforeDestroy() {
@@ -88,12 +96,57 @@ export default {
       }
     },
 
+    /**
+     * Add inline code to the build, if it will take it.
+     *
+     * The classic build ships no `Code` plugin, so a format configured for the
+     * button in Drupal loses it on the way here: the toolbar is read from
+     * Drupal and then filtered down to what can actually be rendered. Inline
+     * code is the one missing button this site's own writing needs.
+     *
+     * As it stands this does not succeed, and the reason is worth recording.
+     * The plugin's source is bundled, but importing it evaluates a second copy
+     * of CKEditor's core, which finds `window.CKEDITOR_VERSION` already set by
+     * the prebuilt bundle and throws `ckeditor-duplicated-modules`. A prebuilt
+     * build cannot be extended from outside; the button needs a build that
+     * contains it, either a custom bundle or the DLL builds Drupal itself uses.
+     *
+     * Left in place, guarded, because it costs one caught import and starts
+     * working the day such a build lands. The editor is unaffected either way:
+     * the return value decides only whether the button may be offered, and an
+     * offered button whose plugin is missing takes the whole editor down.
+     */
+    async addCode(ClassicEditor) {
+      if (!ClassicEditor || CODE_ADDED.has(ClassicEditor)) return CODE_ADDED.has(ClassicEditor)
+      try {
+        const { Code } = await import('@ckeditor/ckeditor5-basic-styles')
+        if (!Code || ClassicEditor.builtinPlugins.includes(Code)) return false
+        ClassicEditor.builtinPlugins.push(Code)
+        CODE_ADDED.add(ClassicEditor)
+        return true
+      } catch {
+        return false
+      }
+    },
+
     async create(ClassicEditor, toolbar) {
       try {
         const editor = await ClassicEditor.create(this.$refs.host, {
           toolbar: { items: toolbar },
           initialData: this.value || '',
         })
+        // The same class the rendered field carries, so what is typed looks
+        // like what will be published. Editing in a box styled differently from
+        // the page is guessing: headings, code and lists all read as plain text
+        // in the editor and as themselves everywhere else.
+        //
+        // Added to the editable root rather than duplicated as CKEditor content
+        // styles, because a second copy of the rules is a second copy to keep
+        // in agreement with the first.
+        editor.editing.view.change((writer) => {
+          writer.addClass('prose-body', editor.editing.view.document.getRoot())
+        })
+
         editor.model.document.on('change:data', () => {
           this.model = editor.getData()
         })
@@ -110,7 +163,7 @@ export default {
      * `editor--editor` needs `administer filters`, so an anonymous visitor gets
      * an empty collection rather than an error, and keeps the fallback.
      */
-    async loadToolbar() {
+    async loadToolbar(extra = []) {
       const backend = this.$authoring && this.$authoring.state.url
       if (!backend || !this.format) return [...FALLBACK_TOOLBAR]
 
@@ -127,7 +180,7 @@ export default {
           .catch(() => [])
       }
 
-      return toolbarFor(await editorConfigPromise, this.format)
+      return toolbarFor(await editorConfigPromise, this.format, extra)
     },
   },
 }

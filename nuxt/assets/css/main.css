@@ -81,6 +81,50 @@ a {
 }
 
 /*
+ * The editing surface, given the same measure and ground as the page.
+ *
+ * CKEditor's editable also carries `prose-body`, so the rules below apply to
+ * both. These are the few that are only right for the editor: it needs a box
+ * to be a field, and it must not inherit the page's centred measure or the
+ * text would sit in the middle of a full width control.
+ */
+.ck-editor__editable.prose-body {
+  @apply rounded border border-hairline bg-paper px-3 py-2;
+
+  min-height: 12rem;
+}
+
+.ck-editor__editable.prose-body p,
+.ck-editor__editable.prose-body li {
+  max-width: none;
+}
+
+/*
+ * Code, restated for the editor.
+ *
+ * CKEditor ships its own `.ck-content code` and `.ck-content pre`, at the same
+ * specificity as the `.prose-body` rules below and loaded after them, so it
+ * wins on source order and inline code turns grey in the editor while it is
+ * dark on the page. Adding the editable's own class puts these one class ahead
+ * and settles it, rather than leaving the two stylesheets to race.
+ */
+.ck-editor__editable.prose-body code {
+  @apply rounded bg-elevated px-1 py-0.5 font-mono text-[0.8125em] text-ink;
+}
+
+.ck-editor__editable.prose-body pre {
+  @apply overflow-hidden rounded-md border border-hairline bg-ink p-0;
+}
+
+.ck-editor__editable.prose-body pre code {
+  @apply block overflow-x-auto rounded-none bg-ink p-5 font-mono text-[13px] leading-relaxed text-paper;
+}
+
+.ck.ck-toolbar {
+  @apply rounded-t border-hairline bg-elevated;
+}
+
+/*
  * Body text out of Drupal.
  *
  * Tailwind's reset strips headings, lists and code back to plain text, which is
