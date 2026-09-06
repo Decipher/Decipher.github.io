@@ -32,10 +32,15 @@
         </div>
       </header>
 
+      <!--
+        Drupal's own layout, not this frontend's. `DruxtSite` renders every
+        region the theme declares, and the content region's Main page content
+        block renders the page, so the site reads the way Drupal arranged it.
+        With no backend it falls through to `<Nuxt />`, which is the static
+        build serving a visitor who never connects one.
+      -->
       <main class="flex-1">
-        <div class="mx-auto w-full max-w-5xl px-6 py-12">
-          <Nuxt />
-        </div>
+        <DruxtSite />
       </main>
 
       <footer class="rule mt-16">
