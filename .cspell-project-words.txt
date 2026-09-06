@@ -2,6 +2,8 @@ Lando
 Landofile
 PKCE
 Stanislav
+adipiscing
+amet
 appserver
 behaviour
 bmewburn
@@ -16,6 +18,8 @@ docroot
 drush
 druxt
 druxtjs
+eiusmod
+elit
 endswith
 extensionless
 gdlib
