@@ -31,6 +31,10 @@ const COLLECTIONS = [
   ['/jsonapi/user/user', 'user_user'],
   ['/jsonapi/editor/editor', 'editor'],
   ['/jsonapi/node/article', 'node_article'],
+  // The site renders Drupal's regions, and the account menu in them carries the
+  // control that turns editing on. A stub with no blocks renders no regions, so
+  // the page under test had no way into edit mode at all.
+  ['/jsonapi/block/block', 'block_block'],
 ]
 
 const ARTICLE = '34156cc1-48f9-4ee9-acd7-e3970ca00554'

@@ -11,43 +11,16 @@
   <div class="flex min-h-screen bg-paper">
     <div class="flex min-w-0 flex-1 flex-col transition-all duration-200">
       <!--
-        Sticky, because the header carries the staged count and the edit toggle.
-        Editing happens down the page, and a count you have to scroll back up to
-        read is a count nobody reads. Opaque background, or the content scrolls
-        through it.
+        Drupal's header is the site's header, so it goes first and nothing sits
+        above it. A toolbar used to, which put the tool above the site it is a
+        tool for.
+
+        The sign-in dialog is hosted here and nowhere else. Drupal's account menu
+        carries the button that opens it, and that menu is inside a region Druxt
+        re-renders the moment a backend connects: a dialog rendered there would
+        be unmounted by the thing it was opened to do.
       -->
-      <header class="sticky top-0 z-20 border-b border-hairline bg-paper">
-        <div class="mx-auto flex w-full max-w-5xl items-baseline gap-6 px-6 py-5">
-          <!--
-            The toolbar says what it is, not what the site is. Drupal's header
-            region brands the page, and two site names one above the other is
-            the toolbar competing with the site it is a tool for.
-          -->
-          <span class="eyebrow">Editing</span>
-          <div class="ml-auto flex items-baseline gap-4">
-            <AuthoringEditToggle />
-            <AuthoringCartToggle />
-            <!--
-              The dialog, never the button. Drupal's account menu carries the
-              button, and this hosts the dialog because the region that menu
-              sits in is re-rendered the moment a backend connects.
-
-              Not conditional on whether that menu is present. It was, and the
-              condition could not be answered in time: Vue renders a parent
-              before its children, so the toolbar decided before the block had
-              claimed anything, and the built HTML shipped with two sign-in
-              buttons that collapsed to one after hydration.
-
-              A site whose theme places no account menu has no button. It can
-              still be pointed at a backend with `?backend=`, and a build with
-              no regions at all has no content either, so it is a broken build
-              rather than a state to design for.
-            -->
-            <AuthoringLogin :trigger="false" />
-          </div>
-        </div>
-      </header>
-
+      <AuthoringLogin :trigger="false" />
       <!--
         Drupal's own layout, not this frontend's. `DruxtSite` renders every
         region the theme declares, and the content region's Main page content
@@ -63,6 +36,30 @@
       -->
       <div class="flex-1">
         <DruxtSite />
+      </div>
+
+      <!--
+        Only while editing, and floating rather than stacked. Editing happens
+        down the page and a count you have to scroll back up for is a count
+        nobody reads, so this follows you; a reader who is not editing sees the
+        site instead of a strip of controls for something they are not doing.
+
+        It does not say "editing" anywhere. Being on screen says that, and the
+        page managed to say the word four times over between the old toolbar
+        label, the toggle, the counter and the drawer heading.
+
+        Also shown when something is staged and editing is off. Staged work
+        survives a reload, and work that is waiting to be sent should never be
+        invisible: the only way back to it would be to guess that turning
+        editing on again would reveal it.
+      -->
+      <div
+        v-if="editing || changes"
+        class="sticky bottom-4 z-30 mx-auto mb-4 flex w-fit items-center gap-5 rounded-full border border-hairline bg-surface px-5 py-2.5 shadow-lg"
+        data-testid="authoring-bar"
+      >
+        <AuthoringCartToggle />
+        <AuthoringEditToggle mode="stop" />
       </div>
 
       <footer class="rule mt-16">
@@ -102,6 +99,15 @@ export default {
   computed: {
     cartOpen() {
       return this.$store.getters['authoringCart/drawerOpen']
+    },
+
+    editing() {
+      return this.$store.getters['authoringCart/editing']
+    },
+
+    /** Anything staged or typed, so held work is never off screen. */
+    changes() {
+      return this.$store.getters['authoringCart/count']
     },
 
     /**

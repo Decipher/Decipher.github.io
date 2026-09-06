@@ -10,7 +10,7 @@
         />
       </div>
       <!-- eslint-disable-next-line vue/no-v-html -->
-      <div v-else class="prose-body" v-html="html" />
+      <div v-else class="prose-body" v-html="rewritten" />
     </template>
 
     <!-- ===== Form displays ===== -->
@@ -199,6 +199,7 @@ import { DruxtEntity, DruxtFieldMixin } from 'druxt-entity'
 import Draggable from 'vuedraggable'
 
 import { fromDateInput, toDateInput } from '../../../lib/datetime.mjs'
+import { rewriteFileUrls } from '../../../lib/files.mjs'
 
 export default {
   components: { Draggable, DruxtEntity },
@@ -240,6 +241,18 @@ export default {
   },
 
   computed: {
+    /**
+     * The rendered field, pointing at images the deployed site actually has.
+     *
+     * Drupal writes its own file URLs into body HTML, and those are served by
+     * Drupal. The build copies the files Tome exported into the static output
+     * and this points the markup at the copies, so a picture inserted through
+     * CKEditor survives the backend being switched off.
+     */
+    rewritten() {
+      return rewriteFileUrls(this.html)
+    },
+
     /** Shared control styling, so every input looks like the same site. */
     controlClass() {
       return 'w-full rounded border border-hairline bg-paper px-3 py-2 font-sans text-sm text-ink focus:border-accent focus:outline-none'

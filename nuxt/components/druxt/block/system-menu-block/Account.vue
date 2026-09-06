@@ -12,7 +12,13 @@
     component name for every prefix of its options, so this one matches any
     theme's account menu rather than only Olivero's.
   -->
-  <div class="druxt-block-account" data-testid="block-account-menu">
+  <div class="druxt-block-account flex items-baseline gap-4" data-testid="block-account-menu">
+    <!--
+      Editing belongs with the account, because it is something an account can
+      do. It used to live in a toolbar of its own above the site, which is a lot
+      of page furniture for one link.
+    -->
+    <AuthoringEditToggle />
     <!--
       The trigger only. The dialog is hosted by the layout, outside every Drupal
       region, because connecting a backend re-renders this one.

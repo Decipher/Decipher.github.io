@@ -787,7 +787,12 @@ test.describe('adding content', () => {
     await page.goto(`/?backend=${encodeURIComponent('http://elsewhere.test')}`, {
       waitUntil: 'networkidle',
     })
-    await page.getByTestId('authoring-edit-toggle').click()
+    // Through the store, not the control. The control lives in Drupal's account
+    // menu, and connecting to a backend with no blocks takes the whole region
+    // away with it. What is under test here is which backend the interface
+    // thinks it is on, not how editing gets turned on.
+    await page.evaluate(() => window.$nuxt.$store.dispatch('authoringCart/setEditing', true))
+    await page.evaluate(() => window.$nuxt.$store.dispatch('authoringCart/setDrawerOpen', true))
     await page.getByTestId('cart-tab-send').click()
     await page.getByTestId('github-repository').fill('o/r')
     await page.getByTestId('github-token').fill('a-token')
