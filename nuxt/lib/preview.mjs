@@ -83,7 +83,13 @@ export function failsFilters(display, resource) {
 export function previewsFor(results = [], staged = [], display) {
   // Results first, configuration second: what a view has actually returned
   // beats what its configuration suggests it might.
-  const fromResults = [...new Set(results.map((result) => result.type))]
+  //
+  // The backend's rows only. Rows put here by a previous pass are marked, and
+  // counting them made a listing's idea of what it accepts depend on what had
+  // already been added to it: stage a page into an empty front page and it was
+  // taken, stage an article first and the same page was refused. Which of those
+  // happened came down to the order somebody wrote things in.
+  const fromResults = [...new Set(results.filter((r) => !r.__staged).map((r) => r.type))]
   const accepted = fromResults.length ? { types: fromResults } : listingTypes(display)
   const present = new Set(results.map((result) => result.id))
   return staged
