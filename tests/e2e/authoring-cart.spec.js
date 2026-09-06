@@ -628,6 +628,58 @@ test.describe('adding content', () => {
     expect(await size()).toMatchObject({ layout: 1440, drawn: 1440, scrolls: true })
   })
 
+  test('a free preview can be dragged to a width, and a named one cannot', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 900 })
+    await page.goto('/', { waitUntil: 'networkidle' })
+    await page.getByTestId('authoring-edit-toggle').click()
+    await stage(page, {
+      type: 'node--article',
+      id: 'abc',
+      original: { title: 'Was' },
+      edited: { title: 'Is' },
+    })
+    await page.getByTestId('cart-preview-abc').click()
+
+    const frame = page.getByTestId('preview-frame')
+    const width = () => frame.evaluate((el) => Math.round(el.getBoundingClientRect().width))
+
+    // Free is a maximum, not a size, so it starts at the width it is given.
+    // It has to be given one: a flex item with no width shrinks to its content,
+    // and this was drawn at the width of its longest line for a while.
+    expect(await width()).toBe(768)
+    await expect(page.getByTestId('preview-width-note')).toHaveCount(0)
+
+    const handle = page.getByTestId('preview-resize-right')
+    const before = await handle.boundingBox()
+    await page.mouse.move(before.x + before.width / 2, before.y + before.height / 2)
+    await page.mouse.down()
+    await page.mouse.move(before.x + before.width / 2 - 150, before.y + before.height / 2, {
+      steps: 10,
+    })
+    await page.mouse.up()
+
+    // Both edges move, because the frame is centred. A width that grew by only
+    // what the pointer travelled would leave the edge behind the pointer, which
+    // reads as the handle slipping out of your hand.
+    expect(await width()).toBe(768 - 300)
+    const after = await handle.boundingBox()
+    expect(Math.round(after.x - before.x)).toBe(-150)
+
+    // And it says what it is now, which Free otherwise does not.
+    await expect(page.getByTestId('preview-width-note')).toContainText('468px')
+
+    // Arrow keys do the same thing, for anyone not using a pointer.
+    await handle.focus()
+    await page.keyboard.press('ArrowRight')
+    expect(await width()).toBe(500)
+
+    // A named size is a claim about a device, so it is not draggable: a handle
+    // that quietly turned 375 into 380 would make the claim false.
+    await page.getByTestId('preview-width').selectOption({ label: 'Phone' })
+    expect(await width()).toBe(375)
+    await expect(page.getByTestId('preview-resize-right')).toHaveCount(0)
+  })
+
   test('the controls keep their own width whatever the page is set to', async ({ page }) => {
     await page.goto('/', { waitUntil: 'networkidle' })
     await page.getByTestId('authoring-edit-toggle').click()

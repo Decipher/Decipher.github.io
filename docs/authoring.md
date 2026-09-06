@@ -88,6 +88,21 @@ It cannot evaluate a view's filters properly; that needs Drupal. It reads plain
 boolean filters where the content actually carries the field, and otherwise
 shows the content and marks it as not published.
 
+### Looking at a change before sending it
+
+**Show** points at what changed, on the field where it can be found rather than
+around the whole entity. **Preview** opens it as the site will render it, in
+whichever view mode you ask for.
+
+Widths there are real, not zoom: a teaser at 1200px and the same teaser at 375px
+are different renderings, and the site's own media queries have to decide which.
+A page wider than the window is scaled down to fit, and the scale is a control,
+because scaling changes what you can see and not what the page thinks it is.
+
+**Free** claims nothing about a device, so it is the one width you can drag. A
+named size is a claim, and a handle that quietly turned 375 into 380 would make
+it false. Both edges move as you drag, because the preview is centred.
+
 ## The pieces
 
 | Where                                     | What                                                                              |
