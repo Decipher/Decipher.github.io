@@ -98,12 +98,34 @@ const shots = {
     await page.waitForTimeout(900)
   },
 
-  /** The cart, holding a change that has not been sent anywhere. */
+  /**
+   * The cart, holding a change that has not been sent anywhere.
+   *
+   * With a body, because the preview shot further down photographs this same
+   * staged article and a page holding nothing but a heading says nothing about
+   * what the preview is for.
+   */
   cart: async (page) => {
     await page.evaluate(() =>
       window.$nuxt.$store.dispatch('authoringCart/stageNew', {
         type: 'node--article',
-        attributes: { title: 'Written in the browser' },
+        attributes: {
+          title: 'Written in the browser',
+          body: {
+            format: 'full_html',
+            value: [
+              '<p>This paragraph was typed into a page on GitHub Pages. There is no',
+              'server holding it: it lives in the browser until it is sent.</p>',
+              '<h2>What the preview shows</h2>',
+              '<p>The same components the built site uses, rendering the staged',
+              'values rather than the published ones. Narrow it to a phone and it',
+              'reflows the way the page will.</p>',
+              '<ul><li>Nothing has been written to Drupal.</li>',
+              '<li>Nothing has been committed yet.</li>',
+              '<li>Closing the tab would lose it.</li></ul>',
+            ].join(' '),
+          },
+        },
       })
     )
     await page.evaluate(() => window.$nuxt.$store.dispatch('authoringCart/setDrawerOpen', true))
