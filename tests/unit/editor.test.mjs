@@ -73,3 +73,18 @@ test('a toolbar of only unsupported buttons falls back', () => {
   const only = [editor('basic_html', ['drupalInsertImage', 'sourceEditing'])]
   assert.deepEqual(toolbarFor(only, 'basic_html'), FALLBACK_TOOLBAR)
 })
+
+test('a button is only offered when its plugin was loaded', () => {
+  // `code` is configured on this site's full_html but is not in the classic
+  // build, so it is dropped unless the caller says it managed to add it.
+  const configured = [editor('full_html', ['bold', 'code', 'italic'])]
+  assert.ok(!toolbarFor(configured, 'full_html').includes('code'))
+  assert.ok(toolbarFor(configured, 'full_html', ['code']).includes('code'))
+})
+
+test('a loaded plugin cannot conjure a button Drupal did not configure', () => {
+  // The configuration decides what is offered. Loading a plugin only decides
+  // whether a configured button can be honoured.
+  const configured = [editor('full_html', ['bold', 'italic'])]
+  assert.ok(!toolbarFor(configured, 'full_html', ['code']).includes('code'))
+})

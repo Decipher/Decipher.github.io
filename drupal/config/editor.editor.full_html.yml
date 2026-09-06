@@ -18,6 +18,7 @@ settings:
       - strikethrough
       - superscript
       - subscript
+      - code
       - removeFormat
       - '|'
       - link

@@ -21,7 +21,7 @@
  * `toolbarview-item-unavailable` and takes the whole editor down with it. So the
  * list is filtered to what can actually be rendered.
  */
-const SUPPORTED = new Set([
+export const SUPPORTED = new Set([
   'heading', 'bold', 'italic', 'link', 'bulletedList', 'numberedList',
   'blockQuote', 'insertTable', 'undo', 'redo', 'indent', 'outdent', '|',
 ])
@@ -50,17 +50,22 @@ export function editorForFormat(resources, format) {
 /**
  * The toolbar for a format, as CKEditor wants it.
  *
+ * `extra` is for buttons added to the build at runtime: the caller knows which
+ * plugins it managed to load, and a button whose plugin is missing takes the
+ * whole editor down, so the decision belongs with whoever did the loading.
+ *
  * Collapses runs of separators and trims them from the ends, because removing
  * an unsupported button often leaves a `|` with nothing on one side, which
  * renders as a stray divider.
  */
-export function toolbarFor(resources, format) {
+export function toolbarFor(resources, format, extra = []) {
   const editor = editorForFormat(resources, format)
   const items = (((editor || {}).attributes || {}).settings || {}).toolbar
   const configured = Array.isArray((items || {}).items) ? items.items : null
   if (!configured || !configured.length) return [...FALLBACK_TOOLBAR]
 
-  const supported = configured.filter((item) => SUPPORTED.has(item))
+  const available = new Set([...SUPPORTED, ...extra])
+  const supported = configured.filter((item) => available.has(item))
   const tidied = supported.filter(
     (item, i, all) => !(item === '|' && (i === 0 || all[i - 1] === '|'))
   )
