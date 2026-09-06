@@ -211,8 +211,22 @@ export default {
     },
 
     /** Only when the display does not already have a field for it. */
+    /**
+     * Whether to draw the entity's own title.
+     *
+     * Druxt renders fields, and a node's title is not one, so a teaser with no
+     * title is a card with no name on it. But the full view of a node is a page,
+     * and Drupal already puts the title on a page: the breadcrumb names it, and
+     * the Page title block in the content_above region prints it. Drawing it
+     * again here made three of them, one under another.
+     *
+     * Also skipped when the display does render the title as a field, which
+     * some do, because then Druxt is already drawing it.
+     */
     showLabel() {
-      return Boolean(this.label) && !Object.keys(this.fields || {}).includes(this.labelField)
+      if (!this.label) return false
+      if (this.mode === 'default' || this.mode === 'full') return false
+      return !Object.keys(this.fields || {}).includes(this.labelField)
     },
 
     staged() {

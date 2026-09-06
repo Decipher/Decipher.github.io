@@ -80,8 +80,9 @@ if (file_exists($db_file)) {
 // var_export() so a path containing quotes stays valid PHP.
 $db_file_php = var_export($db_file, TRUE);
 file_put_contents('web/sites/default/settings.local.php', sprintf(
-  "<?php\n\n/**\n * @file\n * Provision-only override, written fresh each run by .devtools/provision.\n * Gitignored - never committed.\n */\n\n\$databases['default']['default'] = [\n  'driver' => 'sqlite',\n  'database' => %s,\n];\n",
-  $db_file_php
+  "<?php\n\n/**\n * @file\n * Provision-only override, written fresh each run by .devtools/provision.\n * Gitignored - never committed.\n */\n\n\$databases['default']['default'] = [\n  'driver' => 'sqlite',\n  'database' => %s,\n];\n\n// Here rather than in settings.php, which is tracked. `site-install` writes the\n// salt there, so any `git checkout` of that file silently empties it and every\n// request afterwards is a 500 that names a setting rather than the checkout.\n\$settings['hash_salt'] = %s;\n",
+  $db_file_php,
+  var_export(bin2hex(random_bytes(32)), TRUE)
 ));
 PASS('SQLite database configured.');
 

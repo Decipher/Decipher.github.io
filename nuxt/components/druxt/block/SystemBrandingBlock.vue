@@ -43,9 +43,16 @@ export default {
       return siteIdentity(this.settings)
     },
 
-    /** Where the site's front page is, as Drupal has it configured. */
+    /**
+     * The site's home, which is `/` and not Drupal's front path.
+     *
+     * `system.site.page.front` is an internal route, usually `/node`. It is
+     * where Drupal looks for the front page, not an address this site serves:
+     * linking to it points every page at a second copy of the home page, and
+     * Nuxt prefetches it from every page that shows the branding.
+     */
     front() {
-      return this.identity.front || '/'
+      return '/'
     },
 
     /**
