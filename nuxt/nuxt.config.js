@@ -31,6 +31,35 @@ const CONTENT_REPOSITORY = contentRepository()
 
 const baseUrl = process.env.BASE_URL || 'http://quickstart-druxt-serverless.ddev.site'
 
+/**
+ * Put Drupal's public files where the deployed site can serve them.
+ *
+ * An image inserted into a body field is a Drupal file, and its URL is served
+ * by Drupal. A static build has no Drupal, so those images would all be broken
+ * on the deployed site. Tome already exports the files into the repository, so
+ * this copies them into the static output and `lib/files.mjs` points the markup
+ * at the copies.
+ *
+ * Into `static/` rather than `dist/`, so `dev` and `start` serve them too.
+ */
+const copyDrupalFiles = function () {
+  const { cpSync, existsSync, mkdirSync, rmSync } = require('fs')
+  const { join } = require('path')
+  const from = join(__dirname, '..', 'drupal', 'files', 'public')
+  const to = join(__dirname, 'static', 'files')
+  if (!existsSync(from)) return
+  // Removed first, so a file deleted in Drupal stops being served here. The
+  // directory is generated, and gitignored for that reason.
+  rmSync(to, { recursive: true, force: true })
+  mkdirSync(to, { recursive: true })
+  cpSync(from, to, {
+    recursive: true,
+    // Drupal's own protection for its files directory, which says nothing about
+    // a static host and confuses the ones that read it.
+    filter: (path) => !path.endsWith('.htaccess'),
+  })
+}
+
 const localhostListenURL = function () {
   this.nuxt.hook('listen', (server, listener) => {
     listener.host = 'localhost'
@@ -184,6 +213,7 @@ export default async () => ({
   // but `npm start` locally should behave like dev does. Matches the
   // druxt.js monorepo's own example placement.
   modules: [
+    copyDrupalFiles,
     // Before druxt-site, because it reads `druxt.baseUrl` and writes the
     // settings into the runtime config the rest of the build then uses.
     //

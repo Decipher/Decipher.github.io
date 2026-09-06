@@ -143,3 +143,4 @@ Temporary Items
 
 # Scratch space, kept in the repository so it is easy to find, never committed.
 .artifacts/
+nuxt/static/files

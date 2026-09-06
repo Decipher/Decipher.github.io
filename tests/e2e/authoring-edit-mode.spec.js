@@ -29,7 +29,7 @@ test.describe('edit mode', () => {
     await open(page)
     await page.getByTestId('authoring-edit-toggle').click()
 
-    await expect(page.getByTestId('authoring-edit-toggle')).toHaveText('Editing')
+    await expect(page.getByTestId('authoring-edit-toggle')).toHaveText('Done')
     await page.getByTestId('cart-tab-add').click()
     await expect(page.getByTestId('authoring-add')).toBeVisible()
   })
@@ -41,7 +41,7 @@ test.describe('edit mode', () => {
     await expect(page.getByTestId('authoring-add')).toBeVisible()
 
     await open(page)
-    await expect(page.getByTestId('authoring-edit-toggle')).toHaveText('Editing')
+    await expect(page.getByTestId('authoring-edit-toggle')).toHaveText('Done')
     // The mode survives; the drawer is left however it was last put.
     await expect(page.getByTestId('authoring-cart-toggle')).toBeVisible()
   })
