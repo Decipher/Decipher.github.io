@@ -272,22 +272,16 @@
       {{ blockedReason }}
     </p>
 
-    </div>
-
-    <AuthoringPreview
-      v-if="previewing"
-      :type="previewing.type"
-      :uuid="previewing.id"
-      @close="previewing = null"
-    />
-
     <!--
-      The second destination. A backend is for validating against a real site;
-      this is for getting the work reviewed and published, and needs neither a
-      backend nor a session.
-    -->
-    <!--
-      Always, not only once something is staged. Signing in is what lets an
+      Inside the Send panel, because that is what it is for. It escaped it
+      once and rendered under every tab, so an author looking at their
+      changes was shown a repository field and a sign-in button as well.
+
+      This is the second destination. A backend is for validating against a
+      real site; this is for getting the work reviewed and published, and
+      needs neither a backend nor a session.
+
+      Not gated on having staged something, though. Signing in is what lets an
       author start a backend, so requiring an edit first meant arriving at an
       empty site with no way to get one.
     -->
@@ -302,6 +296,16 @@
         {{ prError }}
       </p>
     </div>
+
+    </div>
+
+    <AuthoringPreview
+      v-if="previewing"
+      :type="previewing.type"
+      :uuid="previewing.id"
+      @close="previewing = null"
+    />
+
     <p v-if="result" class="text-sm text-muted mt-3" data-testid="authoring-cart-result">
       {{ result }}
     </p>

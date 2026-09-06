@@ -268,6 +268,9 @@ test.describe('adding content', () => {
     })
     await page.evaluate(() => window.$nuxt.$store.dispatch('authoringCart/setDrawerOpen', true))
 
+    // Send, because that is where the GitHub controls are. They used to render
+    // under every tab, and these two tests were the reason nobody noticed.
+    await page.getByTestId('cart-tab-send').click()
     await page.getByTestId('github-repository').fill('o/r')
     await page.getByTestId('github-token').fill('not-a-real-token')
     await page.getByTestId('github-sign-in').click()
@@ -298,6 +301,9 @@ test.describe('adding content', () => {
     })
     await page.evaluate(() => window.$nuxt.$store.dispatch('authoringCart/setDrawerOpen', true))
 
+    // Send, because that is where the GitHub controls are. They used to render
+    // under every tab, and these two tests were the reason nobody noticed.
+    await page.getByTestId('cart-tab-send').click()
     await page.getByTestId('github-repository').fill('o/r')
     await page.getByTestId('github-token').fill('a-token')
     await page.getByTestId('github-sign-in').click()
@@ -557,6 +563,14 @@ test.describe('adding content', () => {
 
     await page.getByTestId('cart-tab-send').click()
     await expect(page.getByTestId('authoring-cart-commit')).toBeVisible()
+
+    // And Send's controls stay in Send. The GitHub panel escaped the tab once
+    // and rendered under every one of them, so somebody looking at their
+    // changes was shown a repository field and a sign-in button as well.
+    await page.getByTestId('cart-tab-changes').click()
+    await expect(page.getByTestId('github-repository')).toBeHidden()
+    await page.getByTestId('cart-tab-add').click()
+    await expect(page.getByTestId('github-repository')).toBeHidden()
   })
 
   test('a preview can be looked at at a real device width', async ({ page }) => {
