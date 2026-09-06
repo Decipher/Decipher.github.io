@@ -49,20 +49,29 @@ export function applyCaptionFilter(html) {
 /**
  * An attribute value back into the markup it stands for.
  *
- * Only the five entities that have to be encoded to survive an attribute. A
- * caption is allowed to contain a link or an emphasis, and those arrive here as
- * `&lt;em&gt;`; leaving them encoded would print the tags at the reader.
+ * A caption is allowed to contain a link or an emphasis, and those arrive here
+ * as `&lt;em&gt;`; leaving them encoded would print the tags at the reader.
+ *
+ * Numeric references are decoded as well as named ones, because what wrote the
+ * attribute is not always what reads it: an apostrophe can arrive as `&#39;` or
+ * as `&#x27;`, and handling only the first meant every round trip through the
+ * editor re-encoded the ampersand of the second. The caption grew an `&amp;`
+ * each time, and because the value never came back the same, the field decided
+ * on every keystroke that it had changed and pushed itself into the editor
+ * again.
+ *
+ * `&amp;` is decoded last, so a literal `&amp;lt;` stays the text it is.
  */
 export function decodeAttribute(value) {
   return String(value || '')
+    .replace(/&#(\d+);/g, (_, code) => String.fromCodePoint(Number(code)))
+    .replace(/&#x([0-9a-f]+);/gi, (_, code) => String.fromCodePoint(parseInt(code, 16)))
     .split('&lt;')
     .join('<')
     .split('&gt;')
     .join('>')
     .split('&quot;')
     .join('"')
-    .split('&#39;')
-    .join("'")
     .split('&amp;')
     .join('&')
 }
