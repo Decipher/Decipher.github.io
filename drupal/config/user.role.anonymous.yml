@@ -5,6 +5,7 @@ dependencies:
   config:
     - filter.format.restricted_html
   module:
+    - decoupled_settings
     - druxt
     - filter
     - media
@@ -18,5 +19,6 @@ is_admin: false
 permissions:
   - 'access content'
   - 'access druxt resources'
+  - 'read decoupled settings'
   - 'use text format restricted_html'
   - 'view media'

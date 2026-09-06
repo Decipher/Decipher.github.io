@@ -19,9 +19,11 @@
       <header class="sticky top-0 z-20 border-b border-hairline bg-paper">
         <div class="mx-auto flex w-full max-w-5xl items-baseline gap-6 px-6 py-5">
           <NuxtLink to="/" class="no-underline">
-            <span class="font-mono text-sm uppercase tracking-eyebrow text-ink">deciphered</span>
+            <span class="font-mono text-sm uppercase tracking-eyebrow text-ink">{{
+              siteName
+            }}</span>
           </NuxtLink>
-          <span class="eyebrow hidden sm:inline">Serverless Drupal</span>
+          <span v-if="slogan" class="eyebrow hidden sm:inline">{{ slogan }}</span>
           <div class="ml-auto flex items-baseline gap-4">
             <AuthoringEditToggle />
             <AuthoringCartToggle />
@@ -40,7 +42,7 @@
         <div
           class="mx-auto flex w-full max-w-5xl flex-wrap items-baseline gap-x-3 gap-y-1 px-6 py-8"
         >
-          <span class="eyebrow">deciphered</span>
+          <span class="eyebrow">{{ siteName }}</span>
           <span class="text-dimmed" aria-hidden="true">·</span>
           <span class="eyebrow">Static build, backend on demand</span>
           <span class="ml-auto font-mono text-xs text-dimmed" data-testid="built-at">{{
@@ -67,10 +69,38 @@
 </template>
 
 <script>
+import { siteIdentity } from '../lib/settings.mjs'
+
 export default {
   computed: {
     cartOpen() {
       return this.$store.getters['authoringCart/drawerOpen']
+    },
+
+    /**
+     * What Drupal calls this site.
+     *
+     * Read at build time from `decoupled_settings`, so there is one site name
+     * rather than Drupal's and a copy of it here that drifts. The build's
+     * fallback is the template's own name, which is what a build against no
+     * backend gets.
+     */
+    siteName() {
+      return this.identity.name
+    },
+
+    slogan() {
+      return this.identity.slogan
+    },
+
+    identity() {
+      // Baked in by `@druxt-contrib/decoupled-settings`, which reads Drupal's
+      // own configuration at build time. The fallback is what a build against
+      // no backend gets, rather than an empty header.
+      return siteIdentity((this.$config || {}).decoupledSettings, {
+        name: 'Deciphered',
+        slogan: 'Serverless Drupal',
+      })
     },
 
     /**
