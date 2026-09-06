@@ -8,6 +8,7 @@ module:
   block_content: 0
   ckeditor5: 0
   config: 0
+  consumers: 0
   contextual: 0
   datetime: 0
   dblog: 0
