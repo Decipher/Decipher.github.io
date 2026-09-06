@@ -46,8 +46,52 @@ export default {
 
   data: () => ({ message: null, original: null, pendingFiles: {} }),
 
+  computed: {
+    /** Whether the cart holds anything at all for this entity. */
+    held() {
+      const id = (this.original || {}).id
+      if (!id) return false
+      return Boolean(
+        this.$store.getters['authoringCart/entryFor'](this.type, id) ||
+          this.$store.getters['authoringCart/draftFor'](this.type, id)
+      )
+    },
+  },
+
+  watch: {
+    /**
+     * Something else emptied the cart of this entity.
+     *
+     * Only on the way from holding something to holding nothing. Staging is
+     * also a change to what is held, and reverting on that would undo an edit
+     * the moment it was staged.
+     */
+    held(now, before) {
+      if (before && !now) this.revertToOriginal()
+    },
+  },
+
 
   methods: {
+    /**
+     * Put the form back to what the backend holds.
+     *
+     * Called when the cart stops holding anything for this entity, which is
+     * what discarding from the drawer does. Without it the form kept showing
+     * the discarded text, and the next keystroke wrote it straight back as a
+     * new draft: the discard undid itself and nothing said so.
+     *
+     * No warning to confirm. The cart already holds everything the form has,
+     * because every keystroke drafts into it, so there is nothing here that
+     * discarding would lose that discarding was not meant to lose.
+     */
+    revertToOriginal() {
+      const form = this.$refs.form
+      if (!form || !form.model || !this.original) return
+      this.pendingFiles = {}
+      form.model = JSON.parse(JSON.stringify(this.original))
+    },
+
     /**
      * A field changed, so the page should already show it.
      *

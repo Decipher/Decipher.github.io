@@ -334,6 +334,56 @@ test.describe('the edit form', () => {
     }
   })
 
+  test('discarding a change puts the form it is open in back', async ({ page }) => {
+    // The form kept showing the discarded text, and the next keystroke wrote it
+    // straight back as a new draft: the discard undid itself and nothing said
+    // so. No confirmation to dismiss either, because every keystroke is already
+    // in the cart, so there is nothing here that discarding would lose which
+    // discarding was not meant to lose.
+    await stubBackend(page)
+    await openForm(page)
+
+    const field = page.getByTestId('field-input').first()
+    const original = await field.inputValue()
+    await field.fill('Discarded before it was sent')
+    // Asserted on the cart, not on the badge: the badge is drawn on the
+    // rendered entity, and the open form is standing where that was.
+    await expect
+      .poll(() =>
+        page.evaluate(() => Object.keys(window.$nuxt.$store.state.authoringCart.drafts).length)
+      )
+      .toBe(1)
+
+    await page.evaluate(
+      (id) =>
+        window.$nuxt.$store.dispatch('authoringCart/discardOne', { type: 'node--article', id }),
+      ARTICLE
+    )
+
+    await expect(field).toHaveValue(original)
+
+    // The part that mattered. Without the revert the form still held the
+    // discarded text, so the next keystroke wrote it back as a fresh draft and
+    // the discard quietly undid itself. Typing here has to produce a change
+    // measured against the backend's value, not against the thrown-away one.
+    //
+    // Worth knowing: this passes against the stub either way. The failure needs
+    // a real backend, where the entity is rendered through a view and nothing
+    // remounts the form when the cart empties; on this page it is remounted and
+    // reverts by accident. So this guards the behaviour rather than catching
+    // that regression, and the regression was verified by hand against a live
+    // Drupal.
+    await field.fill(`${original} again`)
+    await expect
+      .poll(() =>
+        page.evaluate(() => {
+          const drafts = Object.values(window.$nuxt.$store.state.authoringCart.drafts)
+          return (drafts[0] || {}).attributes?.title ?? null
+        })
+      )
+      .toBe(`${original} again`)
+  })
+
   test('an edit that was never staged is kept, not reverted', async ({ page }) => {
     await stubBackend(page)
     await openForm(page)

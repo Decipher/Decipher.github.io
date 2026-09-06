@@ -200,6 +200,7 @@ import Draggable from 'vuedraggable'
 
 import { fromDateInput, toDateInput } from '../../../lib/datetime.mjs'
 import { rewriteFileUrls } from '../../../lib/files.mjs'
+import { isTrimmed, teaserHtml } from '../../../lib/teaser.mjs'
 
 export default {
   components: { Draggable, DruxtEntity },
@@ -265,6 +266,15 @@ export default {
     /** One size fits all rendering for view displays. */
     html() {
       const model = this.model
+      // The display's formatter, honoured here because that is the theme's job:
+      // Druxt hands over the schema and its settings, and what to do with them
+      // is a decision for whoever is rendering. Without this a front page of
+      // teasers renders whole articles.
+      if (isTrimmed(this.schema.type)) {
+        return teaserHtml(model, {
+          trimLength: ((this.schema.settings || {}).display || {}).trim_length,
+        })
+      }
       if (typeof model === 'string') return model
       return (model || {}).processed || (model || {}).value || ''
     },
