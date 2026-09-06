@@ -72,11 +72,27 @@ test('the backend prompt', async ({ page }) => {
   })
 })
 
+/**
+ * The dialog once a backend has been named, which is the step that asks to sign
+ * in rather than the one that asks where to.
+ *
+ * Opened through the app rather than by clicking the control, because the
+ * control does not survive long enough to be clicked reliably. Naming a backend
+ * in the URL makes the build's payload be rejected so the content can be
+ * fetched live instead, and this stub answers only the probe: the regions empty
+ * out a moment later, taking Drupal's account menu and the trigger inside it
+ * with them. That empty page is the accepted state here, and it is what this
+ * baseline has always shown behind the dialog.
+ *
+ * So the click was a race, and it was passing on being quick. It went red on CI
+ * where everything is slower. The trigger opening the dialog is the behaviour
+ * suite's business; what this photographs is the dialog.
+ */
 test('the login step', async ({ page }) => {
   await isolateFromBackends(page)
   await stubConformingBackend(page)
-  await page.goto(`/?backend=${encodeURIComponent(BACKEND)}`)
-  await page.getByTestId('authoring-login-trigger').click()
+  await page.goto(`/?backend=${encodeURIComponent(BACKEND)}`, { waitUntil: 'networkidle' })
+  await page.evaluate(() => window.$nuxt.$authoring.openLogin())
   await expect(page.getByTestId('authoring-continue')).toBeVisible()
   await hideLoadingBar(page)
   await mockText(page)

@@ -25,6 +25,24 @@ async function stubConformingBackend(page) {
 // Every test in this file, not only the first describe: a build knows where
 // sessions publish themselves and looks there on load, so anything asserting
 // "no backend" would depend on whether one happens to be running.
+/**
+ * Open the dialog without going through the control.
+ *
+ * Naming a backend makes the build's payload be rejected so content can be
+ * fetched live instead. These stubs answer only the probe, so the regions empty
+ * a moment later and take Drupal's account menu, and the trigger inside it, with
+ * them. Clicking it then works only if the click is quick enough, which is not a
+ * property worth having in a test: it passed here and went red on CI.
+ *
+ * The tests above this one click the real control, on a page that is not
+ * connecting and so does not empty. That is where the control belongs under
+ * test. These are about what connecting remembers.
+ */
+async function openLogin(page) {
+  await page.waitForFunction(() => window.$nuxt && window.$nuxt.$authoring)
+  await page.evaluate(() => window.$nuxt.$authoring.openLogin())
+}
+
 test.beforeEach(({ page }) => isolateFromPublishedSessions(page))
 
 test.describe('authoring login', () => {
@@ -85,27 +103,27 @@ test.describe('authoring login', () => {
     await stubConformingBackend(page)
     await page.goto(`/?backend=${encodeURIComponent(BACKEND)}`)
 
-    await page.getByTestId('authoring-login-trigger').click()
+    await openLogin(page)
     await expect(page.getByTestId('authoring-continue')).toBeVisible()
   })
 
   test('a connected backend is remembered across a reload', async ({ page }) => {
     await stubConformingBackend(page)
     await page.goto(`/?backend=${encodeURIComponent(BACKEND)}`)
-    await page.getByTestId('authoring-login-trigger').click()
+    await openLogin(page)
     await expect(page.getByTestId('authoring-continue')).toBeVisible()
 
     // Reloaded without the query string: it has to come from storage or not
     // at all.
     await page.goto('/')
-    await page.getByTestId('authoring-login-trigger').click()
+    await openLogin(page)
     await expect(page.getByTestId('authoring-continue')).toBeVisible()
   })
 
   test('disconnecting forgets the backend', async ({ page }) => {
     await stubConformingBackend(page)
     await page.goto(`/?backend=${encodeURIComponent(BACKEND)}`)
-    await page.getByTestId('authoring-login-trigger').click()
+    await openLogin(page)
     await expect(page.getByTestId('authoring-disconnect')).toBeVisible()
     // Disconnecting reloads, so the dialog closes with it: the built content
     // only comes back on a fresh load. Wait for that load rather than racing

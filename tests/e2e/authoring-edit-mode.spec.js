@@ -85,6 +85,11 @@ test.describe('edit mode', () => {
     // to send anything.
     await page.getByTestId('authoring-add-done').click()
 
+    // The entry lands a tick after the form closes, and reading between the two
+    // found an empty cart and failed on `undefined.isNew`.
+    await page.waitForFunction(
+      () => Object.keys(window.$nuxt.$store.state.authoringCart.entries).length > 0
+    )
     const resource = await page.evaluate(
       () =>
         window.$nuxt.$store.state.authoringCart.entries[

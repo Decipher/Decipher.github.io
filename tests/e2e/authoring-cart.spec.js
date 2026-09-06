@@ -153,7 +153,9 @@ test.describe('adding content', () => {
     // it the only ways out were to discard the work or leave the form open.
     await page.getByTestId('authoring-add-done').click()
     await expect(page.getByTestId('authoring-add-done')).toHaveCount(0)
-    expect(await count(page)).toBe(1)
+    // Polled, not read once: the form closing and the entry landing in the
+    // store are two separate ticks, and reading between them saw nothing.
+    await expect.poll(() => count(page)).toBe(1)
   })
 
   test('the drawer can be opened with nothing staged in it', async ({ page }) => {
