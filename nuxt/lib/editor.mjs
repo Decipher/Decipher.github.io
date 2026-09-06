@@ -12,19 +12,17 @@
  * anyway. Anonymous gets the fallback.
  */
 
+import { SUPPORTED_BUTTONS } from './ckeditor.mjs'
+
 /**
- * Buttons the classic build actually ships.
+ * Buttons this build can render.
  *
- * Drupal's list is its own vocabulary and includes items from modules the build
- * has no plugin for: `drupalInsertImage` and `sourceEditing` are configured on
- * a stock Umami, and passing either to the classic build throws
- * `toolbarview-item-unavailable` and takes the whole editor down with it. So the
- * list is filtered to what can actually be rendered.
+ * Drupal's list is its own vocabulary and can name buttons that are not there:
+ * `drupalInsertImage` is Drupal's own, and passing a button whose plugin is
+ * missing throws `toolbarview-item-unavailable` and takes the whole editor down
+ * with it. So the list is filtered to what `lib/ckeditor.mjs` has a plugin for.
  */
-export const SUPPORTED = new Set([
-  'heading', 'bold', 'italic', 'link', 'bulletedList', 'numberedList',
-  'blockQuote', 'insertTable', 'undo', 'redo', 'indent', 'outdent', '|',
-])
+export const SUPPORTED = new Set([...SUPPORTED_BUTTONS, '|'])
 
 /** Used when Drupal's configuration cannot be read, which is the anonymous case. */
 export const FALLBACK_TOOLBAR = [
@@ -50,22 +48,17 @@ export function editorForFormat(resources, format) {
 /**
  * The toolbar for a format, as CKEditor wants it.
  *
- * `extra` is for buttons added to the build at runtime: the caller knows which
- * plugins it managed to load, and a button whose plugin is missing takes the
- * whole editor down, so the decision belongs with whoever did the loading.
- *
  * Collapses runs of separators and trims them from the ends, because removing
  * an unsupported button often leaves a `|` with nothing on one side, which
  * renders as a stray divider.
  */
-export function toolbarFor(resources, format, extra = []) {
+export function toolbarFor(resources, format) {
   const editor = editorForFormat(resources, format)
   const items = (((editor || {}).attributes || {}).settings || {}).toolbar
   const configured = Array.isArray((items || {}).items) ? items.items : null
   if (!configured || !configured.length) return [...FALLBACK_TOOLBAR]
 
-  const available = new Set([...SUPPORTED, ...extra])
-  const supported = configured.filter((item) => available.has(item))
+  const supported = configured.filter((item) => SUPPORTED.has(item))
   const tidied = supported.filter(
     (item, i, all) => !(item === '|' && (i === 0 || all[i - 1] === '|'))
   )
