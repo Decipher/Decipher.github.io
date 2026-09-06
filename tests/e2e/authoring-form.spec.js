@@ -280,6 +280,56 @@ test.describe('the edit form', () => {
     await expect(page.getByTestId('reference-selected').filter({ hasText: 'admin' })).toHaveCount(1)
   })
 
+  test('what is typed reaches the page on the keystroke, not after it', async ({ page }) => {
+    // The form and the rendering of what it edits are two components with no
+    // relationship, joined only by the cart. That join used to be a watcher on
+    // `$refs.form.model`, which never fired: `$refs` is not reactive, so its
+    // first evaluation ran before Druxt had built the form and registered a
+    // dependency on nothing at all. What was typed reached the page whenever
+    // something else happened to provoke a re-render, which read as lag.
+    await stubBackend(page)
+    await page.goto('/')
+    await page.evaluate((backend) => {
+      localStorage.setItem('authoring.backend', JSON.stringify({ url: backend, clientId: null }))
+      sessionStorage.setItem(
+        'authoring.token',
+        JSON.stringify({ token: 'stub-token', account: 'admin' })
+      )
+    }, BACKEND)
+    await page.goto('/authoring', { waitUntil: 'networkidle' })
+    await page.getByTestId('authoring-edit-toggle').click()
+
+    await page.evaluate(() => window.$nuxt.$store.dispatch('authoringCart/setDrawerOpen', true))
+    await page.getByTestId('cart-tab-add').click()
+    await page.getByTestId('authoring-add-type').selectOption('node--article')
+    await page.getByTestId('authoring-add').click()
+
+    // The new article renders on the page while its form is in the drawer, so
+    // both halves are on screen at once. That is the arrangement this is about.
+    const rendered = page.getByTestId('authoring-new-item')
+    await expect(rendered).toBeVisible()
+
+    const field = page.getByTestId('field-input').first()
+    await field.click()
+
+    // Asserted without retrying, and after a single paint. `toContainText`
+    // would poll for five seconds and pass just as happily on the old
+    // behaviour, which is the thing being tested.
+    const paint = () =>
+      page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))))
+
+    for (const [typed, expected] of [
+      ['L', 'L'],
+      ['i', 'Li'],
+      ['v', 'Liv'],
+      ['e', 'Live'],
+    ]) {
+      await field.type(typed, { delay: 0 })
+      await paint()
+      expect(await rendered.innerText()).toContain(expected)
+    }
+  })
+
   test('an edit that was never staged is kept, not reverted', async ({ page }) => {
     await stubBackend(page)
     await openForm(page)

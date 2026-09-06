@@ -216,6 +216,21 @@ export default {
     authoringForm: { from: 'authoringForm', default: null },
   },
 
+  created() {
+    // Tell the form on every keystroke, rather than leaving it to notice.
+    //
+    // The form used to watch `$refs.form.model` instead. `$refs` is not
+    // reactive, so the first evaluation ran before Druxt had built the form,
+    // registered no dependency on anything, and the watcher never fired again:
+    // what was typed reached the page only when something else happened to
+    // provoke a re-render. A field's own `model` is reactive data, and the
+    // field is where the typing actually lands.
+    //
+    // Deep, because a field's value is often an object the widget mutates in
+    // place rather than replaces.
+    if (!this.authoringForm || !this.authoringForm.onFieldInput) return
+    this.$watch('model', () => this.authoringForm.onFieldInput(), { deep: true })
+  },
 
   methods: {
 

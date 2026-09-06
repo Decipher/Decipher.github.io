@@ -44,27 +44,27 @@ export default {
     value: { type: Object, default: undefined },
   },
 
-  data: () => ({ message: null, original: null, pendingFiles: {}, draftTimer: null }),
+  data: () => ({ message: null, original: null, pendingFiles: {} }),
 
-  mounted() {
-    // Watch the form's own model, once Druxt has built it. Typing is drafting:
-    // the page renders staged and unstaged edits alike, so following the form
-    // is what makes a title appear as it is typed rather than when it is
-    // staged. Debounced, because this writes to storage.
-    this.$watch(
-      () => JSON.stringify(((this.$refs.form || {}).model || {}).attributes || {}),
-      () => {
-        window.clearTimeout(this.draftTimer)
-        this.draftTimer = window.setTimeout(() => this.saveDraft(), 250)
-      }
-    )
-  },
-
-  beforeDestroy() {
-    window.clearTimeout(this.draftTimer)
-  },
 
   methods: {
+    /**
+     * A field changed, so the page should already show it.
+     *
+     * Typing is drafting: the page renders staged and unstaged edits alike, so
+     * following the form is what makes a title appear as it is typed rather
+     * than when it is staged. The row reads the draft through a computed, so
+     * writing it here is the whole of the connection.
+     *
+     * Called by the field rather than watched from here, and not debounced.
+     * Watching `$refs.form.model` never fired at all, and the 250ms delay it
+     * carried was there on the grounds that this writes to storage, which it
+     * does not: only staged entries are ever persisted.
+     */
+    onFieldInput() {
+      this.saveDraft()
+    },
+
     /**
      * Hold bytes chosen for a field until there is somewhere to send them.
      *
