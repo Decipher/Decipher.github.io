@@ -51,6 +51,7 @@ normalised
 nuxt
 nuxtjs
 nvmrc
+olivero
 opcache
 openssl
 openvscode
