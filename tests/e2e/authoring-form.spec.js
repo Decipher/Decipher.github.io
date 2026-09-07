@@ -540,4 +540,26 @@ test.describe('the edit form', () => {
     await page.getByTestId('authoring-stage').click()
     await expect(page.getByTestId('authoring-stage-message')).toContainText('Nothing changed')
   })
+
+  test('discarding an unstaged edit goes back to what was staged, not to the backend', async ({
+    page,
+  }) => {
+    await stubBackend(page)
+    // Stage something, change it again, then throw away only the second change.
+    // The form used to jump all the way back to the backend's version, taking the
+    // staged work with it: an image staged into a body vanished this way.
+    await openForm(page)
+
+    const title = page.getByTestId('field-input').first()
+    await title.fill('The staged title')
+    await page.getByTestId('authoring-stage').click()
+    await expect(page.getByTestId('authoring-unstage')).toBeVisible()
+
+    await title.fill('A further edit nobody kept')
+    const discard = page.locator('[data-testid^="cart-discard-draft-"]').first()
+    await expect(discard).toBeVisible()
+    await discard.click()
+
+    await expect(title).toHaveValue('The staged title')
+  })
 })

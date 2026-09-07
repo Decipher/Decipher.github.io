@@ -85,6 +85,20 @@ export default {
           this.$store.getters['authoringCart/draftFor'](this.type, id)
       )
     },
+
+    /**
+     * Whether there is an unstaged layer on top of whatever is staged.
+     *
+     * Watched on its own, because `held` is true while either layer exists and
+     * so says nothing when only the draft goes. Discarding a draft over a
+     * staged change left the form showing the discarded edit: staging an image,
+     * deleting it, then discarding the deletion did not bring the image back.
+     */
+    drafted() {
+      const id = (this.original || {}).id
+      if (!id) return false
+      return Boolean(this.$store.getters['authoringCart/draftFor'](this.type, id))
+    },
   },
 
   watch: {
@@ -96,7 +110,12 @@ export default {
      * the moment it was staged.
      */
     held(now, before) {
-      if (before && !now) this.revertToOriginal()
+      if (before && !now) this.revertToHeld()
+    },
+
+    /** A discarded draft puts the form back to what is staged, not to nothing. */
+    drafted(now, before) {
+      if (before && !now) this.revertToHeld()
     },
   },
 
@@ -114,11 +133,34 @@ export default {
      * because every keystroke drafts into it, so there is nothing here that
      * discarding would lose that discarding was not meant to lose.
      */
-    revertToOriginal() {
+    /**
+     * Put the form back to the last state the author chose to keep.
+     *
+     * That is the staged change if there is one, and only the backend's version
+     * if there is not. It used to go straight back to the backend's version
+     * either way, which threw away work nobody asked it to: stage an edit, make
+     * a further change, discard the further change, and the staged edit went
+     * with it. An inserted image was the visible case, because it vanished.
+     */
+    revertToHeld() {
       const form = this.$refs.form
       if (!form || !form.model || !this.original) return
-      this.pendingFiles = {}
-      form.model = JSON.parse(JSON.stringify(this.original))
+
+      const held = this.$store.getters['authoringCart/entryFor'](
+        this.type,
+        (this.original || {}).id
+      )
+      const model = JSON.parse(JSON.stringify(this.original))
+      if (held) {
+        model.attributes = { ...(model.attributes || {}), ...(held.attributes || {}) }
+        model.relationships = { ...(model.relationships || {}), ...(held.relationships || {}) }
+      }
+
+      // Files follow the same rule: the ones that belong to the staged change
+      // are kept, and anything chosen since is what is being discarded.
+      this.pendingFiles = { ...((held || {}).files || {}) }
+      this.bodyImages = { ...((held || {}).bodyImages || {}) }
+      form.model = model
     },
 
     /**
@@ -288,6 +330,7 @@ export default {
         id: (this.$refs.form.model || {}).id,
         ...delta,
         files: this.pendingFiles,
+        bodyImages: this.bodyImages,
       })
     },
 
@@ -315,6 +358,9 @@ export default {
         // it to tell "put back the way it was" apart from "not on this form".
         allRelationships: (form.model || {}).relationships || {},
         files: this.pendingFiles,
+        // Images inserted into a text field while there was no backend. The
+        // markup carries a data URL until the commit can put a real one there.
+        bodyImages: this.bodyImages,
       })
 
       this.message = staged
