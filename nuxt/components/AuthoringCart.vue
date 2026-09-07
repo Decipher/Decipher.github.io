@@ -178,12 +178,8 @@
     <section v-if="unstaged.length" class="mb-4">
       <p class="eyebrow mb-2">Unstaged</p>
       <ul class="space-y-1">
-        <li
-          v-for="item in unstaged"
-          :key="item.key"
-          class="flex items-baseline gap-2 text-sm"
-          data-testid="cart-unstaged-row"
-        >
+        <li v-for="item in unstaged" :key="item.key" class="text-sm" data-testid="cart-unstaged-row">
+          <div class="flex items-baseline gap-2">
           <input
             type="checkbox"
             class="authoring-check"
@@ -203,6 +199,20 @@
             </span>
             <span v-if="!item.deleted" class="text-muted">{{ item.fields }}</span>
           </span>
+          <!--
+            The same expander the staged rows have. Without it the only way to
+            see what a tick would actually stage was to tick it and look, which
+            is the wrong order for a decision.
+          -->
+          <button
+            type="button"
+            class="shrink-0 font-mono text-[0.6875rem] uppercase tracking-eyebrow text-muted underline hover:text-accent"
+            :aria-expanded="String(isExpanded(item))"
+            :data-testid="`cart-expand-draft-${item.id}`"
+            @click="toggle(item)"
+          >
+            {{ isExpanded(item) ? '-' : '+' }}
+          </button>
           <button
             type="button"
             class="shrink-0 font-mono text-[0.6875rem] uppercase tracking-eyebrow text-muted underline hover:text-accent"
@@ -219,6 +229,15 @@
           >
             Discard
           </button>
+          </div>
+
+          <!-- What ticking the box would stage. -->
+          <AuthoringJsonTree
+            v-if="isExpanded(item)"
+            :value="item.shape"
+            class="ml-6 mt-1 border-l border-hairline pl-2"
+            :data-testid="`cart-draft-json-${item.id}`"
+          />
         </li>
       </ul>
       <p class="mt-2 text-sm text-muted">
@@ -374,6 +393,14 @@ export default {
           deleted: Boolean(draft.deleted),
           label: attributes.title || attributes.name || this.labelOnPage(type, id) || type,
           fields: Object.keys({ ...attributes, ...(draft.relationships || {}) }).join(', '),
+          // What ticking the box would put in the cart, so it can be looked at
+          // before it is decided rather than after.
+          shape: {
+            type,
+            id,
+            attributes,
+            ...(draft.relationships ? { relationships: draft.relationships } : {}),
+          },
         }
       })
     },

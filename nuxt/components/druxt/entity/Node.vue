@@ -87,18 +87,78 @@
       </div>
     </div>
 
-    <!-- Its form, in the place the content was. -->
-    <div v-else class="rounded border border-accent p-4">
-      <p class="eyebrow mb-3">Editing {{ entity.type }}</p>
-      <AuthoringEntityForm ref="form" :type="entity.type" :uuid="entity.id" :mode="mode" />
-      <button
-        type="button"
-        class="mt-3 rounded border border-hairline px-3 py-1.5 text-sm text-body hover:border-ink"
-        data-testid="authoring-editable-close"
-        @click="close"
+    <!--
+      Its form, in the place the content was.
+
+      Pinned and no taller than the room left under the site's own pinned
+      bands, with the fields scrolling inside it. It used to be an ordinary
+      block in the flow, so a long article's form ran thousands of pixels down
+      the page and the way out was at the bottom of it: opening an editor meant
+      scrolling to the end of it to close it again.
+
+      `--sticky-top` is published by the layout, which measures the header and
+      the breadcrumb bar. The number differs by page, so it cannot be written
+      down here.
+    -->
+    <div
+      v-else
+      class="authoring-panel sticky flex flex-col overflow-hidden rounded border border-accent"
+      data-testid="authoring-panel"
+    >
+      <!-- Always in view: what is being edited, how to look at it, the way out. -->
+      <div
+        class="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-hairline bg-elevated px-4 py-2"
       >
-        Done
-      </button>
+        <p class="eyebrow">Editing {{ entity.type }}</p>
+
+        <!--
+          Form or rendered result, without leaving the panel or staging first.
+          Previewing used to mean staging the change and opening a modal, which
+          is a lot of ceremony for "what will this look like".
+        -->
+        <label class="ml-auto flex items-center gap-2">
+          <span class="sr-only">Editing view</span>
+          <select v-model="view" class="authoring-select" data-testid="authoring-view">
+            <option value="form">Edit</option>
+            <optgroup label="Preview">
+              <option v-for="name of modeOptions" :key="name" :value="name">{{ name }}</option>
+            </optgroup>
+          </select>
+        </label>
+
+        <button
+          type="button"
+          class="rounded border border-hairline px-2 py-0.5 font-mono text-[0.6875rem] uppercase tracking-eyebrow text-muted hover:border-accent hover:text-accent"
+          data-testid="authoring-editable-close"
+          @click="close"
+        >
+          Done
+        </button>
+      </div>
+
+      <!-- The only part that scrolls, so the header and the buttons stay put. -->
+      <div class="authoring-panel-body flex-1 overflow-y-auto px-4 py-4">
+        <AuthoringEntityForm
+          v-if="view === 'form'"
+          ref="form"
+          :type="entity.type"
+          :uuid="entity.id"
+          :mode="mode"
+        />
+        <!--
+          The same components the page uses, rendering what has been typed. The
+          field wrappers already overlay a draft, so this needs no special path:
+          it is the site rendering itself.
+        -->
+        <AuthoringPreviewScope v-else>
+          <DruxtEntity
+            :key="`preview-${previewMode}`"
+            :type="entity.type"
+            :uuid="entity.id"
+            :mode="previewMode"
+          />
+        </AuthoringPreviewScope>
+      </div>
     </div>
   </div>
 </template>
@@ -128,6 +188,7 @@
  * result is an Edit control on the inside of a form that is already editing.
  */
 import { labelFieldFor } from '../../../lib/reference.mjs'
+import { viewModesFor } from '../../../lib/view-modes.mjs'
 
 export default {
   name: 'DruxtEntityNode',
@@ -142,21 +203,59 @@ export default {
     druxtPreview: { default: false },
   },
 
+  /**
+   * Fetch this bundle's display modes when the panel is opened.
+   *
+   * Not up front: it is one request per entity on the page otherwise, for a
+   * list most of them will never show.
+   */
+  watch: {
+    async open(now) {
+      if (!now || this.viewModes) return
+      // Drupal's answer if there is a backend to ask, and the build's copy if
+      // not, because editing works without one and a lone "default" is not a
+      // choice. See `configuredViewModes` in nuxt.config.js.
+      const live = await viewModesFor(this.$druxt, this.entity.type)
+      this.viewModes = live.length > 1 ? live : this.bakedViewModes
+    },
+  },
+
   props: {
     entity: { type: Object, default: () => ({}) },
     fields: { type: Object, default: () => ({}) },
     schema: { type: Object, default: () => ({}) },
   },
 
-  data: () => ({ open: false }),
+  data: () => ({
+    open: false,
+    /** Whether the panel is showing the fields or the result of them. */
+    view: 'form',
+    /** Display modes this bundle has, which is however many it has. */
+    viewModes: null,
+  }),
 
+  /**
+   * What the panel can show.
+   *
+   * The form, and then the view modes worth looking at while writing. Not every
+   * mode Drupal has: a listing of them is a settings screen, and this is a
+   * toggle above a field you are typing in.
+   */
   computed: {
     editing() {
       return this.$store.getters['authoringCart/editing']
     },
 
-    /** Only a saved entity: a form needs something to fetch and to stage against. */
+    /**
+     * Only a saved entity: a form needs something to fetch and to stage against.
+     *
+     * And never inside a preview. An entity carries its own edit control, which
+     * is what makes edit mode apply to the whole site; inside a rendering of an
+     * entity it offered a form within the form, and the preview in that one
+     * offered it again, as deep as anyone cared to click.
+     */
     editable() {
+      if (this.druxtPreview) return false
       return Boolean(this.editing && (this.entity || {}).type && (this.entity || {}).id)
     },
 
@@ -235,6 +334,22 @@ export default {
       const page = this.mode === 'default' || this.mode === 'full'
       if (page && !this.druxtPreview) return false
       return !Object.keys(this.fields || {}).includes(this.labelField)
+    },
+
+    /** What the build read out of Drupal's committed display configuration. */
+    bakedViewModes() {
+      const all = ((this.$config || {}).authoring || {}).viewModes || {}
+      return all[this.entity.type] || ['default']
+    },
+
+    /** The modes to offer, which is whichever list was found. */
+    modeOptions() {
+      return this.viewModes || this.bakedViewModes
+    },
+
+    /** The view mode to render when the toggle is not on the form. */
+    previewMode() {
+      return this.view === 'form' ? this.mode : this.view
     },
 
     staged() {

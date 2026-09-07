@@ -140,6 +140,39 @@ const configuredToolbars = function () {
   return toolbars
 }
 
+/**
+ * The display modes each bundle has, read at build time.
+ *
+ * Same reasoning as `configuredToolbars`. The editor offers a choice of how to
+ * look at what you are writing, and the list comes from Drupal, and asking
+ * Drupal needs a backend. Editing deliberately works without one, and offering
+ * a single "default" there is offering nothing.
+ *
+ * From the filenames, which encode all three parts:
+ * `core.entity_view_display.<entity type>.<bundle>.<mode>.yml`.
+ */
+const configuredViewModes = function () {
+  const { readdirSync } = require('fs')
+  const { join } = require('path')
+  const modes = {}
+  let names = []
+  try {
+    names = readdirSync(join(__dirname, '..', 'drupal', 'config'))
+  } catch {
+    return modes
+  }
+
+  for (const name of names) {
+    const parts = /^core\.entity_view_display\.([^.]+)\.([^.]+)\.([^.]+)\.yml$/.exec(name)
+    if (!parts) continue
+    const [, entityType, bundle, mode] = parts
+    const type = `${entityType}--${bundle}`
+    modes[type] = modes[type] || ['default']
+    if (!modes[type].includes(mode)) modes[type].push(mode)
+  }
+  return modes
+}
+
 const localhostListenURL = function () {
   this.nuxt.hook('listen', (server, listener) => {
     listener.host = 'localhost'
@@ -235,6 +268,10 @@ export default async () => ({
       // The buttons each text format is configured for, from the committed
       // config. See `configuredToolbars` for why this is not left to runtime.
       toolbars: configuredToolbars(),
+
+      // The display modes each bundle has, so the editor can offer a choice of
+      // them with no backend to ask. See `configuredViewModes`.
+      viewModes: configuredViewModes(),
 
       // Where a session provider publishes the live backend, if anywhere.
       //
