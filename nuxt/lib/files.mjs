@@ -95,3 +95,50 @@ export function storedFileUrls(html, backendUrl) {
   const relative = relativeFileUrls(html, backendUrl)
   return rewriteFileUrls(relative, { from: STATIC_FILES, to: DRUPAL_FILES })
 }
+
+/**
+ * Point markup at a file that has just been uploaded.
+ *
+ * An image inserted with no backend is held as a data URL, and the markup shows
+ * that data URL because it is the only address the picture has. Once the bytes
+ * are in Drupal the markup has to say so: the real path, and the uuid, without
+ * which `editor_entity_update()` never records the file as used and cron
+ * deletes it later.
+ *
+ * The data URL is matched whole rather than by prefix. Two images inserted in
+ * one sitting differ only somewhere in the middle of a base64 string, and a
+ * prefix match would point both at whichever uploaded first.
+ */
+export function replaceHeldImage(html, dataUrl, { url, uuid }) {
+  if (!html || !dataUrl || !url) return html
+
+  const source = String(html)
+  const quoted = [`"${dataUrl}"`, `'${dataUrl}'`]
+  let out = source
+  for (const needle of quoted) {
+    const quote = needle[0]
+    out = out.split(needle).join(`${quote}${url}${quote}`)
+  }
+  if (out === source) return source
+
+  // Stamp the uuid on the tag that now points at the file, and only that one.
+  return out.replace(
+    new RegExp(`<img\\b[^>]*?${escapeForRegExp(url)}[^>]*?>`, 'g'),
+    (tag) => (tag.includes('data-entity-uuid') ? tag : withEntityAttributes(tag, uuid))
+  )
+}
+
+/** `data-entity-type` and `data-entity-uuid`, added without disturbing the rest. */
+function withEntityAttributes(tag, uuid) {
+  if (!uuid) return tag
+  return tag.replace(/\s*\/?>$/, ` data-entity-type="file" data-entity-uuid="${uuid}">`)
+}
+
+function escapeForRegExp(value) {
+  return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+/** Whether a value still points at bytes that live only in this browser. */
+export function hasHeldImage(html) {
+  return String(html || '').includes('src="data:')
+}

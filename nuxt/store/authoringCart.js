@@ -29,6 +29,7 @@ import {
   tidyResource,
   withoutComputed,
 } from '../lib/cart.mjs'
+import { replaceHeldImage } from '../lib/files.mjs'
 import { imageRelationship, uploadHeaders, uploadUrl } from '../lib/upload.mjs'
 
 const STORAGE_KEY = 'authoring.cart'
@@ -211,6 +212,81 @@ async function sendFiles(resource, { backendUrl, token, request }) {
   return { resource: { ...resource, relationships } }
 }
 
+/**
+ * Send the images an author put in a text field with no backend to send them to.
+ *
+ * Each one is held against the data URL that stands in for it in the markup, so
+ * uploading it gives both halves of the swap: the real path to show, and the
+ * uuid without which Drupal never records the file as used and deletes it on
+ * the next cron run.
+ *
+ * Every text field is rewritten, not just the one the image came from. The cart
+ * holds a resource rather than a form, and which field the markup is in is not
+ * worth tracking when finding the data URL is exact.
+ */
+async function sendBodyImages(resource, { backendUrl, token, request }) {
+  const held = resource.bodyImages || {}
+  const dataUrls = Object.keys(held)
+  if (!dataUrls.length) return { resource }
+
+  const field = firstUploadField(resource)
+  if (!field) {
+    return { error: 'There is no file field on this content to send an image through.' }
+  }
+
+  let attributes = { ...(resource.attributes || {}) }
+  for (const dataUrl of dataUrls) {
+    const file = held[dataUrl]
+    try {
+      const response = await request(uploadUrl(backendUrl, resource.type, field), {
+        method: 'POST',
+        headers: uploadHeaders(file.name, token),
+        body: dataUrlToBlob(file.dataUrl, file.type),
+      })
+      if (!response.ok) {
+        const detail = await response.json().catch(() => null)
+        return {
+          error:
+            (detail && detail.errors && detail.errors[0] && detail.errors[0].detail) ||
+            `An image in the text was refused with ${response.status}.`,
+        }
+      }
+      const body = await response.json()
+      const url = ((body.data.attributes || {}).uri || {}).url
+      attributes = rewriteTextFields(attributes, dataUrl, { url, uuid: body.data.id })
+    } catch (error) {
+      return { error: `An image in the text could not be sent: ${error.message}` }
+    }
+  }
+
+  return { resource: { ...resource, attributes, bodyImages: {} } }
+}
+
+/** Every text field on the resource, with one held image swapped for its file. */
+function rewriteTextFields(attributes, dataUrl, file) {
+  const out = { ...attributes }
+  for (const [name, value] of Object.entries(out)) {
+    if (value && typeof value === 'object' && typeof value.value === 'string') {
+      out[name] = { ...value, value: replaceHeldImage(value.value, dataUrl, file) }
+    } else if (typeof value === 'string') {
+      out[name] = replaceHeldImage(value, dataUrl, file)
+    }
+  }
+  return out
+}
+
+/**
+ * A field the bytes can be posted through.
+ *
+ * JSON:API has no route for creating a file on its own, so a body image goes
+ * through one of the entity's own file fields and is never attached to it. The
+ * form knows which fields those are and records them with the change.
+ */
+function firstUploadField(resource) {
+  const fields = resource.uploadFields || []
+  return fields[0] || Object.keys(resource.files || {})[0] || null
+}
+
 /** A data URL back into bytes, because that is what the upload route wants. */
 function dataUrlToBlob(dataUrl, type) {
   const base64 = String(dataUrl).split(',')[1] || ''
@@ -306,7 +382,7 @@ export const actions = {
    * difference. Staging an edit that changes nothing is a no-op rather than an
    * empty resource, so the count means what it says.
    */
-  stage({ state, commit }, { type, id, original, edited, relationships, allRelationships, files }) {
+  stage({ state, commit }, { type, id, original, edited, relationships, allRelationships, files, bodyImages }) {
     const key = cartKey(type, id)
     const existing = state.entries[key]
     // From the draft too: content begun and never staged lives there, and
@@ -328,6 +404,9 @@ export const actions = {
         // Bytes chosen in the browser, kept off the wire by `tidyResource` and
         // uploaded when this is committed.
         files: { ...((existing || {}).files || {}), ...(files || {}) },
+        // Images put into a text field before there was anywhere to send them.
+        // Keyed by the data URL standing in for each one in the markup.
+        bodyImages: { ...((existing || {}).bodyImages || {}), ...(bodyImages || {}) },
         before: {
           ...valuesBefore(original || {}, attributes),
           ...valuesBefore((allRelationships || {}), relationships || {}),
@@ -563,7 +642,16 @@ export const actions = {
       try {
         // Bytes first. The relationship names a file that has to exist, and the
         // upload is a different kind of request to a different URL.
-        const uploaded = await sendFiles(resource, { backendUrl, token, request })
+        // Images held in the markup first: each becomes a real file, and the
+        // text is rewritten to point at it before anything is sent.
+        const withImages = await sendBodyImages(resource, { backendUrl, token, request })
+        if (withImages.error) {
+          commit('setError', { key, message: withImages.error })
+          results.failed += 1
+          continue
+        }
+
+        const uploaded = await sendFiles(withImages.resource, { backendUrl, token, request })
         if (uploaded.error) {
           commit('setError', { key, message: uploaded.error })
           results.failed += 1

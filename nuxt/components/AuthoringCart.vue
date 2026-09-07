@@ -137,6 +137,22 @@
             </button>
           </div>
 
+          <!--
+            Images put in a text field before there was anywhere to send them.
+            They are in the markup as data URLs, which is to say they are in the
+            diff as a hundred characters of base64 and nowhere a reader would
+            recognise as a picture. Said plainly instead.
+          -->
+          <p
+            v-if="heldImages(resource).length"
+            class="ml-6 font-mono text-[0.6875rem] text-muted"
+            :data-testid="`cart-held-images-${resource.id}`"
+          >
+            carrying {{ heldImages(resource).length }}
+            {{ heldImages(resource).length === 1 ? 'image' : 'images' }}:
+            {{ heldImages(resource).join(', ') }}
+          </p>
+
           <p
             v-if="dependsOn(resource).length"
             class="ml-6 font-mono text-[0.6875rem] text-muted"
@@ -622,6 +638,11 @@ export default {
 
     /** One resource's own tree, open or shut. Shut by default: the drawer is a
      * list first, and a reader opens the one they care about. */
+    /** The names of any images this change is carrying in its markup. */
+    heldImages(resource) {
+      return Object.values((resource || {}).bodyImages || {}).map((file) => file.name)
+    },
+
     isExpanded(resource) {
       return Boolean(this.expanded[this.expandKey(resource)])
     },
