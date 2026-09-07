@@ -17,7 +17,7 @@ import {
   readSessionRecord,
   resolveSource,
   sessionRecordRequest,
-} from '../../nuxt/lib/authoring.mjs'
+} from '../../nuxt/ice/src/authoring.mjs'
 
 const jsonapiOk = () => ({
   ok: true,

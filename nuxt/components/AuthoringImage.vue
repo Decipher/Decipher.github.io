@@ -84,7 +84,7 @@
  * 200, so the only thing standing between an author and a silently
  * inaccessible image is this field.
  */
-import { fileIsAllowed, imageRelationship } from '../lib/upload.mjs'
+import { fileIsAllowed, imageRelationship } from '../ice/src/upload.mjs'
 
 export default {
   name: 'AuthoringImage',

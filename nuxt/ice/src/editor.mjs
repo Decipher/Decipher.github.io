@@ -20,7 +20,7 @@ import { SUPPORTED_BUTTONS } from './ckeditor.mjs'
  * Drupal's list is its own vocabulary and can name buttons that are not there:
  * `drupalInsertImage` is Drupal's own, and passing a button whose plugin is
  * missing throws `toolbarview-item-unavailable` and takes the whole editor down
- * with it. So the list is filtered to what `lib/ckeditor.mjs` has a plugin for.
+ * with it. So the list is filtered to what `ice/src/ckeditor.mjs` has a plugin for.
  */
 export const SUPPORTED = new Set([...SUPPORTED_BUTTONS, '|'])
 

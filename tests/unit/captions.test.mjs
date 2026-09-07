@@ -8,7 +8,7 @@ import {
   fromEditorCaptions,
   hasUnfilteredCaption,
   toEditorCaptions,
-} from '../../nuxt/lib/captions.mjs'
+} from '../../nuxt/ice/src/captions.mjs'
 
 test('a captioned image becomes the figure Drupal would have rendered', () => {
   assert.equal(

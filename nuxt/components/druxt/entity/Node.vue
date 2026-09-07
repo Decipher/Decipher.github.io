@@ -187,8 +187,8 @@
  * referenced entity, which arrives back here. Without the `editing` guard the
  * result is an Edit control on the inside of a form that is already editing.
  */
-import { labelFieldFor } from '../../../lib/reference.mjs'
-import { viewModesFor } from '../../../lib/view-modes.mjs'
+import { labelFieldFor } from '../../../ice/src/reference.mjs'
+import { viewModesFor } from '../../../ice/src/view-modes.mjs'
 
 export default {
   name: 'DruxtEntityNode',

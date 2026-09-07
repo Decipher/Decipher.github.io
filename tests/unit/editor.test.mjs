@@ -13,7 +13,7 @@ import {
   editorForFormat,
   toolbarFor,
   usableToolbar,
-} from '../../nuxt/lib/editor.mjs'
+} from '../../nuxt/ice/src/editor.mjs'
 
 const editor = (format, items) => ({
   attributes: { drupal_internal__format: format, settings: { toolbar: { items } } },

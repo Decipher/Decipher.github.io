@@ -15,6 +15,8 @@ import path from 'node:path'
 
 import { expect, test } from '@playwright/test'
 
+import { appReady } from './isolate.js'
+
 const BACKEND = 'http://backend.test'
 
 const FIXTURES = path.join(__dirname, '..', 'fixtures', 'jsonapi')
@@ -130,6 +132,7 @@ async function stubBackend(page) {
 /** Connect, sign in, turn on edit mode and open the first article's form. */
 async function openForm(page) {
   await page.goto('/')
+  await appReady(page)
   await page.evaluate((backend) => {
     localStorage.setItem('authoring.backend', JSON.stringify({ url: backend, clientId: null }))
     sessionStorage.setItem(
@@ -139,6 +142,7 @@ async function openForm(page) {
   }, BACKEND)
 
   await page.goto('/authoring', { waitUntil: 'networkidle' })
+  await appReady(page)
   await page.getByTestId('authoring-edit-toggle').click()
   await page.getByTestId(`edit-node--article-${ARTICLE}`).click()
   await expect(page.getByTestId('authoring-stage')).toBeVisible()
@@ -293,6 +297,7 @@ test.describe('the edit form', () => {
     // something else happened to provoke a re-render, which read as lag.
     await stubBackend(page)
     await page.goto('/')
+    await appReady(page)
     await page.evaluate((backend) => {
       localStorage.setItem('authoring.backend', JSON.stringify({ url: backend, clientId: null }))
       sessionStorage.setItem(
@@ -301,6 +306,7 @@ test.describe('the edit form', () => {
       )
     }, BACKEND)
     await page.goto('/authoring', { waitUntil: 'networkidle' })
+    await appReady(page)
     await page.getByTestId('authoring-edit-toggle').click()
 
     await page.evaluate(() => window.$nuxt.$store.dispatch('authoringCart/setDrawerOpen', true))

@@ -8,7 +8,7 @@
  * static site holding a bearer token, and the backend may not even be the one
  * that built it.
  *
- * So the bytes go over JSON:API, the same way `lib/upload.mjs` already sends a
+ * So the bytes go over JSON:API, the same way `ice/src/upload.mjs` already sends a
  * field's image, and the markup that comes out is the markup Drupal's own
  * editor writes.
  *
@@ -88,7 +88,7 @@ export function absolute(url, backendUrl) {
  * saving, and nothing says so.
  *
  * Captions are not done here. They are a shape difference rather than a missing
- * attribute, and `lib/captions.mjs` translates them on the way in and out,
+ * attribute, and `ice/src/captions.mjs` translates them on the way in and out,
  * where it can be tested without an editor. Doing it as a downcast converter
  * meant overriding the one that builds the image's figure, and CKEditor
  * answered `conversion-slot-filter-incomplete`.

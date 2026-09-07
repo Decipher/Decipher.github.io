@@ -28,9 +28,9 @@ import {
   requestUrl,
   tidyResource,
   withoutComputed,
-} from '../lib/cart.mjs'
-import { replaceHeldImage } from '../lib/files.mjs'
-import { imageRelationship, uploadHeaders, uploadUrl } from '../lib/upload.mjs'
+} from '../ice/src/cart.mjs'
+import { replaceHeldImage } from '../ice/src/files.mjs'
+import { imageRelationship, uploadHeaders, uploadUrl } from '../ice/src/upload.mjs'
 
 const STORAGE_KEY = 'authoring.cart'
 

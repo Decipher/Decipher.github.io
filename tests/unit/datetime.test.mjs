@@ -8,7 +8,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { fromDateInput, toDateInput } from '../../nuxt/lib/datetime.mjs'
+import { fromDateInput, toDateInput } from '../../nuxt/ice/src/datetime.mjs'
 
 test('an ISO timestamp becomes something the input can show', () => {
   const shown = toDateInput('2026-09-04T14:30:00+00:00')

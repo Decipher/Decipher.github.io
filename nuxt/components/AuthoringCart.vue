@@ -350,7 +350,7 @@ import {
   requestMethod,
   requiredBy,
   tidyResource,
-} from '../lib/cart.mjs'
+} from '../ice/src/cart.mjs'
 import { openChangeRequest } from '../lib/github-client.mjs'
 
 export default {

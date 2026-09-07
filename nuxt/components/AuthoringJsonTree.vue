@@ -76,7 +76,7 @@
  * is the shape rather than a single collapsed row. Deeper levels stay shut,
  * because a body field with its format and summary is noise until wanted.
  */
-import { diffLines, isLong } from '../lib/diff.mjs'
+import { diffLines, isLong } from '../ice/src/diff.mjs'
 
 export default {
   name: 'AuthoringJsonTree',

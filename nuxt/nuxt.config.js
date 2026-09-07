@@ -1,4 +1,4 @@
-import { CKEDITOR_PACKAGES } from './lib/ckeditor.mjs'
+import { CKEDITOR_PACKAGES } from './ice/src/ckeditor.mjs'
 import { repositoryFromRemotes } from './lib/github.mjs'
 
 require('dotenv').config({ path: '../.env' })
@@ -38,7 +38,7 @@ const baseUrl = process.env.BASE_URL || 'http://quickstart-druxt-serverless.ddev
  * An image inserted into a body field is a Drupal file, and its URL is served
  * by Drupal. A static build has no Drupal, so those images would all be broken
  * on the deployed site. Tome already exports the files into the repository, so
- * this copies them into the static output and `lib/files.mjs` points the markup
+ * this copies them into the static output and `ice/src/files.mjs` points the markup
  * at the copies.
  *
  * Into `static/` rather than `dist/`, so `dev` and `start` serve them too.
@@ -66,7 +66,7 @@ const copyDrupalFiles = function () {
  *
  * The editor is assembled at runtime from one script per plugin package rather
  * than from a prebuilt bundle, so that the toolbar Drupal is configured for is
- * the toolbar that renders. See `lib/ckeditor.mjs` for why it has to be done
+ * the toolbar that renders. See `ice/src/ckeditor.mjs` for why it has to be done
  * this way rather than with an import.
  *
  * Copied out of `node_modules` at build time, and gitignored for that reason.

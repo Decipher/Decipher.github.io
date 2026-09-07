@@ -13,7 +13,7 @@ import {
   listingAccepts,
   listingTypes,
   previewsFor,
-} from '../../nuxt/lib/preview.mjs'
+} from '../../nuxt/ice/src/preview.mjs'
 
 /** The front page view's own filters, as Drupal ships them. */
 const FRONTPAGE = {

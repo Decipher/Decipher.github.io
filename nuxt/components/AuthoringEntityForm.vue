@@ -12,7 +12,7 @@
 </template>
 
 <script>
-import { changedFields, newResourceId } from '../lib/cart.mjs'
+import { changedFields, newResourceId } from '../ice/src/cart.mjs'
 
 export default {
   name: 'AuthoringEntityForm',

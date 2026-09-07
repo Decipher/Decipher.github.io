@@ -97,7 +97,7 @@ import {
   labelsUrl,
   targetResourceTypes,
   toRelationship,
-} from '../lib/reference.mjs'
+} from '../ice/src/reference.mjs'
 
 export default {
   name: 'AuthoringReference',

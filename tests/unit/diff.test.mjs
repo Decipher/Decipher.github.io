@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { changedRegion, diffLines, isLong } from '../../nuxt/lib/diff.mjs'
+import { changedRegion, diffLines, isLong } from '../../nuxt/ice/src/diff.mjs'
 
 test('a word replaced in the middle is the only thing reported', () => {
   const r = changedRegion('the quick brown fox jumps', 'the quick red fox jumps')
