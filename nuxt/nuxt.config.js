@@ -96,6 +96,50 @@ const copyCkeditor = function () {
   }
 }
 
+/**
+ * The toolbar each text format is configured for, read at build time.
+ *
+ * It used to be fetched at runtime from `editor--editor` and nothing else, on
+ * the reasoning that a change made in Drupal should reach the frontend without
+ * a deploy. That resource needs `administer filters`, and the OAuth scope an
+ * author signs in with grants the `authenticated` role, which does not have it.
+ * So every real author got the fallback toolbar: no inline code, no image, none
+ * of the buttons this site's own article is written with. The content could not
+ * have been made with the editor that was being offered.
+ *
+ * Granting `administer filters` to read a toolbar would hand every author the
+ * ability to edit text formats, which is how a text format becomes an XSS. The
+ * configuration is already in the repository, exported by Tome, so the build
+ * reads it from there instead. The runtime fetch still wins when it succeeds,
+ * which keeps the no-deploy property for anyone who can actually use it.
+ */
+const configuredToolbars = function () {
+  const { readdirSync, readFileSync } = require('fs')
+  const { join } = require('path')
+  const yaml = require('js-yaml')
+  const dir = join(__dirname, '..', 'drupal', 'config')
+  const toolbars = {}
+  let names = []
+  try {
+    names = readdirSync(dir).filter((name) => /^editor\.editor\..+\.yml$/.test(name))
+  } catch {
+    // A checkout with no Drupal config still builds; it just has no toolbars.
+    return toolbars
+  }
+
+  for (const name of names) {
+    try {
+      const config = yaml.load(readFileSync(join(dir, name), 'utf8')) || {}
+      const items = (((config.settings || {}).toolbar || {}).items) || []
+      const format = config.format || name.replace(/^editor\.editor\.|\.yml$/g, '')
+      if (items.length) toolbars[format] = items
+    } catch {
+      // One unreadable format is not a reason to build without the others.
+    }
+  }
+  return toolbars
+}
+
 const localhostListenURL = function () {
   this.nuxt.hook('listen', (server, listener) => {
     listener.host = 'localhost'
@@ -188,6 +232,10 @@ export default async () => ({
     // baseline every time the date rolled over in UTC.
     builtAt: new Date().toISOString(),
     authoring: {
+      // The buttons each text format is configured for, from the committed
+      // config. See `configuredToolbars` for why this is not left to runtime.
+      toolbars: configuredToolbars(),
+
       // Where a session provider publishes the live backend, if anywhere.
       //
       // Derived from the repository when nothing sets it, because a build that

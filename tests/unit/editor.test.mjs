@@ -8,7 +8,12 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { FALLBACK_TOOLBAR, editorForFormat, toolbarFor } from '../../nuxt/lib/editor.mjs'
+import {
+  FALLBACK_TOOLBAR,
+  editorForFormat,
+  toolbarFor,
+  usableToolbar,
+} from '../../nuxt/lib/editor.mjs'
 
 const editor = (format, items) => ({
   attributes: { drupal_internal__format: format, settings: { toolbar: { items } } },
@@ -104,4 +109,29 @@ test('the buttons the classic build lacked are offered now', () => {
   ]
   const toolbar = toolbarFor([editor('full_html', gained)], 'full_html')
   assert.deepEqual(toolbar, gained)
+})
+
+test('the build can supply a toolbar when Drupal will not', () => {
+  // `editor--editor` needs `administer filters`, which the scope an author
+  // signs in with does not grant, so it answers with an empty collection and
+  // the committed configuration is what the editor gets built from.
+  const configured = ['bold', 'italic', '|', 'drupalInsertImage', 'code', '|', 'sourceEditing']
+  assert.deepEqual(usableToolbar(configured), [
+    'bold',
+    'italic',
+    '|',
+    'uploadImage',
+    'code',
+    '|',
+    'sourceEditing',
+  ])
+})
+
+test('nothing configured is nothing usable, rather than a fallback', () => {
+  // The caller decides what to do with nothing. `toolbarFor` substitutes the
+  // fallback; this has to be able to say "Drupal offered nothing" so the
+  // build's own copy gets its turn.
+  assert.deepEqual(usableToolbar([]), [])
+  assert.deepEqual(usableToolbar(null), [])
+  assert.deepEqual(usableToolbar(['drupalMedia']), [])
 })
