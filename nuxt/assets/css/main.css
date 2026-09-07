@@ -276,7 +276,22 @@ main img {
  * the page and would otherwise cover the panel's own buttons.
  */
 .authoring-panel-body {
+  /*
+   * No vertical padding, and the breathing room given as margin on the children
+   * instead.
+   *
+   * In a scroll container a sticky element stops at the padding box, so a
+   * padding-top left a strip of the container above the pinned toolbar with
+   * content sliding through it. A margin belongs to the child and scrolls away
+   * with it, which is what was wanted: space at rest, nothing in the way once
+   * you move.
+   */
+  padding-top: 0;
   padding-bottom: 0;
+}
+
+.authoring-panel-body > * {
+  @apply my-4;
 }
 
 .authoring-panel {

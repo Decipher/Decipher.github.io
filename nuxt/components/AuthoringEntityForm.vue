@@ -44,7 +44,19 @@ export default {
     value: { type: Object, default: undefined },
   },
 
-  data: () => ({ message: null, original: null, pendingFiles: {}, fileFields: [] }),
+  data: () => ({
+    message: null,
+    original: null,
+    pendingFiles: {},
+    fileFields: [],
+    /**
+     * Images inserted into a body while there was nowhere to send them.
+     *
+     * Keyed by the data URL that is standing in for them in the markup, so
+     * committing can find each one in the text it has to rewrite.
+     */
+    bodyImages: {},
+  }),
 
   computed: {
     /**
@@ -144,6 +156,13 @@ export default {
       if (!id) return
       this.$store.dispatch('authoringCart/discardOne', { type: this.type, id })
       this.message = 'Unstaged. The change is still here, it is just not going anywhere.'
+    },
+
+    /** Keep an image inserted into a body until the change is sent. */
+    holdBodyImage({ name, type, dataUrl }) {
+      if (!dataUrl) return
+      this.$set(this.bodyImages, dataUrl, { name, type, dataUrl })
+      this.saveDraft()
     },
 
     registerFileField(field) {

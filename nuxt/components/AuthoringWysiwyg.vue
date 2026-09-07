@@ -73,7 +73,13 @@ export default {
     },
 
     /**
-     * What the upload adapter needs, or nothing if it cannot work.
+     * What the upload adapter needs.
+     *
+     * Never null now. An image can be inserted with no backend and no token:
+     * the bytes are held with the change and sent when the change is, the same
+     * way a field's image already works. Withholding the button until somebody
+     * signed in meant the one thing an author could not do offline was the
+     * thing they most wanted to.
      *
      * Not gated on being signed in. It was, briefly, on the reasoning that an
      * upload without a token is a guaranteed 403 and a button that cannot work
@@ -83,12 +89,13 @@ export default {
      * `uploadImage` says what is missing if it is pressed too early.
      */
     uploadOptions() {
-      if (!this.backendUrl || !this.upload || !this.upload.field) return null
       return {
         backendUrl: this.backendUrl,
         token: (this.$authoringAuth && this.$authoringAuth.token) || null,
-        resourceType: this.upload.resourceType,
-        field: this.upload.field,
+        resourceType: (this.upload || {}).resourceType,
+        field: (this.upload || {}).field,
+        // Where the bytes go when they cannot go to Drupal yet.
+        hold: (file, dataUrl) => this.holdImage(file, dataUrl),
       }
     },
 
@@ -115,7 +122,7 @@ export default {
   async mounted() {
     const [namespace, configured] = await Promise.all([loadCkeditor(), this.loadToolbar()])
     if (!namespace) return
-    await this.create(namespace, this.withoutUnusableImage(configured))
+    await this.create(namespace, configured)
   },
 
   beforeDestroy() {
@@ -146,21 +153,30 @@ export default {
       return editorFileUrls(toEditorCaptions(value || ''), this.backendUrl)
     },
 
+    /**
+     * Keep an inserted image with the change until there is somewhere to send it.
+     *
+     * Handed to the form, which carries it into the cart entry, so committing
+     * can upload it and put the real URL in the body. Until then the body holds
+     * the data URL, which is what the editor is showing.
+     */
+    holdImage(file, dataUrl) {
+      const form = this.$parent && this.findForm()
+      if (form && typeof form.holdBodyImage === 'function') {
+        form.holdBodyImage({ name: file.name, type: file.type, dataUrl })
+      }
+    },
+
+    /** The authoring form above this field, if this field is on one. */
+    findForm() {
+      let parent = this.$parent
+      while (parent && typeof parent.holdBodyImage !== 'function') parent = parent.$parent
+      return parent
+    },
+
     /** And back, so what is staged is what Drupal would have written. */
     outOfEditor(data) {
       return fromEditorCaptions(storedFileUrls(data, this.backendUrl))
-    },
-
-    /**
-     * Drop the image button when there is nowhere to send an image.
-     *
-     * The backend decides the toolbar and the form decides whether this bundle
-     * has a field to post through. Both have to agree before the button is
-     * worth offering.
-     */
-    withoutUnusableImage(toolbar) {
-      if (this.uploadOptions) return toolbar
-      return (toolbar || []).filter((item) => item !== 'uploadImage')
     },
 
     async create(namespace, toolbar) {
