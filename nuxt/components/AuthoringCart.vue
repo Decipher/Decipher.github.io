@@ -187,7 +187,16 @@
             :data-testid="`cart-stage-${item.id}`"
             @change="stageDraft(item)"
           />
-          <span class="flex min-w-0 flex-1 items-baseline gap-2 truncate">
+          <button
+            type="button"
+            class="flex min-w-0 flex-1 items-baseline gap-1 text-left"
+            :aria-expanded="String(isExpanded(item))"
+            :data-testid="`cart-expand-draft-${item.id}`"
+            @click="toggle(item)"
+          >
+            <span class="w-3 shrink-0 font-mono text-xs text-muted" aria-hidden="true">
+              {{ isExpanded(item) ? '-' : '+' }}
+            </span>
             <span
               class="shrink-0 rounded border px-1.5 py-0.5 font-mono text-[0.625rem] uppercase tracking-eyebrow"
               :class="item.deleted ? 'border-accent text-accent' : 'border-hairline text-muted'"
@@ -197,21 +206,7 @@
             <span :class="item.deleted ? 'text-muted line-through' : 'text-ink'">
               {{ item.label }}
             </span>
-            <span v-if="!item.deleted" class="text-muted">{{ item.fields }}</span>
-          </span>
-          <!--
-            The same expander the staged rows have. Without it the only way to
-            see what a tick would actually stage was to tick it and look, which
-            is the wrong order for a decision.
-          -->
-          <button
-            type="button"
-            class="shrink-0 font-mono text-[0.6875rem] uppercase tracking-eyebrow text-muted underline hover:text-accent"
-            :aria-expanded="String(isExpanded(item))"
-            :data-testid="`cart-expand-draft-${item.id}`"
-            @click="toggle(item)"
-          >
-            {{ isExpanded(item) ? '-' : '+' }}
+            <span v-if="!item.deleted" class="truncate text-muted">{{ item.fields }}</span>
           </button>
           <button
             type="button"
@@ -628,11 +623,22 @@ export default {
     /** One resource's own tree, open or shut. Shut by default: the drawer is a
      * list first, and a reader opens the one they care about. */
     isExpanded(resource) {
-      return Boolean(this.expanded[resource.type + resource.id])
+      return Boolean(this.expanded[this.expandKey(resource)])
+    },
+
+    /**
+     * One row's key.
+     *
+     * Drafts are namespaced. The same entity can be staged and have a draft on
+     * top of it, and without this they shared a key, so opening one opened the
+     * other and the `+` on the row you had not touched flipped to `-`.
+     */
+    expandKey(resource) {
+      return `${resource.key ? 'draft:' : ''}${resource.type}${resource.id}`
     },
 
     toggle(resource) {
-      const key = resource.type + resource.id
+      const key = this.expandKey(resource)
       this.$set(this.expanded, key, !this.expanded[key])
     },
 

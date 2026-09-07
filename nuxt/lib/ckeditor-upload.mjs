@@ -35,11 +35,18 @@ import { uploadHeaders, uploadUrl } from './upload.mjs'
  * the frontend, which does not serve it. `relativeFileUrls` puts it back before
  * anything is staged, so what gets committed is Drupal's own path.
  */
-export async function uploadImage(file, { backendUrl, token, resourceType, field, request }) {
-  // Said plainly, because CKEditor shows this to the author. Drupal would
-  // answer 403 and the message would be about permissions rather than about
-  // the one thing they need to do.
-  if (!token) throw new Error('Sign in before adding an image.')
+export async function uploadImage(file, options) {
+  const { backendUrl, token, resourceType, field, request, hold } = options || {}
+
+  // Nowhere to send it yet: hold the bytes with the change instead of refusing.
+  // Editing works with no backend, and an image is the one thing that used to
+  // need one before you could even put it on the page. What the editor shows
+  // until then is the file itself, read in the browser.
+  if (!backendUrl || !token || !field) {
+    const dataUrl = await readAsDataUrl(file)
+    if (typeof hold === 'function') hold(file, dataUrl)
+    return { default: dataUrl, held: true }
+  }
 
   const fetcher = request || globalThis.fetch
   const response = await fetcher(uploadUrl(backendUrl, resourceType, field), {
@@ -189,3 +196,18 @@ function recordUploadedUuid(editor) {
   })
 }
 
+
+/**
+ * A chosen file as a data URL, which is what an editor with no backend can show.
+ *
+ * The same shape the cart already keeps a field's image in, so committing has
+ * one kind of held file to deal with rather than two.
+ */
+export function readAsDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(String(reader.result))
+    reader.onerror = () => reject(new Error('That file could not be read.'))
+    reader.readAsDataURL(file)
+  })
+}
