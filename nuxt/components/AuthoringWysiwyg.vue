@@ -35,7 +35,7 @@ import { DrupalImageCompatibility, imageUploadAdapter } from '../lib/ckeditor-up
 import { fromEditorCaptions, toEditorCaptions } from '../lib/captions.mjs'
 import { absoluteFileUrls, relativeFileUrls } from '../lib/files.mjs'
 import { editorPlugins, loadCkeditor } from '../lib/ckeditor.mjs'
-import { FALLBACK_TOOLBAR, toolbarFor } from '../lib/editor.mjs'
+import { editorForFormat, FALLBACK_TOOLBAR, usableToolbar } from '../lib/editor.mjs'
 
 // Shared across every field on the page: one request, however many editors.
 let editorConfigPromise = null
@@ -61,17 +61,31 @@ export default {
   },
 
   computed: {
+    /** The toolbars the build read out of Drupal's committed configuration. */
+    bakedToolbars() {
+      return ((this.$config || {}).authoring || {}).toolbars || {}
+    },
+
     /** The backend this session is connected to, if any. */
     backendUrl() {
       return (this.$authoring && this.$authoring.state.url) || null
     },
 
-    /** What the upload adapter needs, or nothing if it cannot work. */
+    /**
+     * What the upload adapter needs, or nothing if it cannot work.
+     *
+     * A token is part of that. Everything else an author does is staged in the
+     * browser and sent when they say so, but bytes have to go somewhere the
+     * moment the image is inserted, and Drupal will not take them from nobody.
+     * Offering the button before signing in is offering a guaranteed 403.
+     */
     uploadOptions() {
       if (!this.backendUrl || !this.upload || !this.upload.field) return null
+      const token = (this.$authoringAuth && this.$authoringAuth.token) || null
+      if (!token) return null
       return {
         backendUrl: this.backendUrl,
-        token: (this.$authoringAuth && this.$authoringAuth.token) || null,
+        token,
         resourceType: this.upload.resourceType,
         field: this.upload.field,
       }
@@ -190,14 +204,31 @@ export default {
     },
 
     /**
-     * Read the configured toolbar, if this session is allowed to.
+     * The buttons this format is configured for.
      *
-     * `editor--editor` needs `administer filters`, so an anonymous visitor gets
-     * an empty collection rather than an error, and keeps the fallback.
+     * Two sources, in order. `editor--editor` is the live one and wins when it
+     * answers, so a change made in Drupal reaches a session that can read it
+     * without a deploy. It needs `administer filters`, which the scope an
+     * author signs in with does not grant, so for almost everybody it returns
+     * an empty collection.
+     *
+     * The build carries the same configuration, read from the committed files.
+     * Without it every real author got the fallback toolbar and none of the
+     * buttons this site's own writing needs, which made the content something
+     * the editor could not have produced.
      */
     async loadToolbar() {
-      const backend = this.$authoring && this.$authoring.state.url
-      if (!backend || !this.format) return [...FALLBACK_TOOLBAR]
+      const live = await this.liveToolbar()
+      if (live.length) return live
+
+      const baked = usableToolbar((this.bakedToolbars || {})[this.format])
+      return baked.length ? baked : [...FALLBACK_TOOLBAR]
+    },
+
+    /** Drupal's own answer, for a session allowed to ask. */
+    async liveToolbar() {
+      const backend = this.backendUrl
+      if (!backend || !this.format) return []
 
       if (!editorConfigPromise) {
         const token = this.$authoringAuth && this.$authoringAuth.token
@@ -212,7 +243,12 @@ export default {
           .catch(() => [])
       }
 
-      return toolbarFor(await editorConfigPromise, this.format)
+      // Not `toolbarFor`: it substitutes the fallback when it finds nothing,
+      // and the build's copy is a better answer than that. This wants to know
+      // whether Drupal said anything usable, so it asks for the parts.
+      const editor = editorForFormat(await editorConfigPromise, this.format)
+      const items = (((editor || {}).attributes || {}).settings || {}).toolbar
+      return usableToolbar((items || {}).items)
     },
   },
 }

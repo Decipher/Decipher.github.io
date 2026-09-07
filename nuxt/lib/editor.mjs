@@ -58,17 +58,18 @@ export function editorForFormat(resources, format) {
 }
 
 /**
- * The toolbar for a format, as CKEditor wants it.
+ * A configured list of buttons, reduced to the ones that can be rendered.
+ *
+ * Shared, because the list arrives two ways: over JSON:API from a session that
+ * is allowed to read it, and baked into the build from the committed config for
+ * every session that is not.
  *
  * Collapses runs of separators and trims them from the ends, because removing
  * an unsupported button often leaves a `|` with nothing on one side, which
  * renders as a stray divider.
  */
-export function toolbarFor(resources, format) {
-  const editor = editorForFormat(resources, format)
-  const items = (((editor || {}).attributes || {}).settings || {}).toolbar
-  const configured = Array.isArray((items || {}).items) ? items.items : null
-  if (!configured || !configured.length) return [...FALLBACK_TOOLBAR]
+export function usableToolbar(configured) {
+  if (!Array.isArray(configured) || !configured.length) return []
 
   const named = configured.map((item) => ALIASES[item] || item)
   const supported = named.filter((item) => SUPPORTED.has(item))
@@ -76,8 +77,19 @@ export function toolbarFor(resources, format) {
     (item, i, all) => !(item === '|' && (i === 0 || all[i - 1] === '|'))
   )
   while (tidied.length && tidied[tidied.length - 1] === '|') tidied.pop()
+  return tidied
+}
+
+/**
+ * The toolbar for a format, as CKEditor wants it.
+ *
+ */
+export function toolbarFor(resources, format) {
+  const editor = editorForFormat(resources, format)
+  const items = (((editor || {}).attributes || {}).settings || {}).toolbar
+  const usable = usableToolbar(((items || {}).items) || null)
 
   // Every configured button was one this build cannot render, which is a
   // configuration worth falling back from rather than showing an empty bar.
-  return tidied.length ? tidied : [...FALLBACK_TOOLBAR]
+  return usable.length ? usable : [...FALLBACK_TOOLBAR]
 }
