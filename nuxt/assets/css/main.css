@@ -275,6 +275,10 @@ main img {
  * The gap below is for the floating Edits bar, which sits over the bottom of
  * the page and would otherwise cover the panel's own buttons.
  */
+.authoring-panel-body {
+  padding-bottom: 0;
+}
+
 .authoring-panel {
   top: calc(var(--sticky-top, 0px) + 0.75rem);
 
@@ -301,5 +305,52 @@ main img {
  * the end of the fields to find.
  */
 .authoring-entity-form-fields > .authoring-form-actions {
-  @apply sticky bottom-0 -mx-4 mt-4 border-t border-hairline bg-paper px-4 py-3;
+  @apply sticky bottom-0 -mx-4 mt-4 border-t border-hairline bg-paper px-4 pt-3;
+
+  /*
+   * Down to the bottom of the panel, not just to the end of the buttons. The
+   * scroll container has its own padding below this, so a background that
+   * stopped at the button row left a transparent strip with the panel's border
+   * under it, and the content scrolled through the gap.
+   */
+  padding-bottom: 1rem;
+}
+
+/*
+ * CKEditor's toolbar, pinned to the panel rather than to the window.
+ *
+ * CKEditor sticks its toolbar to the viewport, which is right when the page
+ * scrolls and wrong here: the fields scroll inside the panel, so the toolbar
+ * detached and floated over the page while the field it belonged to was
+ * somewhere else. `viewportOffset` cannot fix that, because the offset is not
+ * the problem, the scrolling element is.
+ *
+ * So its own behaviour is turned off and the toolbar is stuck to the top of
+ * the scroller instead, which is what a toolbar in a scrolling panel should do.
+ */
+.authoring-panel-body .ck-sticky-panel__content_sticky {
+  position: static !important;
+  width: auto !important;
+}
+
+.authoring-panel-body .ck-sticky-panel__placeholder {
+  display: none !important;
+}
+
+/*
+ * The editor's top bar, not the toolbar inside it.
+ *
+ * A sticky element moves within its own parent, and every wrapper between the
+ * toolbar and here is exactly as tall as the toolbar, so sticking any of them
+ * had nowhere to go. `.ck-editor__top` is a child of the editor itself, which
+ * is as tall as the field.
+ *
+ * `.ck.` in the selector for weight: CKEditor's own stylesheet is injected at
+ * runtime, so it lands after this one and wins every tie on source order. The
+ * same reason the code styling further down carries the editable's class.
+ */
+.authoring-panel-body .ck.ck-editor__top {
+  @apply sticky top-0 z-10;
+
+  background: theme('colors.paper');
 }
