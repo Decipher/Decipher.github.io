@@ -86,6 +86,21 @@ file_put_contents('web/sites/default/settings.local.php', sprintf(
 ));
 PASS('SQLite database configured.');
 
+// This site is reached through a tunnel that terminates TLS and forwards plain
+// HTTP to here. Without being told, Drupal builds absolute URLs from the
+// request it actually received, so the JSON:API index advertises http:// links.
+// The frontend is served over https, so the browser blocks every one of those
+// as mixed content: the site connects, fetches nothing, and renders a blank
+// page with no error a reader could act on.
+TASK('Trusting the tunnel that terminates TLS in front of this.');
+file_put_contents(
+  'web/sites/default/settings.local.php',
+  "\n\$settings['reverse_proxy'] = TRUE;\n"
+    . "\$settings['reverse_proxy_addresses'] = ['127.0.0.1', '::1'];\n",
+  FILE_APPEND
+);
+PASS('Forwarded scheme and host will be honoured.');
+
 // The authoring provisioner writes its CORS settings to their own file and
 // registers it here. This script rewrites this file from scratch, so a plain
 // re-provision drops that registration and takes cross-origin authoring with
