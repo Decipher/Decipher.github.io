@@ -259,3 +259,47 @@ main img {
     transition-duration: 0.01ms !important;
   }
 }
+
+/*
+ * The edit panel, kept inside the viewport.
+ *
+ * It used to be an ordinary block in the page flow, so a long article's form
+ * ran thousands of pixels down and the way out was at the bottom of it: to
+ * close an editor you had opened by mistake, you scrolled to the end of it.
+ *
+ * Pinned under whatever the site has already pinned, and no taller than what is
+ * left. `--sticky-top` is published by the layout, which measures the header and
+ * the breadcrumb bar; the number differs between the front page and an article,
+ * so it cannot be a constant here.
+ *
+ * The gap below is for the floating Edits bar, which sits over the bottom of
+ * the page and would otherwise cover the panel's own buttons.
+ */
+.authoring-panel {
+  top: calc(var(--sticky-top, 0px) + 0.75rem);
+
+  max-height: calc(100vh - var(--sticky-top, 0px) - 5.5rem);
+}
+
+/*
+ * Small screens have no room to spare, and no mouse to hover a control with.
+ * The panel takes the whole viewport under the header, which is what a phone
+ * does with any editing surface worth the name.
+ */
+@media (max-width: 640px) {
+  .authoring-panel {
+    top: var(--sticky-top, 0px);
+
+    max-height: calc(100vh - var(--sticky-top, 0px) - 4rem);
+  }
+}
+
+/*
+ * The form's own buttons, pinned to the bottom of the panel that scrolls them.
+ *
+ * Staging is the point of the form and it was the one control you had to reach
+ * the end of the fields to find.
+ */
+.authoring-entity-form-fields > .authoring-form-actions {
+  @apply sticky bottom-0 -mx-4 mt-4 border-t border-hairline bg-paper px-4 py-3;
+}

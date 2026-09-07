@@ -47,6 +47,18 @@ export default {
   data: () => ({ message: null, original: null, pendingFiles: {}, fileFields: [] }),
 
   computed: {
+    /**
+     * Whether this change is already in the cart.
+     *
+     * The button that put it there should say what pressing it again does, and
+     * "Stage change" on a change that is already staged says nothing at all.
+     */
+    staged() {
+      const id = (this.original || {}).id
+      if (!id) return false
+      return Boolean(this.$store.getters['authoringCart/entryFor'](this.type, id))
+    },
+
     /** A field bytes can be posted through, if this bundle has one. */
     uploadField() {
       return this.fileFields[0] || null
@@ -126,6 +138,14 @@ export default {
      * given a resource and not a schema, and so has no other way to know which
      * of its fields takes a file.
      */
+    /** Take it back out of the cart, leaving what was typed in the form. */
+    unstage() {
+      const id = (this.original || {}).id
+      if (!id) return
+      this.$store.dispatch('authoringCart/discardOne', { type: this.type, id })
+      this.message = 'Unstaged. The change is still here, it is just not going anywhere.'
+    },
+
     registerFileField(field) {
       if (field && !this.fileFields.includes(field)) this.fileFields.push(field)
     },

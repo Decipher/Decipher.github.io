@@ -93,9 +93,37 @@
 </template>
 
 <script>
+import { publishStickyOffset } from '../lib/sticky.mjs'
+
 import { siteIdentity } from '../lib/settings.mjs'
 
 export default {
+  /**
+   * Publish how much of the viewport the pinned bands take.
+   *
+   * Once, here, because several things need to start below them and the number
+   * changes with the page: the breadcrumb bar only exists where there is a
+   * trail. Everything else reads `--sticky-top` rather than measuring again.
+   *
+   * After a tick, because the regions are rendered by Druxt and are not there
+   * when the layout mounts.
+   */
+  mounted() {
+    this.measureSticky()
+    this.$nextTick(this.measureSticky)
+    window.addEventListener('resize', this.measureSticky)
+  },
+
+  beforeDestroy() {
+    window.removeEventListener('resize', this.measureSticky)
+  },
+
+  methods: {
+    measureSticky() {
+      publishStickyOffset(document, window)
+    },
+  },
+
   computed: {
     cartOpen() {
       return this.$store.getters['authoringCart/drawerOpen']

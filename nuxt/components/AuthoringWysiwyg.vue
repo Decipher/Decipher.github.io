@@ -34,6 +34,7 @@
 import { DrupalImageCompatibility, imageUploadAdapter } from '../lib/ckeditor-upload.mjs'
 import { fromEditorCaptions, toEditorCaptions } from '../lib/captions.mjs'
 import { editorFileUrls, storedFileUrls } from '../lib/files.mjs'
+import { stickyOffset } from '../lib/sticky.mjs'
 import { editorPlugins, loadCkeditor } from '../lib/ckeditor.mjs'
 import { editorForFormat, FALLBACK_TOOLBAR, usableToolbar } from '../lib/editor.mjs'
 
@@ -125,22 +126,13 @@ export default {
     /**
      * How far down the page the editor should treat as the top.
      *
-     * CKEditor keeps its toolbar stuck to the top of the viewport while you
-     * scroll through a long field. It does not know about this site's own
-     * sticky header and breadcrumb, so it parked itself underneath them and the
-     * buttons disappeared behind the header.
-     *
-     * Measured rather than hard coded: the breadcrumb bar is only on pages that
-     * have a trail, so the stack is not always the same height.
+     * CKEditor pins its toolbar to the top of the viewport while you scroll a
+     * long field, and knows nothing about this site's own pinned header, so it
+     * parked underneath it. The measurement is the layout's, so the toolbar and
+     * the edit panel cannot disagree about where the top is.
      */
     stickyOffset() {
-      if (typeof document === 'undefined') return 0
-      let offset = 0
-      for (const band of document.querySelectorAll('.druxt-region-top, .druxt-region-bar')) {
-        if (window.getComputedStyle(band).position !== 'sticky') continue
-        offset += band.getBoundingClientRect().height
-      }
-      return Math.round(offset)
+      return stickyOffset(typeof document === 'undefined' ? null : document, window)
     },
 
     /**

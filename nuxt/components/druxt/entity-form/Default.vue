@@ -23,15 +23,36 @@
       </div>
     </details>
 
-    <!-- The authoring buttons, when this form is inside the authoring UI. -->
-    <div v-if="form" class="mt-4 flex flex-wrap gap-2">
+    <!--
+      The authoring buttons, when this form is inside the authoring UI.
+
+      Pinned to the bottom of the panel that scrolls them, because staging is
+      the point of the form and it was the one control you had to reach the end
+      of the fields to find.
+    -->
+    <div v-if="form" class="authoring-form-actions flex flex-wrap items-center gap-2">
+      <!--
+        One control, saying what it will do. It used to say "Stage change"
+        whether or not the change was already staged, so the only way to tell
+        was to look in the drawer.
+      -->
       <button
+        v-if="!form.staged"
         type="button"
         class="rounded bg-accent px-3 py-1.5 text-sm text-accent-contrast hover:opacity-90"
         data-testid="authoring-stage"
         @click="form.stage()"
       >
         Stage change
+      </button>
+      <button
+        v-else
+        type="button"
+        class="rounded border border-accent px-3 py-1.5 text-sm text-accent hover:bg-elevated"
+        data-testid="authoring-unstage"
+        @click="form.unstage()"
+      >
+        Unstage change
       </button>
       <button
         type="button"
