@@ -86,6 +86,29 @@ file_put_contents('web/sites/default/settings.local.php', sprintf(
 ));
 PASS('SQLite database configured.');
 
+// The authoring provisioner writes its CORS settings to their own file and
+// registers it here. This script rewrites this file from scratch, so a plain
+// re-provision drops that registration and takes cross-origin authoring with
+// it: reads keep working, because a GET with no custom header needs no
+// preflight, and anything that does need one starts failing with nothing in
+// the log to say why. Uploading an image was broken this way for a day.
+//
+// So re-register it whenever the file is there, rather than leaving it to
+// whoever remembers to run the other script afterwards.
+TASK('Registering authoring CORS settings, if they exist.');
+if (file_exists('web/sites/default/authoring.services.yml')) {
+  file_put_contents(
+    'web/sites/default/settings.local.php',
+    "\n// Authoring: CORS for the deployed frontend's origin.\n"
+      . "\$settings['container_yamls'][] = \$app_root . '/' . \$site_path . '/authoring.services.yml';\n",
+    FILE_APPEND
+  );
+  PASS('authoring.services.yml registered.');
+}
+else {
+  PASS('None found; run .devtools/provision-authoring to create them.');
+}
+
 TASK('Running drush site-install --existing-config.');
 drush('site-install --existing-config');
 PASS('Site installed from committed config.');

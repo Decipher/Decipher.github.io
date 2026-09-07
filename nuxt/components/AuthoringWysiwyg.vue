@@ -187,8 +187,9 @@ export default {
               'imageStyle:side',
             ],
           },
-          // So the toolbar stops below this site's sticky header rather than
-          // sliding under it.
+          // Only meaningful when the page itself scrolls. Inside the edit
+          // panel the fields scroll in their own box and the stylesheet pins
+          // the toolbar to that instead; see `.authoring-panel-body .ck-toolbar`.
           ui: { viewportOffset: { top: this.stickyOffset() } },
           initialData: this.intoEditor(this.value),
         })

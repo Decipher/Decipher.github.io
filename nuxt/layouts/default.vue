@@ -38,29 +38,6 @@
         <DruxtSite />
       </div>
 
-      <!--
-        Only while editing, and floating rather than stacked. Editing happens
-        down the page and a count you have to scroll back up for is a count
-        nobody reads, so this follows you; a reader who is not editing sees the
-        site instead of a strip of controls for something they are not doing.
-
-        It does not say "editing" anywhere. Being on screen says that, and the
-        page managed to say the word four times over between the old toolbar
-        label, the toggle, the counter and the drawer heading.
-
-        Also shown when something is staged and editing is off. Staged work
-        survives a reload, and work that is waiting to be sent should never be
-        invisible: the only way back to it would be to guess that turning
-        editing on again would reveal it.
-      -->
-      <div
-        v-if="editing || changes"
-        class="sticky bottom-4 z-30 mx-auto mb-4 flex w-fit items-center gap-5 rounded-full border border-hairline bg-surface px-5 py-2.5 shadow-lg"
-        data-testid="authoring-bar"
-      >
-        <AuthoringCartToggle />
-        <AuthoringEditToggle mode="stop" />
-      </div>
 
       <footer class="rule mt-16">
         <div

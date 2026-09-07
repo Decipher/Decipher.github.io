@@ -31,16 +31,25 @@ export default {
   name: 'AuthoringEditToggle',
 
   props: {
-    /** `start` is the way in, `stop` the way out. */
+    /**
+     * `both` is one control that changes what it says, which is what the
+     * account menu wants. `start` and `stop` split it in two, which is what a
+     * second control somewhere else on the page needed.
+     *
+     * There is no second control any more: the floating bar that held the way
+     * out has been folded into the menu, so one control has to do both jobs or
+     * there is no way to leave edit mode at all.
+     */
     mode: {
       type: String,
-      default: 'start',
-      validator: (value) => ['start', 'stop'].includes(value),
+      default: 'both',
+      validator: (value) => ['both', 'start', 'stop'].includes(value),
     },
   },
 
   computed: {
     shown() {
+      if (this.mode === 'both') return true
       return this.mode === (this.editing ? 'stop' : 'start')
     },
 
