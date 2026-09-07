@@ -3,7 +3,7 @@
  *
  * The editor used to be `@ckeditor/ckeditor5-build-classic`, a bundle someone
  * else decided the contents of. Drupal's `full_html` is configured for eight
- * buttons that bundle has no plugin for, so `lib/editor.mjs` filtered them out
+ * buttons that bundle has no plugin for, so `ice/src/editor.mjs` filtered them out
  * and the frontend quietly offered a smaller editor than the site was set up
  * for. Inline code was the one that mattered: this site's own writing is full
  * of it and there was no way to type any.
@@ -112,7 +112,7 @@ const PLUGINS = [
  * `bulletedList` where CKEditor wants the `List` plugin, and `insertTable`
  * needs `TableToolbar` as well or the table has no controls.
  *
- * Keyed by CKEditor's names, after `lib/editor.mjs` has renamed the few Drupal
+ * Keyed by CKEditor's names, after `ice/src/editor.mjs` has renamed the few Drupal
  * calls something else.
  */
 export const BUTTON_PLUGINS = {

@@ -7,20 +7,20 @@
  * JSON:API, allows this origin, and carries a consumer for this site's callback
  * is a valid backend, whether it runs in CI or on the author's laptop.
  *
- * The decisions live in lib/authoring.mjs, where they are unit tested without a
+ * The decisions live in ice/src/authoring.mjs, where they are unit tested without a
  * browser. This file is the browser half: storage, the query string, and state.
  */
 
 import Vue from 'vue'
 
-import { asResource, previewsFor } from '../lib/preview.mjs'
+import { asResource, previewsFor } from '../ice/src/preview.mjs'
 
 import {
   checkConformance,
   normaliseUrl,
   readSessionRecord,
   resolveSource,
-} from '../lib/authoring.mjs'
+} from '../ice/src/authoring.mjs'
 import { readStoredToken } from '../lib/github.mjs'
 
 const STORAGE_KEY = 'authoring.backend'

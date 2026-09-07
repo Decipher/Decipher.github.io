@@ -1,0 +1,12 @@
+{
+  "name": "@druxt-contrib/inline-content-edit",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Edit a Druxt site in the browser: stage changes, preview them, send them somewhere.",
+  "type": "module",
+  "main": "index.mjs",
+  "exports": {
+    ".": "./index.mjs",
+    "./src/*": "./src/*"
+  }
+}

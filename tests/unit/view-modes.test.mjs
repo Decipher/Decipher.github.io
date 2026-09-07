@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { modesFromDisplays } from '../../nuxt/lib/view-modes.mjs'
+import { modesFromDisplays } from '../../nuxt/ice/src/view-modes.mjs'
 
 const display = (targetEntityType, bundle, mode) => ({
   attributes: { targetEntityType, bundle, mode },

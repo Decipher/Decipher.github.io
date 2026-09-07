@@ -31,12 +31,12 @@
  * so it throws before it subscribes to the editor's change events: the editor
  * appears, and every keystroke in it is silently dropped.
  */
-import { DrupalImageCompatibility, imageUploadAdapter } from '../lib/ckeditor-upload.mjs'
-import { captionsAreAttributes, fromEditorCaptions, toEditorCaptions } from '../lib/captions.mjs'
-import { editorFileUrls, storedFileUrls } from '../lib/files.mjs'
+import { DrupalImageCompatibility, imageUploadAdapter } from '../ice/src/ckeditor-upload.mjs'
+import { captionsAreAttributes, fromEditorCaptions, toEditorCaptions } from '../ice/src/captions.mjs'
+import { editorFileUrls, storedFileUrls } from '../ice/src/files.mjs'
 import { stickyOffset } from '../lib/sticky.mjs'
-import { editorPlugins, loadCkeditor } from '../lib/ckeditor.mjs'
-import { editorForFormat, FALLBACK_TOOLBAR, usableToolbar } from '../lib/editor.mjs'
+import { editorPlugins, loadCkeditor } from '../ice/src/ckeditor.mjs'
+import { editorForFormat, FALLBACK_TOOLBAR, usableToolbar } from '../ice/src/editor.mjs'
 
 // Shared across every field on the page: one request, however many editors.
 let editorConfigPromise = null

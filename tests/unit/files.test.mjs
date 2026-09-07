@@ -14,7 +14,7 @@ import {
   isDrupalFile,
   relativeFileUrls,
   rewriteFileUrls,
-} from '../../nuxt/lib/files.mjs'
+} from '../../nuxt/ice/src/files.mjs'
 
 test('an inserted image points at the copy the build made', () => {
   assert.equal(

@@ -29,7 +29,7 @@ import {
   patchBody,
   patchUrl,
   tidyResource,
-} from '../../nuxt/lib/cart.mjs'
+} from '../../nuxt/ice/src/cart.mjs'
 
 test('one cart entry per entity', () => {
   assert.equal(cartKey('node--article', 'abc'), 'node--article:abc')

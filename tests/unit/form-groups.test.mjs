@@ -8,7 +8,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { ADVANCED_FIELDS, groupFields } from '../../nuxt/lib/form-groups.mjs'
+import { ADVANCED_FIELDS, groupFields } from '../../nuxt/ice/src/form-groups.mjs'
 
 test('what the author writes stays in front of them', () => {
   const { content } = groupFields(['title', 'body', 'field_tags', 'field_image', 'status'])
