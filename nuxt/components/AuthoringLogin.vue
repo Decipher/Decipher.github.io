@@ -78,6 +78,14 @@
             <button type="button" class="rounded border border-hairline px-3 py-1.5 text-sm text-body hover:border-ink hover:text-ink transition-colors" data-testid="authoring-reload" @click="reload">
               Reload
             </button>
+            <button
+              type="button"
+              class="rounded border border-hairline px-3 py-1.5 text-sm text-muted transition-colors hover:border-ink hover:text-ink"
+              data-testid="authoring-login-close"
+              @click="close"
+            >
+              Close
+            </button>
             <button type="button" class="rounded border border-hairline px-3 py-1.5 text-sm text-body hover:border-ink hover:text-ink transition-colors" data-testid="authoring-disconnect" @click="disconnect">
               Disconnect
             </button>
@@ -92,6 +100,14 @@
           </p>
           <div class="mt-5 flex flex-wrap gap-2">
             <button type="button" class="rounded bg-accent px-3 py-1.5 text-sm text-accent-contrast hover:opacity-90 transition-opacity" data-testid="authoring-logout" @click="logout">Log out</button>
+            <button
+              type="button"
+              class="rounded border border-hairline px-3 py-1.5 text-sm text-muted transition-colors hover:border-ink hover:text-ink"
+              data-testid="authoring-login-close"
+              @click="close"
+            >
+              Close
+            </button>
             <button type="button" class="rounded border border-hairline px-3 py-1.5 text-sm text-body hover:border-ink hover:text-ink transition-colors" data-testid="authoring-disconnect" @click="disconnect">
               Disconnect
             </button>
@@ -164,7 +180,27 @@ export default {
     },
   },
 
+  mounted() {
+    document.addEventListener('keydown', this.onKey)
+  },
+
+  beforeDestroy() {
+    document.removeEventListener('keydown', this.onKey)
+  },
+
   methods: {
+    /**
+     * Escape closes it.
+     *
+     * The backdrop already did, which is a dismissal nobody can see and a
+     * keyboard cannot reach. Connecting a backend leaves this open on its
+     * sign-in step, so without a way out the page behind it is unreachable
+     * unless you happen to click the dark part.
+     */
+    onKey(event) {
+      if (event.key === 'Escape' && this.dialog) this.close()
+    },
+
     open() {
       this.error = null
       this.url = (this.state && this.state.url) || ''
