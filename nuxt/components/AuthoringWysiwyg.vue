@@ -32,7 +32,7 @@
  * appears, and every keystroke in it is silently dropped.
  */
 import { DrupalImageCompatibility, imageUploadAdapter } from '../lib/ckeditor-upload.mjs'
-import { fromEditorCaptions, toEditorCaptions } from '../lib/captions.mjs'
+import { captionsAreAttributes, fromEditorCaptions, toEditorCaptions } from '../lib/captions.mjs'
 import { editorFileUrls, storedFileUrls } from '../lib/files.mjs'
 import { stickyOffset } from '../lib/sticky.mjs'
 import { editorPlugins, loadCkeditor } from '../lib/ckeditor.mjs'
@@ -62,6 +62,20 @@ export default {
   },
 
   computed: {
+    /**
+     * Whether this format's captions belong in `data-caption`.
+     *
+     * Read from the build's copy of the format configuration. It used to be
+     * assumed, and the assumption is true of every format on this site, which
+     * is exactly why it went unnoticed: on a site whose format does not run
+     * `filter_caption`, every caption an author wrote would have been stored
+     * into an attribute nothing reads and lost without a word.
+     */
+    captionsAsAttributes() {
+      const filters = ((this.$config || {}).authoring || {}).filters || {}
+      return captionsAreAttributes(filters, this.format)
+    },
+
     /** The toolbars the build read out of Drupal's committed configuration. */
     bakedToolbars() {
       return ((this.$config || {}).authoring || {}).toolbars || {}
@@ -150,7 +164,8 @@ export default {
      * editor's schema does not know and would drop.
      */
     intoEditor(value) {
-      return editorFileUrls(toEditorCaptions(value || ''), this.backendUrl)
+      const html = this.captionsAsAttributes ? toEditorCaptions(value || '') : value || ''
+      return editorFileUrls(html, this.backendUrl)
     },
 
     /**
@@ -176,7 +191,8 @@ export default {
 
     /** And back, so what is staged is what Drupal would have written. */
     outOfEditor(data) {
-      return fromEditorCaptions(storedFileUrls(data, this.backendUrl))
+      const html = storedFileUrls(data, this.backendUrl)
+      return this.captionsAsAttributes ? fromEditorCaptions(html) : html
     },
 
     async create(namespace, toolbar) {

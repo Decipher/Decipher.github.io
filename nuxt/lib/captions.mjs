@@ -145,3 +145,26 @@ export function encodeAttribute(value) {
     .split('"')
     .join('&quot;')
 }
+
+/** The filter that turns `data-caption` into a figure when the field renders. */
+export const CAPTION_FILTER = 'filter_caption'
+
+/**
+ * Whether captions belong in an attribute for this format.
+ *
+ * Only when Drupal will build the figure back. Writing `data-caption` into a
+ * format that does not run `filter_caption` puts the words somewhere nothing
+ * reads: the picture renders, the caption is gone, and no error is raised
+ * anywhere. Leaving the editor's own `<figcaption>` alone is the safe answer,
+ * because that at least renders as itself.
+ *
+ * Unknown formats are treated as running it. Every format that ships with
+ * Drupal and permits images runs it, and the alternative default silently
+ * changes how existing content is stored the first time a format cannot be
+ * looked up.
+ */
+export function captionsAreAttributes(filters, format) {
+  const known = (filters || {})[format]
+  if (!Array.isArray(known)) return true
+  return known.includes(CAPTION_FILTER)
+}
