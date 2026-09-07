@@ -36,6 +36,11 @@ import { uploadHeaders, uploadUrl } from './upload.mjs'
  * anything is staged, so what gets committed is Drupal's own path.
  */
 export async function uploadImage(file, { backendUrl, token, resourceType, field, request }) {
+  // Said plainly, because CKEditor shows this to the author. Drupal would
+  // answer 403 and the message would be about permissions rather than about
+  // the one thing they need to do.
+  if (!token) throw new Error('Sign in before adding an image.')
+
   const fetcher = request || globalThis.fetch
   const response = await fetcher(uploadUrl(backendUrl, resourceType, field), {
     method: 'POST',

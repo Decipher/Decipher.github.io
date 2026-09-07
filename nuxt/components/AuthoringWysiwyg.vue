@@ -33,7 +33,7 @@
  */
 import { DrupalImageCompatibility, imageUploadAdapter } from '../lib/ckeditor-upload.mjs'
 import { fromEditorCaptions, toEditorCaptions } from '../lib/captions.mjs'
-import { absoluteFileUrls, relativeFileUrls } from '../lib/files.mjs'
+import { editorFileUrls, storedFileUrls } from '../lib/files.mjs'
 import { editorPlugins, loadCkeditor } from '../lib/ckeditor.mjs'
 import { editorForFormat, FALLBACK_TOOLBAR, usableToolbar } from '../lib/editor.mjs'
 
@@ -74,18 +74,18 @@ export default {
     /**
      * What the upload adapter needs, or nothing if it cannot work.
      *
-     * A token is part of that. Everything else an author does is staged in the
-     * browser and sent when they say so, but bytes have to go somewhere the
-     * moment the image is inserted, and Drupal will not take them from nobody.
-     * Offering the button before signing in is offering a guaranteed 403.
+     * Not gated on being signed in. It was, briefly, on the reasoning that an
+     * upload without a token is a guaranteed 403 and a button that cannot work
+     * should not be offered. That reasoning costs more than it saves: a control
+     * an author never sees is a feature they never find out about, and the way
+     * to add an image stopped being discoverable at all. The button stays, and
+     * `uploadImage` says what is missing if it is pressed too early.
      */
     uploadOptions() {
       if (!this.backendUrl || !this.upload || !this.upload.field) return null
-      const token = (this.$authoringAuth && this.$authoringAuth.token) || null
-      if (!token) return null
       return {
         backendUrl: this.backendUrl,
-        token,
+        token: (this.$authoringAuth && this.$authoringAuth.token) || null,
         resourceType: this.upload.resourceType,
         field: this.upload.field,
       }
@@ -123,6 +123,27 @@ export default {
 
   methods: {
     /**
+     * How far down the page the editor should treat as the top.
+     *
+     * CKEditor keeps its toolbar stuck to the top of the viewport while you
+     * scroll through a long field. It does not know about this site's own
+     * sticky header and breadcrumb, so it parked itself underneath them and the
+     * buttons disappeared behind the header.
+     *
+     * Measured rather than hard coded: the breadcrumb bar is only on pages that
+     * have a trail, so the stack is not always the same height.
+     */
+    stickyOffset() {
+      if (typeof document === 'undefined') return 0
+      let offset = 0
+      for (const band of document.querySelectorAll('.druxt-region-top, .druxt-region-bar')) {
+        if (window.getComputedStyle(band).position !== 'sticky') continue
+        offset += band.getBoundingClientRect().height
+      }
+      return Math.round(offset)
+    },
+
+    /**
      * Drupal's stored markup, in the shape CKEditor edits.
      *
      * Two differences, both of which cost content if left: the file path is one
@@ -130,12 +151,12 @@ export default {
      * editor's schema does not know and would drop.
      */
     intoEditor(value) {
-      return absoluteFileUrls(toEditorCaptions(value || ''), this.backendUrl)
+      return editorFileUrls(toEditorCaptions(value || ''), this.backendUrl)
     },
 
     /** And back, so what is staged is what Drupal would have written. */
     outOfEditor(data) {
-      return fromEditorCaptions(relativeFileUrls(data, this.backendUrl))
+      return fromEditorCaptions(storedFileUrls(data, this.backendUrl))
     },
 
     /**
@@ -174,6 +195,9 @@ export default {
               'imageStyle:side',
             ],
           },
+          // So the toolbar stops below this site's sticky header rather than
+          // sliding under it.
+          ui: { viewportOffset: { top: this.stickyOffset() } },
           initialData: this.intoEditor(this.value),
         })
         // The same class the rendered field carries, so what is typed looks

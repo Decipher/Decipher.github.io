@@ -73,3 +73,25 @@ export function relativeFileUrls(html, backendUrl) {
   const origin = String(backendUrl).replace(/\/+$/, '')
   return rewriteFileUrls(html, { from: `${origin}${DRUPAL_FILES}`, to: DRUPAL_FILES })
 }
+
+/**
+ * A body image, addressed so the editor can actually show it.
+ *
+ * Three forms of the same file. Drupal stores `/sites/default/files/...`, the
+ * built site serves a copy at `/files/...`, and a connected backend serves the
+ * original. The editable shows stored markup as-is, so without this every image
+ * in an article an author opens is a broken picture.
+ *
+ * Which copy depends on whether a backend is connected. Editing is deliberately
+ * possible without one, and that case was the broken one: the markup kept
+ * Drupal's path, which this origin does not serve and never has.
+ */
+export function editorFileUrls(html, backendUrl) {
+  return backendUrl ? absoluteFileUrls(html, backendUrl) : rewriteFileUrls(html)
+}
+
+/** And back to what Drupal stores, whichever copy the editor was shown. */
+export function storedFileUrls(html, backendUrl) {
+  const relative = relativeFileUrls(html, backendUrl)
+  return rewriteFileUrls(relative, { from: STATIC_FILES, to: DRUPAL_FILES })
+}
