@@ -3,6 +3,7 @@ import test from 'node:test'
 
 import {
   applyCaptionFilter,
+  captionsAreAttributes,
   decodeAttribute,
   fromEditorCaptions,
   hasUnfilteredCaption,
@@ -90,4 +91,21 @@ test('an apostrophe written as a hex reference decodes like a decimal one', () =
 test('a figure with no caption is left as the editor wrote it', () => {
   const figure = '<figure class="image"><img src="/a.png"><figcaption></figcaption></figure>'
   assert.equal(fromEditorCaptions(figure), figure)
+})
+
+test('captions are attributes only where Drupal will build the figure back', () => {
+  const filters = {
+    full_html: ['editor_file_reference', 'filter_caption', 'filter_align'],
+    plain_html: ['filter_autop', 'filter_url'],
+  }
+  assert.equal(captionsAreAttributes(filters, 'full_html'), true)
+  assert.equal(captionsAreAttributes(filters, 'plain_html'), false)
+})
+
+test('a format nobody could look up is assumed to run the filter', () => {
+  // Every format shipping with Drupal that permits images runs it, and the
+  // other default would quietly change how existing content is stored the
+  // first time a lookup failed.
+  assert.equal(captionsAreAttributes({}, 'unknown'), true)
+  assert.equal(captionsAreAttributes(null, 'unknown'), true)
 })

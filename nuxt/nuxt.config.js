@@ -173,6 +173,44 @@ const configuredViewModes = function () {
   return modes
 }
 
+/**
+ * Which filters each text format runs, read at build time.
+ *
+ * A caption is stored one of two ways depending on this. With `filter_caption`
+ * on, Drupal builds the figure at render time from a `data-caption` attribute,
+ * so that is where the caption belongs. With it off, nothing ever reads that
+ * attribute and a caption written into it is a caption nobody sees again.
+ *
+ * The integration used to assume it was on, which is true of every format this
+ * site has and is not a safe thing to assume about someone else's. Same source
+ * and same reasoning as `configuredToolbars`: the runtime resource needs
+ * permission that an author's token does not carry.
+ */
+const configuredFilters = function () {
+  const { readdirSync, readFileSync } = require('fs')
+  const { join } = require('path')
+  const yaml = require('js-yaml')
+  const dir = join(__dirname, '..', 'drupal', 'config')
+  const filters = {}
+  let names = []
+  try {
+    names = readdirSync(dir).filter((name) => /^filter\.format\..+\.yml$/.test(name))
+  } catch {
+    return filters
+  }
+
+  for (const name of names) {
+    try {
+      const config = yaml.load(readFileSync(join(dir, name), 'utf8')) || {}
+      const format = config.format || name.replace(/^filter\.format\.|\.yml$/g, '')
+      filters[format] = Object.keys(config.filters || {})
+    } catch {
+      // One unreadable format is not a reason to build without the others.
+    }
+  }
+  return filters
+}
+
 const localhostListenURL = function () {
   this.nuxt.hook('listen', (server, listener) => {
     listener.host = 'localhost'
@@ -272,6 +310,10 @@ export default async () => ({
       // The display modes each bundle has, so the editor can offer a choice of
       // them with no backend to ask. See `configuredViewModes`.
       viewModes: configuredViewModes(),
+
+      // Which filters each format runs, so the editor knows where a caption
+      // belongs. See `configuredFilters`.
+      filters: configuredFilters(),
 
       // Where a session provider publishes the live backend, if anywhere.
       //
