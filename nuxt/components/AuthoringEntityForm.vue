@@ -401,8 +401,16 @@ export default {
      */
     discardEdits() {
       const id = (this.original || {}).id
-      if (id) this.$store.dispatch('authoringCart/clearDraft', { type: this.type, id })
-      this.revertToHeld()
+      if (!id) return
+      // Only the dispatch. The form reverts because `drafted` becomes false and
+      // its watcher runs, which is exactly what happens when the same draft is
+      // discarded from the drawer.
+      //
+      // It used to dispatch and revert, so this button reverted twice, once
+      // before the store had settled and once after, while the drawer reverted
+      // once. Two routes to one operation is two things to keep in agreement,
+      // and they will not stay in agreement.
+      this.$store.dispatch('authoringCart/clearDraft', { type: this.type, id })
       this.message = this.staged
         ? 'Discarded. What was staged is still staged.'
         : 'Discarded.'
