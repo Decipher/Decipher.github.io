@@ -388,12 +388,24 @@ export default {
       return changed
     },
 
-    reset() {
-      const form = this.$refs.form
-      // DruxtEntityForm's own reset sets the model back to `entity`, which is
-      // the model, so it does nothing. Restore the snapshot instead.
-      if (form && this.original) form.model = JSON.parse(JSON.stringify(this.original))
-      this.message = null
+    /**
+     * Throw away the edits that have not been staged, and only those.
+     *
+     * Anything already in the cart stays there. That is the difference between
+     * this and Unstage, and it was previously only reachable by finding the
+     * change in the drawer and discarding its draft, which is a long way round
+     * for "undo what I just typed".
+     *
+     * `revertToHeld` is the same operation the form already does when a draft
+     * is discarded from the drawer, so both routes land in the same place.
+     */
+    discardEdits() {
+      const id = (this.original || {}).id
+      if (id) this.$store.dispatch('authoringCart/clearDraft', { type: this.type, id })
+      this.revertToHeld()
+      this.message = this.staged
+        ? 'Discarded. What was staged is still staged.'
+        : 'Discarded.'
     },
 
     onError(error) {

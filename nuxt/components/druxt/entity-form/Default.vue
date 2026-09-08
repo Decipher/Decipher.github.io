@@ -32,21 +32,26 @@
     -->
     <div v-if="form" class="authoring-form-actions flex flex-wrap items-center gap-2">
       <!--
-        One control, saying what it will do. It used to say "Stage change"
-        whether or not the change was already staged, so the only way to tell
-        was to look in the drawer.
+        Three states, not two, and they overlap.
+        A change can be staged and then edited again, which is neither "not
+        staged yet" nor "staged and done with". This used to be one control
+        showing Stage or Unstage, so after staging and typing again the only
+        button on the form was Unstage, and there was no way to add the new
+        edits without first undoing the old ones.
+
+        So: Stage is always offered, Unstage appears when there is something in
+        the cart, and Discard appears when there is unsent work on top of it.
       -->
       <button
-        v-if="!form.staged"
         type="button"
         class="rounded bg-accent px-3 py-1.5 text-sm text-accent-contrast hover:opacity-90"
         data-testid="authoring-stage"
         @click="form.stage()"
       >
-        Stage change
+        {{ form.staged && form.drafted ? 'Stage these too' : 'Stage change' }}
       </button>
       <button
-        v-else
+        v-if="form.staged"
         type="button"
         class="rounded border border-accent px-3 py-1.5 text-sm text-accent hover:bg-elevated"
         data-testid="authoring-unstage"
@@ -54,13 +59,19 @@
       >
         Unstage change
       </button>
+      <!--
+        Throws away only what has not been staged. Everything staged stays in
+        the cart, which is the difference between this and Unstage, and the
+        thing that was previously only reachable from the drawer.
+      -->
       <button
+        v-if="form.drafted"
         type="button"
         class="rounded border border-hairline px-3 py-1.5 text-sm text-body hover:border-ink"
-        data-testid="authoring-reset"
-        @click="form.reset()"
+        data-testid="authoring-discard-edits"
+        @click="form.discardEdits()"
       >
-        Reset
+        Discard edits
       </button>
       <p
         v-if="form.message"
