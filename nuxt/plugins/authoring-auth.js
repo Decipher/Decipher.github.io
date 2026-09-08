@@ -18,7 +18,7 @@
 
 import Vue from 'vue'
 
-import { base64Url, callbackUrl } from '../lib/authoring.mjs'
+import { base64Url, callbackUrl } from '../ice/src/authoring.mjs'
 
 const VERIFIER_KEY = 'authoring.verifier'
 const RETURN_KEY = 'authoring.return'

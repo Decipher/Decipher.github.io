@@ -12,7 +12,7 @@
 </template>
 
 <script>
-import { changedFields, newResourceId } from '../lib/cart.mjs'
+import { changedFields, newResourceId } from '../ice/src/cart.mjs'
 
 export default {
   name: 'AuthoringEntityForm',
@@ -44,10 +44,125 @@ export default {
     value: { type: Object, default: undefined },
   },
 
-  data: () => ({ message: null, original: null, pendingFiles: {} }),
+  data: () => ({
+    message: null,
+    original: null,
+    pendingFiles: {},
+    fileFields: [],
+    /**
+     * Images inserted into a body while there was nowhere to send them.
+     *
+     * Keyed by the data URL that is standing in for them in the markup, so
+     * committing can find each one in the text it has to rewrite.
+     */
+    bodyImages: {},
+  }),
+
+  computed: {
+    /**
+     * Whether this change is already in the cart.
+     *
+     * The button that put it there should say what pressing it again does, and
+     * "Stage change" on a change that is already staged says nothing at all.
+     */
+    staged() {
+      const id = (this.original || {}).id
+      if (!id) return false
+      return Boolean(this.$store.getters['authoringCart/entryFor'](this.type, id))
+    },
+
+    /** A field bytes can be posted through, if this bundle has one. */
+    uploadField() {
+      return this.fileFields[0] || null
+    },
+
+    /** Whether the cart holds anything at all for this entity. */
+    held() {
+      const id = (this.original || {}).id
+      if (!id) return false
+      return Boolean(
+        this.$store.getters['authoringCart/entryFor'](this.type, id) ||
+          this.$store.getters['authoringCart/draftFor'](this.type, id)
+      )
+    },
+
+    /**
+     * Whether there is an unstaged layer on top of whatever is staged.
+     *
+     * Watched on its own, because `held` is true while either layer exists and
+     * so says nothing when only the draft goes. Discarding a draft over a
+     * staged change left the form showing the discarded edit: staging an image,
+     * deleting it, then discarding the deletion did not bring the image back.
+     */
+    drafted() {
+      const id = (this.original || {}).id
+      if (!id) return false
+      return Boolean(this.$store.getters['authoringCart/draftFor'](this.type, id))
+    },
+  },
+
+  watch: {
+    /**
+     * Something else emptied the cart of this entity.
+     *
+     * Only on the way from holding something to holding nothing. Staging is
+     * also a change to what is held, and reverting on that would undo an edit
+     * the moment it was staged.
+     */
+    held(now, before) {
+      if (before && !now) this.revertToHeld()
+    },
+
+    /** A discarded draft puts the form back to what is staged, not to nothing. */
+    drafted(now, before) {
+      if (before && !now) this.revertToHeld()
+    },
+  },
 
 
   methods: {
+    /**
+     * Put the form back to what the backend holds.
+     *
+     * Called when the cart stops holding anything for this entity, which is
+     * what discarding from the drawer does. Without it the form kept showing
+     * the discarded text, and the next keystroke wrote it straight back as a
+     * new draft: the discard undid itself and nothing said so.
+     *
+     * No warning to confirm. The cart already holds everything the form has,
+     * because every keystroke drafts into it, so there is nothing here that
+     * discarding would lose that discarding was not meant to lose.
+     */
+    /**
+     * Put the form back to the last state the author chose to keep.
+     *
+     * That is the staged change if there is one, and only the backend's version
+     * if there is not. It used to go straight back to the backend's version
+     * either way, which threw away work nobody asked it to: stage an edit, make
+     * a further change, discard the further change, and the staged edit went
+     * with it. An inserted image was the visible case, because it vanished.
+     */
+    revertToHeld() {
+      const form = this.$refs.form
+      if (!form || !form.model || !this.original) return
+
+      const held = this.$store.getters['authoringCart/entryFor'](
+        this.type,
+        (this.original || {}).id
+      )
+      const model = JSON.parse(JSON.stringify(this.original))
+      if (held) {
+        model.attributes = { ...(model.attributes || {}), ...(held.attributes || {}) }
+        model.relationships = { ...(model.relationships || {}), ...(held.relationships || {}) }
+      }
+
+      // Files follow the same rule: the ones that belong to the staged change
+      // are kept, and anything chosen since is what is being discarded.
+      this.pendingFiles = { ...((held || {}).files || {}) }
+      this.bodyImages = { ...((held || {}).bodyImages || {}) }
+      form.model = model
+    },
+
     /**
      * A field changed, so the page should already show it.
      *
@@ -63,6 +178,37 @@ export default {
      */
     onFieldInput() {
       this.saveDraft()
+    },
+
+    /**
+     * Note that this bundle has a field files can be posted to.
+     *
+     * JSON:API has no route for creating a file on its own: every upload route
+     * belongs to a field. An image put in the body is not going in a field at
+     * all, so it is posted through one of these and never attached, which is
+     * the only way in that JSON:API offers.
+     *
+     * Registered by the fields themselves as they render, because the form is
+     * given a resource and not a schema, and so has no other way to know which
+     * of its fields takes a file.
+     */
+    /** Take it back out of the cart, leaving what was typed in the form. */
+    unstage() {
+      const id = (this.original || {}).id
+      if (!id) return
+      this.$store.dispatch('authoringCart/discardOne', { type: this.type, id })
+      this.message = 'Unstaged. The change is still here, it is just not going anywhere.'
+    },
+
+    /** Keep an image inserted into a body until the change is sent. */
+    holdBodyImage({ name, type, dataUrl }) {
+      if (!dataUrl) return
+      this.$set(this.bodyImages, dataUrl, { name, type, dataUrl })
+      this.saveDraft()
+    },
+
+    registerFileField(field) {
+      if (field && !this.fileFields.includes(field)) this.fileFields.push(field)
     },
 
     /**
@@ -184,6 +330,7 @@ export default {
         id: (this.$refs.form.model || {}).id,
         ...delta,
         files: this.pendingFiles,
+        bodyImages: this.bodyImages,
       })
     },
 
@@ -211,6 +358,9 @@ export default {
         // it to tell "put back the way it was" apart from "not on this form".
         allRelationships: (form.model || {}).relationships || {},
         files: this.pendingFiles,
+        // Images inserted into a text field while there was no backend. The
+        // markup carries a data URL until the commit can put a real one there.
+        bodyImages: this.bodyImages,
       })
 
       this.message = staged
@@ -238,12 +388,32 @@ export default {
       return changed
     },
 
-    reset() {
-      const form = this.$refs.form
-      // DruxtEntityForm's own reset sets the model back to `entity`, which is
-      // the model, so it does nothing. Restore the snapshot instead.
-      if (form && this.original) form.model = JSON.parse(JSON.stringify(this.original))
-      this.message = null
+    /**
+     * Throw away the edits that have not been staged, and only those.
+     *
+     * Anything already in the cart stays there. That is the difference between
+     * this and Unstage, and it was previously only reachable by finding the
+     * change in the drawer and discarding its draft, which is a long way round
+     * for "undo what I just typed".
+     *
+     * `revertToHeld` is the same operation the form already does when a draft
+     * is discarded from the drawer, so both routes land in the same place.
+     */
+    discardEdits() {
+      const id = (this.original || {}).id
+      if (!id) return
+      // Only the dispatch. The form reverts because `drafted` becomes false and
+      // its watcher runs, which is exactly what happens when the same draft is
+      // discarded from the drawer.
+      //
+      // It used to dispatch and revert, so this button reverted twice, once
+      // before the store had settled and once after, while the drawer reverted
+      // once. Two routes to one operation is two things to keep in agreement,
+      // and they will not stay in agreement.
+      this.$store.dispatch('authoringCart/clearDraft', { type: this.type, id })
+      this.message = this.staged
+        ? 'Discarded. What was staged is still staged.'
+        : 'Discarded.'
     },
 
     onError(error) {

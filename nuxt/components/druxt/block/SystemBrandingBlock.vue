@@ -25,7 +25,7 @@
 </template>
 
 <script>
-import { faviconUrl, siteIdentity } from '../../../lib/settings.mjs'
+import { siteIdentity } from '../../../lib/settings.mjs'
 
 export default {
   name: 'DruxtBlockSystemBrandingBlock',
@@ -43,21 +43,34 @@ export default {
       return siteIdentity(this.settings)
     },
 
-    /** Where the site's front page is, as Drupal has it configured. */
+    /**
+     * The site's home, which is `/` and not Drupal's front path.
+     *
+     * `system.site.page.front` is an internal route, usually `/node`. It is
+     * where Drupal looks for the front page, not an address this site serves:
+     * linking to it points every page at a second copy of the home page, and
+     * Nuxt prefetches it from every page that shows the branding.
+     */
     front() {
-      return this.identity.front || '/'
+      return '/'
     },
 
     /**
-     * The theme's logo, resolved by Drupal with its own fallbacks.
+     * The theme's logo, if the theme has one.
      *
-     * Falls back to the favicon: this build's theme settings carry one and no
-     * logo, and an empty header reads as broken rather than as unconfigured.
+     * No fallback to the favicon. `@druxt-contrib/decoupled-settings` rewrites
+     * both to `/_decoupled/<name>`, a path served by a server middleware, and a
+     * full static build has no server: the URL resolves to nothing and the
+     * header renders a broken image where a logo would be. A theme with no logo
+     * shows its name, which is what Drupal does too.
+     *
+     * See druxt/druxt-decoupled-settings#3.
      */
     logo() {
       const theme = (this.$config || {}).decoupledTheme || 'olivero'
       const url = (this.settings[`${theme}.settings`] || {}).logo?.url
-      return url || faviconUrl(this.settings, theme, (this.$config || {}).decoupledBaseUrl || '')
+      // Only a real file, not the proxy path the module substitutes.
+      return url && !url.startsWith('/_decoupled/') ? url : ''
     },
 
     // Drupal records which parts a branding block shows. Honoured, so turning
@@ -73,14 +86,6 @@ export default {
     showLogo() {
       return this.setting('use_site_logo')
     },
-  },
-
-  created() {
-    if (this.$authoring) this.$authoring.claimBranding(true)
-  },
-
-  beforeDestroy() {
-    if (this.$authoring) this.$authoring.claimBranding(false)
   },
 
   methods: {

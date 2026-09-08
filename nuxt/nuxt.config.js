@@ -1,3 +1,4 @@
+import { CKEDITOR_PACKAGES } from './ice/src/ckeditor.mjs'
 import { repositoryFromRemotes } from './lib/github.mjs'
 
 require('dotenv').config({ path: '../.env' })
@@ -30,6 +31,223 @@ function contentRepository() {
 const CONTENT_REPOSITORY = contentRepository()
 
 const baseUrl = process.env.BASE_URL || 'http://quickstart-druxt-serverless.ddev.site'
+
+/**
+ * Put Drupal's public files where the deployed site can serve them.
+ *
+ * An image inserted into a body field is a Drupal file, and its URL is served
+ * by Drupal. A static build has no Drupal, so those images would all be broken
+ * on the deployed site. Tome already exports the files into the repository, so
+ * this copies them into the static output and `ice/src/files.mjs` points the markup
+ * at the copies.
+ *
+ * Into `static/` rather than `dist/`, so `dev` and `start` serve them too.
+ */
+const copyDrupalFiles = function () {
+  const { cpSync, existsSync, mkdirSync, rmSync } = require('fs')
+  const { join } = require('path')
+  const from = join(__dirname, '..', 'drupal', 'files', 'public')
+  const to = join(__dirname, 'static', 'files')
+  if (!existsSync(from)) return
+  // Removed first, so a file deleted in Drupal stops being served here. The
+  // directory is generated, and gitignored for that reason.
+  rmSync(to, { recursive: true, force: true })
+  mkdirSync(to, { recursive: true })
+  cpSync(from, to, {
+    recursive: true,
+    // Drupal's own protection for its files directory, which says nothing about
+    // a static host and confuses the ones that read it.
+    filter: (path) => !path.endsWith('.htaccess'),
+  })
+}
+
+/**
+ * Put CKEditor's DLL builds where the deployed site can fetch them.
+ *
+ * The editor is assembled at runtime from one script per plugin package rather
+ * than from a prebuilt bundle, so that the toolbar Drupal is configured for is
+ * the toolbar that renders. See `ice/src/ckeditor.mjs` for why it has to be done
+ * this way rather than with an import.
+ *
+ * Copied out of `node_modules` at build time, and gitignored for that reason.
+ */
+const copyCkeditor = function () {
+  const { copyFileSync, existsSync, mkdirSync, rmSync } = require('fs')
+  const { dirname, join } = require('path')
+  const to = join(__dirname, 'static', 'ckeditor5')
+  const resolve = (request) => {
+    try {
+      return dirname(require.resolve(`${request}/package.json`))
+    } catch {
+      return null
+    }
+  }
+
+  const core = resolve('ckeditor5')
+  if (!core) return
+  rmSync(to, { recursive: true, force: true })
+  mkdirSync(to, { recursive: true })
+  copyFileSync(join(core, 'build', 'ckeditor5-dll.js'), join(to, 'ckeditor5-dll.js'))
+
+  for (const name of CKEDITOR_PACKAGES) {
+    const from = resolve(`@ckeditor/ckeditor5-${name}`)
+    const file = from && join(from, 'build', `${name}.js`)
+    if (file && existsSync(file)) copyFileSync(file, join(to, `${name}.js`))
+  }
+}
+
+/**
+ * The toolbar each text format is configured for, read at build time.
+ *
+ * It used to be fetched at runtime from `editor--editor` and nothing else, on
+ * the reasoning that a change made in Drupal should reach the frontend without
+ * a deploy. That resource needs `administer filters`, and the OAuth scope an
+ * author signs in with grants the `authenticated` role, which does not have it.
+ * So every real author got the fallback toolbar: no inline code, no image, none
+ * of the buttons this site's own article is written with. The content could not
+ * have been made with the editor that was being offered.
+ *
+ * Granting `administer filters` to read a toolbar would hand every author the
+ * ability to edit text formats, which is how a text format becomes an XSS. The
+ * configuration is already in the repository, exported by Tome, so the build
+ * reads it from there instead. The runtime fetch still wins when it succeeds,
+ * which keeps the no-deploy property for anyone who can actually use it.
+ */
+const configuredToolbars = function () {
+  const { readdirSync, readFileSync } = require('fs')
+  const { join } = require('path')
+  const yaml = require('js-yaml')
+  const dir = join(__dirname, '..', 'drupal', 'config')
+  const toolbars = {}
+  let names = []
+  try {
+    names = readdirSync(dir).filter((name) => /^editor\.editor\..+\.yml$/.test(name))
+  } catch {
+    // A checkout with no Drupal config still builds; it just has no toolbars.
+    return toolbars
+  }
+
+  for (const name of names) {
+    try {
+      const config = yaml.load(readFileSync(join(dir, name), 'utf8')) || {}
+      const items = (((config.settings || {}).toolbar || {}).items) || []
+      const format = config.format || name.replace(/^editor\.editor\.|\.yml$/g, '')
+      if (items.length) toolbars[format] = items
+    } catch {
+      // One unreadable format is not a reason to build without the others.
+    }
+  }
+  return toolbars
+}
+
+/**
+ * The display modes each bundle has, read at build time.
+ *
+ * Same reasoning as `configuredToolbars`. The editor offers a choice of how to
+ * look at what you are writing, and the list comes from Drupal, and asking
+ * Drupal needs a backend. Editing deliberately works without one, and offering
+ * a single "default" there is offering nothing.
+ *
+ * From the filenames, which encode all three parts:
+ * `core.entity_view_display.<entity type>.<bundle>.<mode>.yml`.
+ */
+const configuredViewModes = function () {
+  const { readdirSync } = require('fs')
+  const { join } = require('path')
+  const modes = {}
+  let names = []
+  try {
+    names = readdirSync(join(__dirname, '..', 'drupal', 'config'))
+  } catch {
+    return modes
+  }
+
+  for (const name of names) {
+    const parts = /^core\.entity_view_display\.([^.]+)\.([^.]+)\.([^.]+)\.yml$/.exec(name)
+    if (!parts) continue
+    const [, entityType, bundle, mode] = parts
+    const type = `${entityType}--${bundle}`
+    modes[type] = modes[type] || ['default']
+    if (!modes[type].includes(mode)) modes[type].push(mode)
+  }
+  return modes
+}
+
+/**
+ * Which filters each text format runs, read at build time.
+ *
+ * A caption is stored one of two ways depending on this. With `filter_caption`
+ * on, Drupal builds the figure at render time from a `data-caption` attribute,
+ * so that is where the caption belongs. With it off, nothing ever reads that
+ * attribute and a caption written into it is a caption nobody sees again.
+ *
+ * The integration used to assume it was on, which is true of every format this
+ * site has and is not a safe thing to assume about someone else's. Same source
+ * and same reasoning as `configuredToolbars`: the runtime resource needs
+ * permission that an author's token does not carry.
+ */
+const configuredFilters = function () {
+  const { readdirSync, readFileSync } = require('fs')
+  const { join } = require('path')
+  const yaml = require('js-yaml')
+  const dir = join(__dirname, '..', 'drupal', 'config')
+  const filters = {}
+  let names = []
+  try {
+    names = readdirSync(dir).filter((name) => /^filter\.format\..+\.yml$/.test(name))
+  } catch {
+    return filters
+  }
+
+  for (const name of names) {
+    try {
+      const config = yaml.load(readFileSync(join(dir, name), 'utf8')) || {}
+      const format = config.format || name.replace(/^filter\.format\.|\.yml$/g, '')
+      filters[format] = Object.keys(config.filters || {})
+    } catch {
+      // One unreadable format is not a reason to build without the others.
+    }
+  }
+  return filters
+}
+
+/**
+ * The order a theme declares its regions in, read at build time.
+ *
+ * Druxt derives the region list from the blocks that are placed, so it arrives
+ * in whatever order that query returned: the account menu before the branding,
+ * and a header rendered backwards. This used to be corrected by a list of
+ * regexes in `lib/regions.mjs` guessing the order from region names, which was
+ * a guess at Olivero's naming made because there was no way to ask.
+ *
+ * `decoupled_settings` can serve the theme's declared order now, behind its
+ * `expose_theme_manifest` setting. Read directly rather than through the
+ * vendored Nuxt module, because the vendored build predates the manifest; when
+ * that build is refreshed this should go and the module should supply it.
+ *
+ * An empty list is the honest answer when nothing served it, and
+ * `layoutFor` then falls back to arrival order rather than to a guess.
+ */
+const declaredRegions = async function (baseUrl) {
+  // `axios`, not `fetch`. This build runs on Node 16, which has no global
+  // fetch, so a fetch here throws and the catch below turns that into "no
+  // manifest" - a silent wrong answer rather than an error. It cost an
+  // afternoon of wondering why the payload was empty when curl could see it.
+  const axios = require('axios')
+  const endpoint = `${String(baseUrl).replace(/\/+$/, '')}/jsonapi/decoupled/settings`
+  try {
+    const { data: body } = await axios.get(endpoint, {
+      headers: { Accept: 'application/vnd.api+json' },
+      timeout: 15000,
+    })
+    const data = Array.isArray(body.data) ? body.data[0] : body.data
+    const regions = (((data || {}).attributes || {}).theme || {}).regions || {}
+    return Object.keys(regions)
+  } catch {
+    // A build with no backend still builds; it just cannot order its regions.
+    return []
+  }
+}
 
 const localhostListenURL = function () {
   this.nuxt.hook('listen', (server, listener) => {
@@ -123,6 +341,22 @@ export default async () => ({
     // baseline every time the date rolled over in UTC.
     builtAt: new Date().toISOString(),
     authoring: {
+      // The buttons each text format is configured for, from the committed
+      // config. See `configuredToolbars` for why this is not left to runtime.
+      // The theme's own region order, so the header is not assembled in
+      // whatever order the block query happened to return.
+      regions: await declaredRegions(baseUrl),
+
+      toolbars: configuredToolbars(),
+
+      // The display modes each bundle has, so the editor can offer a choice of
+      // them with no backend to ask. See `configuredViewModes`.
+      viewModes: configuredViewModes(),
+
+      // Which filters each format runs, so the editor knows where a caption
+      // belongs. See `configuredFilters`.
+      filters: configuredFilters(),
+
       // Where a session provider publishes the live backend, if anywhere.
       //
       // Derived from the repository when nothing sets it, because a build that
@@ -184,6 +418,8 @@ export default async () => ({
   // but `npm start` locally should behave like dev does. Matches the
   // druxt.js monorepo's own example placement.
   modules: [
+    copyDrupalFiles,
+    copyCkeditor,
     // Before druxt-site, because it reads `druxt.baseUrl` and writes the
     // settings into the runtime config the rest of the build then uses.
     //

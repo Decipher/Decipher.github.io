@@ -16,14 +16,38 @@
         one leads and the others are pushed to the far end, rather than every
         region being given a row of its own.
       -->
-      <header v-if="band.top.length" class="druxt-region-top border-b border-hairline">
-        <div class="mx-auto flex w-full max-w-5xl flex-wrap items-center gap-x-6 gap-y-2 px-6 py-4">
+      <!--
+        Sticky, and translucent so the page shows through rather than sliding
+        under an opaque strip. The same two-layer arrangement druxtjs.org uses:
+        the site header pinned at the top, and the trail pinned beneath it, so
+        where you are stays on screen while you read.
+
+        A fixed height, because the layer below pins to the bottom of this one
+        and a header that changes height would leave a gap or an overlap.
+      -->
+      <header
+        v-if="band.top.length"
+        class="druxt-region-top sticky top-0 z-40 h-16 border-b border-hairline bg-paper/90 backdrop-blur"
+      >
+        <div class="mx-auto flex h-full w-full max-w-5xl flex-wrap items-center gap-x-6 gap-y-2 px-6">
           <slot :name="band.top[0]" />
           <div class="ml-auto flex flex-wrap items-center gap-x-6 gap-y-2">
             <slot v-for="region of band.top.slice(1)" :name="region" />
           </div>
         </div>
       </header>
+
+      <!--
+        The second layer. `top-16` is the header's height: they are pinned to
+        each other, so this number and the `h-16` above move together.
+
+        Positioning only. Whatever lands here draws its own strip, because a
+        bar drawn by the wrapper is drawn whether or not anything filled it,
+        and the front page has no trail to show.
+      -->
+      <div v-if="band.bar.length" class="druxt-region-bar sticky top-16 z-30">
+        <slot v-for="region of band.bar" :name="region" />
+      </div>
 
       <div v-if="band.hero.length" class="druxt-region-hero">
         <slot v-for="region of band.hero" :name="region" />
@@ -89,8 +113,18 @@ export default {
   },
 
   computed: {
+    /**
+     * The order the theme declares its regions in, from the build.
+     *
+     * Empty when nothing served it, which `layoutFor` treats as "order them
+     * the way they arrived" rather than guessing.
+     */
+    declaredRegions() {
+      return ((this.$config || {}).authoring || {}).regions || []
+    },
+
     band() {
-      return layoutFor(this.regions)
+      return layoutFor(this.regions, this.declaredRegions)
     },
 
     twoColumn() {

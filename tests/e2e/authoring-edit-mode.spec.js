@@ -6,7 +6,7 @@
 
 import { expect, test } from '@playwright/test'
 
-import { isolateFromPublishedSessions } from './isolate.js'
+import { appReady, isolateFromPublishedSessions } from './isolate.js'
 
 // networkidle throughout: the cart and the edit mode are restored by a plugin
 // during startup, and asserting before that settles reads the pre-hydration page.
@@ -29,7 +29,7 @@ test.describe('edit mode', () => {
     await open(page)
     await page.getByTestId('authoring-edit-toggle').click()
 
-    await expect(page.getByTestId('authoring-edit-toggle')).toHaveText('Editing')
+    await expect(page.getByTestId('authoring-edit-toggle')).toHaveText('Done')
     await page.getByTestId('cart-tab-add').click()
     await expect(page.getByTestId('authoring-add')).toBeVisible()
   })
@@ -41,7 +41,7 @@ test.describe('edit mode', () => {
     await expect(page.getByTestId('authoring-add')).toBeVisible()
 
     await open(page)
-    await expect(page.getByTestId('authoring-edit-toggle')).toHaveText('Editing')
+    await expect(page.getByTestId('authoring-edit-toggle')).toHaveText('Done')
     // The mode survives; the drawer is left however it was last put.
     await expect(page.getByTestId('authoring-cart-toggle')).toBeVisible()
   })
@@ -81,10 +81,20 @@ test.describe('edit mode', () => {
     await page.getByTestId('cart-tab-add').click()
     await page.getByTestId('authoring-add').click()
 
+    // The form opens asynchronously, and Done on a form that has not finished
+    // opening does nothing. Under load that is what happened, which is why this
+    // failed in a full run and never on its own.
+    await expect(page.getByTestId('authoring-add-message')).toBeVisible()
+
     // Staged only when staged: pressing Add opens a form, it does not decide
     // to send anything.
     await page.getByTestId('authoring-add-done').click()
 
+    // The entry lands a tick after the form closes, and reading between the two
+    // found an empty cart and failed on `undefined.isNew`.
+    await page.waitForFunction(
+      () => Object.keys(window.$nuxt.$store.state.authoringCart.entries).length > 0
+    )
     const resource = await page.evaluate(
       () =>
         window.$nuxt.$store.state.authoringCart.entries[

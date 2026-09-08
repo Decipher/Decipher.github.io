@@ -14,7 +14,7 @@ import {
   safeFilename,
   uploadHeaders,
   uploadUrl,
-} from '../../nuxt/lib/upload.mjs'
+} from '../../nuxt/ice/src/upload.mjs'
 
 const imageSchema = {
   settings: {

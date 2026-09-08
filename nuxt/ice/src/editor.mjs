@@ -12,19 +12,29 @@
  * anyway. Anonymous gets the fallback.
  */
 
+import { SUPPORTED_BUTTONS } from './ckeditor.mjs'
+
 /**
- * Buttons the classic build actually ships.
+ * Buttons this build can render.
  *
- * Drupal's list is its own vocabulary and includes items from modules the build
- * has no plugin for: `drupalInsertImage` and `sourceEditing` are configured on
- * a stock Umami, and passing either to the classic build throws
- * `toolbarview-item-unavailable` and takes the whole editor down with it. So the
- * list is filtered to what can actually be rendered.
+ * Drupal's list is its own vocabulary and can name buttons that are not there:
+ * `drupalInsertImage` is Drupal's own, and passing a button whose plugin is
+ * missing throws `toolbarview-item-unavailable` and takes the whole editor down
+ * with it. So the list is filtered to what `ice/src/ckeditor.mjs` has a plugin for.
  */
-const SUPPORTED = new Set([
-  'heading', 'bold', 'italic', 'link', 'bulletedList', 'numberedList',
-  'blockQuote', 'insertTable', 'undo', 'redo', 'indent', 'outdent', '|',
-])
+export const SUPPORTED = new Set([...SUPPORTED_BUTTONS, '|'])
+
+/**
+ * Drupal's name for a button, where CKEditor calls it something else.
+ *
+ * `drupalInsertImage` is the button Drupal's own module registers for inserting
+ * an image. The thing it does is CKEditor's `uploadImage`, so the name is
+ * translated rather than the button dropped: the site is configured to offer
+ * image insertion, and it can be offered.
+ */
+export const ALIASES = {
+  drupalInsertImage: 'uploadImage',
+}
 
 /** Used when Drupal's configuration cannot be read, which is the anonymous case. */
 export const FALLBACK_TOOLBAR = [
@@ -48,25 +58,38 @@ export function editorForFormat(resources, format) {
 }
 
 /**
- * The toolbar for a format, as CKEditor wants it.
+ * A configured list of buttons, reduced to the ones that can be rendered.
+ *
+ * Shared, because the list arrives two ways: over JSON:API from a session that
+ * is allowed to read it, and baked into the build from the committed config for
+ * every session that is not.
  *
  * Collapses runs of separators and trims them from the ends, because removing
  * an unsupported button often leaves a `|` with nothing on one side, which
  * renders as a stray divider.
  */
-export function toolbarFor(resources, format) {
-  const editor = editorForFormat(resources, format)
-  const items = (((editor || {}).attributes || {}).settings || {}).toolbar
-  const configured = Array.isArray((items || {}).items) ? items.items : null
-  if (!configured || !configured.length) return [...FALLBACK_TOOLBAR]
+export function usableToolbar(configured) {
+  if (!Array.isArray(configured) || !configured.length) return []
 
-  const supported = configured.filter((item) => SUPPORTED.has(item))
+  const named = configured.map((item) => ALIASES[item] || item)
+  const supported = named.filter((item) => SUPPORTED.has(item))
   const tidied = supported.filter(
     (item, i, all) => !(item === '|' && (i === 0 || all[i - 1] === '|'))
   )
   while (tidied.length && tidied[tidied.length - 1] === '|') tidied.pop()
+  return tidied
+}
+
+/**
+ * The toolbar for a format, as CKEditor wants it.
+ *
+ */
+export function toolbarFor(resources, format) {
+  const editor = editorForFormat(resources, format)
+  const items = (((editor || {}).attributes || {}).settings || {}).toolbar
+  const usable = usableToolbar(((items || {}).items) || null)
 
   // Every configured button was one this build cannot render, which is a
   // configuration worth falling back from rather than showing an empty bar.
-  return tidied.length ? tidied : [...FALLBACK_TOOLBAR]
+  return usable.length ? usable : [...FALLBACK_TOOLBAR]
 }

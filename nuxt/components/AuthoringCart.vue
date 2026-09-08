@@ -137,6 +137,22 @@
             </button>
           </div>
 
+          <!--
+            Images put in a text field before there was anywhere to send them.
+            They are in the markup as data URLs, which is to say they are in the
+            diff as a hundred characters of base64 and nowhere a reader would
+            recognise as a picture. Said plainly instead.
+          -->
+          <p
+            v-if="heldImages(resource).length"
+            class="ml-6 font-mono text-[0.6875rem] text-muted"
+            :data-testid="`cart-held-images-${resource.id}`"
+          >
+            carrying {{ heldImages(resource).length }}
+            {{ heldImages(resource).length === 1 ? 'image' : 'images' }}:
+            {{ heldImages(resource).join(', ') }}
+          </p>
+
           <p
             v-if="dependsOn(resource).length"
             class="ml-6 font-mono text-[0.6875rem] text-muted"
@@ -178,12 +194,8 @@
     <section v-if="unstaged.length" class="mb-4">
       <p class="eyebrow mb-2">Unstaged</p>
       <ul class="space-y-1">
-        <li
-          v-for="item in unstaged"
-          :key="item.key"
-          class="flex items-baseline gap-2 text-sm"
-          data-testid="cart-unstaged-row"
-        >
+        <li v-for="item in unstaged" :key="item.key" class="text-sm" data-testid="cart-unstaged-row">
+          <div class="flex items-baseline gap-2">
           <input
             type="checkbox"
             class="authoring-check"
@@ -191,7 +203,16 @@
             :data-testid="`cart-stage-${item.id}`"
             @change="stageDraft(item)"
           />
-          <span class="flex min-w-0 flex-1 items-baseline gap-2 truncate">
+          <button
+            type="button"
+            class="flex min-w-0 flex-1 items-baseline gap-1 text-left"
+            :aria-expanded="String(isExpanded(item))"
+            :data-testid="`cart-expand-draft-${item.id}`"
+            @click="toggle(item)"
+          >
+            <span class="w-3 shrink-0 font-mono text-xs text-muted" aria-hidden="true">
+              {{ isExpanded(item) ? '-' : '+' }}
+            </span>
             <span
               class="shrink-0 rounded border px-1.5 py-0.5 font-mono text-[0.625rem] uppercase tracking-eyebrow"
               :class="item.deleted ? 'border-accent text-accent' : 'border-hairline text-muted'"
@@ -201,8 +222,8 @@
             <span :class="item.deleted ? 'text-muted line-through' : 'text-ink'">
               {{ item.label }}
             </span>
-            <span v-if="!item.deleted" class="text-muted">{{ item.fields }}</span>
-          </span>
+            <span v-if="!item.deleted" class="truncate text-muted">{{ item.fields }}</span>
+          </button>
           <button
             type="button"
             class="shrink-0 font-mono text-[0.6875rem] uppercase tracking-eyebrow text-muted underline hover:text-accent"
@@ -219,6 +240,15 @@
           >
             Discard
           </button>
+          </div>
+
+          <!-- What ticking the box would stage. -->
+          <AuthoringJsonTree
+            v-if="isExpanded(item)"
+            :value="item.shape"
+            class="ml-6 mt-1 border-l border-hairline pl-2"
+            :data-testid="`cart-draft-json-${item.id}`"
+          />
         </li>
       </ul>
       <p class="mt-2 text-sm text-muted">
@@ -272,22 +302,16 @@
       {{ blockedReason }}
     </p>
 
-    </div>
-
-    <AuthoringPreview
-      v-if="previewing"
-      :type="previewing.type"
-      :uuid="previewing.id"
-      @close="previewing = null"
-    />
-
     <!--
-      The second destination. A backend is for validating against a real site;
-      this is for getting the work reviewed and published, and needs neither a
-      backend nor a session.
-    -->
-    <!--
-      Always, not only once something is staged. Signing in is what lets an
+      Inside the Send panel, because that is what it is for. It escaped it
+      once and rendered under every tab, so an author looking at their
+      changes was shown a repository field and a sign-in button as well.
+
+      This is the second destination. A backend is for validating against a
+      real site; this is for getting the work reviewed and published, and
+      needs neither a backend nor a session.
+
+      Not gated on having staged something, though. Signing in is what lets an
       author start a backend, so requiring an edit first meant arriving at an
       empty site with no way to get one.
     -->
@@ -302,6 +326,16 @@
         {{ prError }}
       </p>
     </div>
+
+    </div>
+
+    <AuthoringPreview
+      v-if="previewing"
+      :type="previewing.type"
+      :uuid="previewing.id"
+      @close="previewing = null"
+    />
+
     <p v-if="result" class="text-sm text-muted mt-3" data-testid="authoring-cart-result">
       {{ result }}
     </p>
@@ -316,7 +350,7 @@ import {
   requestMethod,
   requiredBy,
   tidyResource,
-} from '../lib/cart.mjs'
+} from '../ice/src/cart.mjs'
 import { openChangeRequest } from '../lib/github-client.mjs'
 
 export default {
@@ -370,6 +404,14 @@ export default {
           deleted: Boolean(draft.deleted),
           label: attributes.title || attributes.name || this.labelOnPage(type, id) || type,
           fields: Object.keys({ ...attributes, ...(draft.relationships || {}) }).join(', '),
+          // What ticking the box would put in the cart, so it can be looked at
+          // before it is decided rather than after.
+          shape: {
+            type,
+            id,
+            attributes,
+            ...(draft.relationships ? { relationships: draft.relationships } : {}),
+          },
         }
       })
     },
@@ -596,12 +638,28 @@ export default {
 
     /** One resource's own tree, open or shut. Shut by default: the drawer is a
      * list first, and a reader opens the one they care about. */
+    /** The names of any images this change is carrying in its markup. */
+    heldImages(resource) {
+      return Object.values((resource || {}).bodyImages || {}).map((file) => file.name)
+    },
+
     isExpanded(resource) {
-      return Boolean(this.expanded[resource.type + resource.id])
+      return Boolean(this.expanded[this.expandKey(resource)])
+    },
+
+    /**
+     * One row's key.
+     *
+     * Drafts are namespaced. The same entity can be staged and have a draft on
+     * top of it, and without this they shared a key, so opening one opened the
+     * other and the `+` on the row you had not touched flipped to `-`.
+     */
+    expandKey(resource) {
+      return `${resource.key ? 'draft:' : ''}${resource.type}${resource.id}`
     },
 
     toggle(resource) {
-      const key = resource.type + resource.id
+      const key = this.expandKey(resource)
       this.$set(this.expanded, key, !this.expanded[key])
     },
 

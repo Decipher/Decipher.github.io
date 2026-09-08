@@ -149,6 +149,16 @@
 export default {
   name: 'AuthoringPreview',
 
+  /**
+   * Tells whatever gets rendered that it is standing in for a page.
+   *
+   * The page's own furniture is not here: no breadcrumb, no Page title block.
+   * An entity that leaves its title to the page has to draw it here instead.
+   */
+  provide() {
+    return { druxtPreview: true }
+  },
+
   props: {
     type: { type: String, required: true },
     uuid: { type: String, required: true },

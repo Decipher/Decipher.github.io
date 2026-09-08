@@ -1,0 +1,19 @@
+uuid: 9e61e782-68ca-443a-b085-f2d85dc60d20
+langcode: en
+status: true
+dependencies:
+  config:
+    - field.storage.node.field_canonical_url
+    - node.type.article
+id: node.article.field_canonical_url
+field_name: field_canonical_url
+entity_type: node
+bundle: article
+label: 'Canonical URL'
+description: 'Where this was published first, if somewhere else. Search engines are told the original is there, so a copy here does not compete with it.'
+required: false
+translatable: true
+default_value: {  }
+default_value_callback: ''
+settings: {  }
+field_type: string

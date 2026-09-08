@@ -11,39 +11,16 @@
   <div class="flex min-h-screen bg-paper">
     <div class="flex min-w-0 flex-1 flex-col transition-all duration-200">
       <!--
-        Sticky, because the header carries the staged count and the edit toggle.
-        Editing happens down the page, and a count you have to scroll back up to
-        read is a count nobody reads. Opaque background, or the content scrolls
-        through it.
-      -->
-      <header class="sticky top-0 z-20 border-b border-hairline bg-paper">
-        <div class="mx-auto flex w-full max-w-5xl items-baseline gap-6 px-6 py-5">
-          <!--
-            Only when Drupal is not already branding the page. `DruxtSite`
-            renders the branding block in the header region, and two site names
-            one above the other is the toolbar competing with the site.
-          -->
-          <NuxtLink v-if="!brandingPresent" to="/" class="no-underline">
-            <span class="font-mono text-sm uppercase tracking-eyebrow text-ink">{{
-              siteName
-            }}</span>
-          </NuxtLink>
-          <span v-if="!brandingPresent && slogan" class="eyebrow hidden sm:inline">{{ slogan }}</span>
-          <span v-if="brandingPresent" class="eyebrow">Editing</span>
-          <div class="ml-auto flex items-baseline gap-4">
-            <AuthoringEditToggle />
-            <AuthoringCartToggle />
-            <!--
-              Always rendered, because it hosts the sign-in dialog and that has
-              to outlive the region Drupal's account menu sits in. Its own
-              button is hidden when that menu is carrying one, so there is one
-              control rather than two.
-            -->
-            <AuthoringLogin :trigger="!accountMenuPresent" />
-          </div>
-        </div>
-      </header>
+        Drupal's header is the site's header, so it goes first and nothing sits
+        above it. A toolbar used to, which put the tool above the site it is a
+        tool for.
 
+        The sign-in dialog is hosted here and nowhere else. Drupal's account menu
+        carries the button that opens it, and that menu is inside a region Druxt
+        re-renders the moment a backend connects: a dialog rendered there would
+        be unmounted by the thing it was opened to do.
+      -->
+      <AuthoringLogin :trigger="false" />
       <!--
         Drupal's own layout, not this frontend's. `DruxtSite` renders every
         region the theme declares, and the content region's Main page content
@@ -60,6 +37,7 @@
       <div class="flex-1">
         <DruxtSite />
       </div>
+
 
       <footer class="rule mt-16">
         <div
@@ -92,12 +70,49 @@
 </template>
 
 <script>
+import { publishStickyOffset } from '../lib/sticky.mjs'
+
 import { siteIdentity } from '../lib/settings.mjs'
 
 export default {
+  /**
+   * Publish how much of the viewport the pinned bands take.
+   *
+   * Once, here, because several things need to start below them and the number
+   * changes with the page: the breadcrumb bar only exists where there is a
+   * trail. Everything else reads `--sticky-top` rather than measuring again.
+   *
+   * After a tick, because the regions are rendered by Druxt and are not there
+   * when the layout mounts.
+   */
+  mounted() {
+    this.measureSticky()
+    this.$nextTick(this.measureSticky)
+    window.addEventListener('resize', this.measureSticky)
+  },
+
+  beforeDestroy() {
+    window.removeEventListener('resize', this.measureSticky)
+  },
+
+  methods: {
+    measureSticky() {
+      publishStickyOffset(document, window)
+    },
+  },
+
   computed: {
     cartOpen() {
       return this.$store.getters['authoringCart/drawerOpen']
+    },
+
+    editing() {
+      return this.$store.getters['authoringCart/editing']
+    },
+
+    /** Anything staged or typed, so held work is never off screen. */
+    changes() {
+      return this.$store.getters['authoringCart/count']
     },
 
     /**
@@ -114,14 +129,6 @@ export default {
 
     slogan() {
       return this.identity.slogan
-    },
-
-    brandingPresent() {
-      return Boolean(this.$authoring && this.$authoring.brandingPresent)
-    },
-
-    accountMenuPresent() {
-      return Boolean(this.$authoring && this.$authoring.accountMenuPresent)
     },
 
     identity() {

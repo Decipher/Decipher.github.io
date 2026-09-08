@@ -80,10 +80,49 @@ if (file_exists($db_file)) {
 // var_export() so a path containing quotes stays valid PHP.
 $db_file_php = var_export($db_file, TRUE);
 file_put_contents('web/sites/default/settings.local.php', sprintf(
-  "<?php\n\n/**\n * @file\n * Provision-only override, written fresh each run by .devtools/provision.\n * Gitignored - never committed.\n */\n\n\$databases['default']['default'] = [\n  'driver' => 'sqlite',\n  'database' => %s,\n];\n",
-  $db_file_php
+  "<?php\n\n/**\n * @file\n * Provision-only override, written fresh each run by .devtools/provision.\n * Gitignored - never committed.\n */\n\n\$databases['default']['default'] = [\n  'driver' => 'sqlite',\n  'database' => %s,\n];\n\n// Here rather than in settings.php, which is tracked. `site-install` writes the\n// salt there, so any `git checkout` of that file silently empties it and every\n// request afterwards is a 500 that names a setting rather than the checkout.\n\$settings['hash_salt'] = %s;\n",
+  $db_file_php,
+  var_export(bin2hex(random_bytes(32)), TRUE)
 ));
 PASS('SQLite database configured.');
+
+// This site is reached through a tunnel that terminates TLS and forwards plain
+// HTTP to here. Without being told, Drupal builds absolute URLs from the
+// request it actually received, so the JSON:API index advertises http:// links.
+// The frontend is served over https, so the browser blocks every one of those
+// as mixed content: the site connects, fetches nothing, and renders a blank
+// page with no error a reader could act on.
+TASK('Trusting the tunnel that terminates TLS in front of this.');
+file_put_contents(
+  'web/sites/default/settings.local.php',
+  "\n\$settings['reverse_proxy'] = TRUE;\n"
+    . "\$settings['reverse_proxy_addresses'] = ['127.0.0.1', '::1'];\n",
+  FILE_APPEND
+);
+PASS('Forwarded scheme and host will be honoured.');
+
+// The authoring provisioner writes its CORS settings to their own file and
+// registers it here. This script rewrites this file from scratch, so a plain
+// re-provision drops that registration and takes cross-origin authoring with
+// it: reads keep working, because a GET with no custom header needs no
+// preflight, and anything that does need one starts failing with nothing in
+// the log to say why. Uploading an image was broken this way for a day.
+//
+// So re-register it whenever the file is there, rather than leaving it to
+// whoever remembers to run the other script afterwards.
+TASK('Registering authoring CORS settings, if they exist.');
+if (file_exists('web/sites/default/authoring.services.yml')) {
+  file_put_contents(
+    'web/sites/default/settings.local.php',
+    "\n// Authoring: CORS for the deployed frontend's origin.\n"
+      . "\$settings['container_yamls'][] = \$app_root . '/' . \$site_path . '/authoring.services.yml';\n",
+    FILE_APPEND
+  );
+  PASS('authoring.services.yml registered.');
+}
+else {
+  PASS('None found; run .devtools/provision-authoring to create them.');
+}
 
 TASK('Running drush site-install --existing-config.');
 drush('site-install --existing-config');

@@ -7,7 +7,7 @@
 
 import { expect, test } from '@playwright/test'
 
-import { isolateFromPublishedSessions } from './isolate.js'
+import { appReady, isolateFromPublishedSessions } from './isolate.js'
 
 const BACKEND = 'https://backend.test'
 
@@ -25,17 +25,37 @@ async function stubConformingBackend(page) {
 // Every test in this file, not only the first describe: a build knows where
 // sessions publish themselves and looks there on load, so anything asserting
 // "no backend" would depend on whether one happens to be running.
+/**
+ * Open the dialog without going through the control.
+ *
+ * Naming a backend makes the build's payload be rejected so content can be
+ * fetched live instead. These stubs answer only the probe, so the regions empty
+ * a moment later and take Drupal's account menu, and the trigger inside it, with
+ * them. Clicking it then works only if the click is quick enough, which is not a
+ * property worth having in a test: it passed here and went red on CI.
+ *
+ * The tests above this one click the real control, on a page that is not
+ * connecting and so does not empty. That is where the control belongs under
+ * test. These are about what connecting remembers.
+ */
+async function openLogin(page) {
+  await page.waitForFunction(() => window.$nuxt && window.$nuxt.$authoring)
+  await page.evaluate(() => window.$nuxt.$authoring.openLogin())
+}
+
 test.beforeEach(({ page }) => isolateFromPublishedSessions(page))
 
 test.describe('authoring login', () => {
   test('a visitor sees only a login control, and no backend', async ({ page }) => {
     await page.goto('/')
+    await appReady(page)
     await expect(page.getByTestId('authoring-login-trigger')).toHaveText('Log in')
     await expect(page.getByTestId('authoring-login-dialog')).toHaveCount(0)
   })
 
   test('clicking log in asks for a backend first', async ({ page }) => {
     await page.goto('/')
+    await appReady(page)
     await page.getByTestId('authoring-login-trigger').click()
 
     await expect(page.getByTestId('authoring-login-dialog')).toBeVisible()
@@ -47,6 +67,7 @@ test.describe('authoring login', () => {
   test('a verified backend unlocks the login step', async ({ page }) => {
     await stubConformingBackend(page)
     await page.goto('/')
+    await appReady(page)
 
     await page.getByTestId('authoring-login-trigger').click()
     await page.getByTestId('authoring-backend-url').fill(BACKEND)
@@ -59,6 +80,7 @@ test.describe('authoring login', () => {
   test('an unreachable backend is reported, and does not unlock login', async ({ page }) => {
     await page.route('https://nope.test/jsonapi', (route) => route.abort())
     await page.goto('/')
+    await appReady(page)
 
     await page.getByTestId('authoring-login-trigger').click()
     await page.getByTestId('authoring-backend-url').fill('https://nope.test')
@@ -73,6 +95,7 @@ test.describe('authoring login', () => {
       route.fulfill({ status: 200, contentType: 'application/json', body: '{"hello":"world"}' })
     )
     await page.goto('/')
+    await appReady(page)
 
     await page.getByTestId('authoring-login-trigger').click()
     await page.getByTestId('authoring-backend-url').fill('https://notdrupal.test')
@@ -84,28 +107,32 @@ test.describe('authoring login', () => {
   test('a backend named in the URL connects without being typed', async ({ page }) => {
     await stubConformingBackend(page)
     await page.goto(`/?backend=${encodeURIComponent(BACKEND)}`)
+    await appReady(page)
 
-    await page.getByTestId('authoring-login-trigger').click()
+    await openLogin(page)
     await expect(page.getByTestId('authoring-continue')).toBeVisible()
   })
 
   test('a connected backend is remembered across a reload', async ({ page }) => {
     await stubConformingBackend(page)
     await page.goto(`/?backend=${encodeURIComponent(BACKEND)}`)
-    await page.getByTestId('authoring-login-trigger').click()
+    await appReady(page)
+    await openLogin(page)
     await expect(page.getByTestId('authoring-continue')).toBeVisible()
 
     // Reloaded without the query string: it has to come from storage or not
     // at all.
     await page.goto('/')
-    await page.getByTestId('authoring-login-trigger').click()
+    await appReady(page)
+    await openLogin(page)
     await expect(page.getByTestId('authoring-continue')).toBeVisible()
   })
 
   test('disconnecting forgets the backend', async ({ page }) => {
     await stubConformingBackend(page)
     await page.goto(`/?backend=${encodeURIComponent(BACKEND)}`)
-    await page.getByTestId('authoring-login-trigger').click()
+    await appReady(page)
+    await openLogin(page)
     await expect(page.getByTestId('authoring-disconnect')).toBeVisible()
     // Disconnecting reloads, so the dialog closes with it: the built content
     // only comes back on a fresh load. Wait for that load rather than racing
@@ -122,6 +149,7 @@ test.describe('authoring login', () => {
     // Reloaded: a disconnect has to survive, or a backend that has gone away
     // gets retried on every single load with no way out.
     await page.goto('/')
+    await appReady(page)
     await page.getByTestId('authoring-login-trigger').click()
     await expect(page.getByTestId('authoring-backend-url')).toBeVisible()
   })
@@ -139,6 +167,7 @@ test.describe('authoring login', () => {
     })
 
     await page.goto(`/?backend=${encodeURIComponent(BACKEND)}`)
+    await appReady(page)
     await page.getByTestId('authoring-login-trigger').click()
     await page.getByTestId('authoring-continue').click()
 
@@ -151,6 +180,7 @@ test.describe('authoring login', () => {
 
   test('the callback reports what the backend refused', async ({ page }) => {
     await page.goto('/callback?error=invalid_client&error_description=Client+authentication+failed')
+    await appReady(page)
     await expect(page.getByTestId('callback-error')).toContainText('Client authentication failed')
   })
 })

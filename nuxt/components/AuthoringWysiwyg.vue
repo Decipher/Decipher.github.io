@@ -31,10 +31,17 @@
  * so it throws before it subscribes to the editor's change events: the editor
  * appears, and every keystroke in it is silently dropped.
  */
-import { FALLBACK_TOOLBAR, toolbarFor } from '../lib/editor.mjs'
+import { DrupalImageCompatibility, imageUploadAdapter } from '../ice/src/ckeditor-upload.mjs'
+import { captionsAreAttributes, fromEditorCaptions, toEditorCaptions } from '../ice/src/captions.mjs'
+import { filtersFromResources } from '../ice/src/formats.mjs'
+import { editorFileUrls, storedFileUrls } from '../ice/src/files.mjs'
+import { stickyOffset } from '../lib/sticky.mjs'
+import { editorPlugins, loadCkeditor } from '../ice/src/ckeditor.mjs'
+import { editorForFormat, FALLBACK_TOOLBAR, usableToolbar } from '../ice/src/editor.mjs'
 
 // Shared across every field on the page: one request, however many editors.
 let editorConfigPromise = null
+let formatCollectionPromise = null
 
 export default {
   name: 'AuthoringWysiwyg',
@@ -43,13 +50,86 @@ export default {
     value: { type: String, default: '' },
     /** The text format this value belongs to, e.g. `basic_html`. */
     format: { type: String, default: null },
+    /**
+     * Where an inserted image's bytes should be posted, if anywhere.
+     *
+     * `{ resourceType, field }`. Null means no route was found, and the image
+     * button is withdrawn rather than offered and left to fail.
+     */
+    upload: { type: Object, default: null },
   },
 
   data() {
-    return { model: this.value, editor: null }
+    return {
+      model: this.value,
+      editor: null,
+      /**
+       * The filters Drupal says this format runs, once it has said.
+       *
+       * Null until asked and if it will not answer. An empty array is a real
+       * answer, so the two cannot be collapsed: see `formats.mjs`.
+       */
+      liveFilters: null,
+    }
   },
 
   computed: {
+    /**
+     * Whether this format's captions belong in `data-caption`.
+     *
+     * Read from the build's copy of the format configuration. It used to be
+     * assumed, and the assumption is true of every format on this site, which
+     * is exactly why it went unnoticed: on a site whose format does not run
+     * `filter_caption`, every caption an author wrote would have been stored
+     * into an attribute nothing reads and lost without a word.
+     */
+    captionsAsAttributes() {
+      // Drupal's own answer when this session can read it, which needs
+      // `filter_format--filter_format` exposed, and the build's copy when not.
+      if (Array.isArray(this.liveFilters)) {
+        return captionsAreAttributes({ [this.format]: this.liveFilters }, this.format)
+      }
+      const filters = ((this.$config || {}).authoring || {}).filters || {}
+      return captionsAreAttributes(filters, this.format)
+    },
+
+    /** The toolbars the build read out of Drupal's committed configuration. */
+    bakedToolbars() {
+      return ((this.$config || {}).authoring || {}).toolbars || {}
+    },
+
+    /** The backend this session is connected to, if any. */
+    backendUrl() {
+      return (this.$authoring && this.$authoring.state.url) || null
+    },
+
+    /**
+     * What the upload adapter needs.
+     *
+     * Never null now. An image can be inserted with no backend and no token:
+     * the bytes are held with the change and sent when the change is, the same
+     * way a field's image already works. Withholding the button until somebody
+     * signed in meant the one thing an author could not do offline was the
+     * thing they most wanted to.
+     *
+     * Not gated on being signed in. It was, briefly, on the reasoning that an
+     * upload without a token is a guaranteed 403 and a button that cannot work
+     * should not be offered. That reasoning costs more than it saves: a control
+     * an author never sees is a feature they never find out about, and the way
+     * to add an image stopped being discoverable at all. The button stays, and
+     * `uploadImage` says what is missing if it is pressed too early.
+     */
+    uploadOptions() {
+      return {
+        backendUrl: this.backendUrl,
+        token: (this.$authoringAuth && this.$authoringAuth.token) || null,
+        resourceType: (this.upload || {}).resourceType,
+        field: (this.upload || {}).field,
+        // Where the bytes go when they cannot go to Drupal yet.
+        hold: (file, dataUrl) => this.holdImage(file, dataUrl),
+      }
+    },
+
     ready() {
       return Boolean(this.editor)
     },
@@ -61,7 +141,9 @@ export default {
       this.model = to
       // Only push into CKEditor when the change came from somewhere else;
       // setData on every keystroke would move the caret to the start.
-      if (this.editor && this.editor.getData() !== to) this.editor.setData(to || '')
+      if (this.editor && this.outOfEditor(this.editor.getData()) !== to) {
+        this.editor.setData(this.intoEditor(to))
+      }
     },
     model(to) {
       this.$emit('input', to)
@@ -69,9 +151,13 @@ export default {
   },
 
   async mounted() {
-    const [ClassicEditor, toolbar] = await Promise.all([this.loadEditor(), this.loadToolbar()])
-    if (!ClassicEditor) return
-    await this.create(ClassicEditor, toolbar)
+    // Alongside the editor, not before it: a format that cannot be read should
+    // not hold up an editor that has a perfectly good build-time answer.
+    this.loadFilters()
+
+    const [namespace, configured] = await Promise.all([loadCkeditor(), this.loadToolbar()])
+    if (!namespace) return
+    await this.create(namespace, configured)
   },
 
   beforeDestroy() {
@@ -79,40 +165,160 @@ export default {
   },
 
   methods: {
-    async loadEditor() {
-      try {
-        return (await import('@ckeditor/ckeditor5-build-classic')).default
-      } catch {
-        // The textarea stays. An edit is still possible without the toolbar.
-        return null
+    /**
+     * How far down the page the editor should treat as the top.
+     *
+     * CKEditor pins its toolbar to the top of the viewport while you scroll a
+     * long field, and knows nothing about this site's own pinned header, so it
+     * parked underneath it. The measurement is the layout's, so the toolbar and
+     * the edit panel cannot disagree about where the top is.
+     */
+    stickyOffset() {
+      return stickyOffset(typeof document === 'undefined' ? null : document, window)
+    },
+
+    /**
+     * Drupal's stored markup, in the shape CKEditor edits.
+     *
+     * Two differences, both of which cost content if left: the file path is one
+     * this origin does not serve, and a caption lives in an attribute the
+     * editor's schema does not know and would drop.
+     */
+    intoEditor(value) {
+      const html = this.captionsAsAttributes ? toEditorCaptions(value || '') : value || ''
+      return editorFileUrls(html, this.backendUrl)
+    },
+
+    /**
+     * Keep an inserted image with the change until there is somewhere to send it.
+     *
+     * Handed to the form, which carries it into the cart entry, so committing
+     * can upload it and put the real URL in the body. Until then the body holds
+     * the data URL, which is what the editor is showing.
+     */
+    holdImage(file, dataUrl) {
+      const form = this.$parent && this.findForm()
+      if (form && typeof form.holdBodyImage === 'function') {
+        form.holdBodyImage({ name: file.name, type: file.type, dataUrl })
       }
     },
 
-    async create(ClassicEditor, toolbar) {
+    /** The authoring form above this field, if this field is on one. */
+    findForm() {
+      let parent = this.$parent
+      while (parent && typeof parent.holdBodyImage !== 'function') parent = parent.$parent
+      return parent
+    },
+
+    /** And back, so what is staged is what Drupal would have written. */
+    outOfEditor(data) {
+      const html = storedFileUrls(data, this.backendUrl)
+      return this.captionsAsAttributes ? fromEditorCaptions(html) : html
+    },
+
+    async create(namespace, toolbar) {
       try {
-        const editor = await ClassicEditor.create(this.$refs.host, {
+        const editor = await namespace.editorClassic.ClassicEditor.create(this.$refs.host, {
           toolbar: { items: toolbar },
-          initialData: this.value || '',
+          // Everything, not just what the toolbar shows: see `editorPlugins`.
+          plugins: [
+            ...editorPlugins(namespace),
+            // Always: it is what makes Drupal's own markup survive a round trip.
+            DrupalImageCompatibility,
+            ...(this.uploadOptions ? [imageUploadAdapter(this.uploadOptions)] : []),
+          ],
+          // What appears when an image is selected. Left empty, CKEditor warns
+          // `widget-toolbar-no-items` and a selected image offers nothing at
+          // all, alt text included, which the field requires.
+          image: {
+            toolbar: [
+              'imageTextAlternative',
+              'toggleImageCaption',
+              '|',
+              'imageStyle:inline',
+              'imageStyle:block',
+              'imageStyle:side',
+            ],
+          },
+          // Only meaningful when the page itself scrolls. Inside the edit
+          // panel the fields scroll in their own box and the stylesheet pins
+          // the toolbar to that instead; see `.authoring-panel-body .ck-toolbar`.
+          ui: { viewportOffset: { top: this.stickyOffset() } },
+          initialData: this.intoEditor(this.value),
         })
+        // The same class the rendered field carries, so what is typed looks
+        // like what will be published. Editing in a box styled differently from
+        // the page is guessing: headings, code and lists all read as plain text
+        // in the editor and as themselves everywhere else.
+        //
+        // Added to the editable root rather than duplicated as CKEditor content
+        // styles, because a second copy of the rules is a second copy to keep
+        // in agreement with the first.
+        editor.editing.view.change((writer) => {
+          writer.addClass('prose-body', editor.editing.view.document.getRoot())
+        })
+
         editor.model.document.on('change:data', () => {
-          this.model = editor.getData()
+          this.model = this.outOfEditor(editor.getData())
         })
         this.editor = editor
-      } catch {
-        // A toolbar item the build does not have throws here. The textarea
-        // stays rather than leaving the author with no field at all.
+      } catch (error) {
+        // A toolbar item with no plugin throws here, and so does a plugin that
+        // will not load. The textarea stays rather than leaving the author with
+        // no field at all.
+        //
+        // Said out loud, because a silent fallback looks identical to an editor
+        // nobody configured: the difference only showed up as a missing toolbar.
+        console.warn('The rich text editor could not start; using a plain field.', error)
       }
     },
 
     /**
-     * Read the configured toolbar, if this session is allowed to.
+     * The buttons this format is configured for.
      *
-     * `editor--editor` needs `administer filters`, so an anonymous visitor gets
-     * an empty collection rather than an error, and keeps the fallback.
+     * Two sources, in order. `editor--editor` is the live one and wins when it
+     * answers, so a change made in Drupal reaches a session that can read it
+     * without a deploy. It needs `administer filters`, which the scope an
+     * author signs in with does not grant, so for almost everybody it returns
+     * an empty collection.
+     *
+     * The build carries the same configuration, read from the committed files.
+     * Without it every real author got the fallback toolbar and none of the
+     * buttons this site's own writing needs, which made the content something
+     * the editor could not have produced.
      */
     async loadToolbar() {
-      const backend = this.$authoring && this.$authoring.state.url
-      if (!backend || !this.format) return [...FALLBACK_TOOLBAR]
+      const live = await this.liveToolbar()
+      if (live.length) return live
+
+      const baked = usableToolbar((this.bakedToolbars || {})[this.format])
+      return baked.length ? baked : [...FALLBACK_TOOLBAR]
+    },
+
+    /**
+     * Ask Drupal which filters this format runs.
+     *
+     * Needs `filter_format--filter_format` exposed, which stock Druxt does not
+     * do. Where it is not, this stays null and the build's copy answers.
+     */
+    async loadFilters() {
+      if (!this.backendUrl || !this.format || !this.$druxt) return
+      // The collection is shared, the answer is not: two fields on one form can
+      // use different formats, and memoising the answer gave the second field
+      // the first one's filters.
+      if (!formatCollectionPromise) {
+        formatCollectionPromise = this.$druxt
+          .getCollection('filter_format--filter_format')
+          .then((collection) => (collection || {}).data || null)
+          .catch(() => null)
+      }
+      this.liveFilters = filtersFromResources(await formatCollectionPromise, this.format)
+    },
+
+    /** Drupal's own answer, for a session allowed to ask. */
+    async liveToolbar() {
+      const backend = this.backendUrl
+      if (!backend || !this.format) return []
 
       if (!editorConfigPromise) {
         const token = this.$authoringAuth && this.$authoringAuth.token
@@ -127,7 +333,12 @@ export default {
           .catch(() => [])
       }
 
-      return toolbarFor(await editorConfigPromise, this.format)
+      // Not `toolbarFor`: it substitutes the fallback when it finds nothing,
+      // and the build's copy is a better answer than that. This wants to know
+      // whether Drupal said anything usable, so it asks for the parts.
+      const editor = editorForFormat(await editorConfigPromise, this.format)
+      const items = (((editor || {}).attributes || {}).settings || {}).toolbar
+      return usableToolbar((items || {}).items)
     },
   },
 }

@@ -7,7 +7,7 @@
 
 import { expect, test } from '@playwright/test'
 
-import { isolateFromPublishedSessions } from './isolate.js'
+import { appReady, isolateFromPublishedSessions } from './isolate.js'
 
 // Every navigation waits for networkidle. The cart is restored by a plugin
 // during startup, so staging or asserting before that settles races it: the
@@ -42,6 +42,7 @@ test.beforeEach(({ page }) => isolateFromPublishedSessions(page))
 test.describe('authoring cart', () => {
   test('a visitor sees no cart', async ({ page }) => {
     await page.goto('/', { waitUntil: 'networkidle' })
+    await appReady(page)
     await expect(page.getByTestId('authoring-cart')).toHaveCount(0)
   })
 
@@ -52,6 +53,7 @@ test.describe('authoring cart', () => {
     })
 
     await page.goto('/', { waitUntil: 'networkidle' })
+    await appReady(page)
     const staged = await stage(page, {
       type: 'node--article',
       id: 'abc',
@@ -66,12 +68,14 @@ test.describe('authoring cart', () => {
 
   test('the cart says what is missing before it can be committed', async ({ page }) => {
     await page.goto('/', { waitUntil: 'networkidle' })
+    await appReady(page)
     await stage(page, { type: 'node--article', id: 'abc', original: {}, edited: { title: 'A' } })
     await expect(page.getByTestId('authoring-cart-blocked')).toContainText('Connect a backend')
   })
 
   test('staged changes survive a reload', async ({ page }) => {
     await page.goto('/', { waitUntil: 'networkidle' })
+    await appReady(page)
     await stage(page, { type: 'node--article', id: 'abc', original: {}, edited: { title: 'A' } })
 
     // networkidle, not the default: the cart is restored by a plugin during
@@ -89,6 +93,7 @@ test.describe('authoring cart', () => {
 
   test('two edits to one entity are one staged change', async ({ page }) => {
     await page.goto('/', { waitUntil: 'networkidle' })
+    await appReady(page)
     await stage(page, { type: 'node--article', id: 'abc', original: {}, edited: { title: 'A' } })
     await stage(page, { type: 'node--article', id: 'abc', original: {}, edited: { body: 'B' } })
 
@@ -101,6 +106,7 @@ test.describe('authoring cart', () => {
 
   test('an edit that changes nothing stages nothing', async ({ page }) => {
     await page.goto('/', { waitUntil: 'networkidle' })
+    await appReady(page)
     const staged = await stage(page, {
       type: 'node--article',
       id: 'abc',
@@ -113,6 +119,7 @@ test.describe('authoring cart', () => {
 
   test('discarding empties the cart and does not come back', async ({ page }) => {
     await page.goto('/', { waitUntil: 'networkidle' })
+    await appReady(page)
     await stage(page, { type: 'node--article', id: 'abc', original: {}, edited: { title: 'A' } })
     // Discard lives with the other destinations now.
     await page.getByTestId('cart-tab-send').click()
@@ -127,6 +134,7 @@ test.describe('authoring cart', () => {
 test.describe('adding content', () => {
   test('a new article can be abandoned', async ({ page }) => {
     await page.goto('/authoring', { waitUntil: 'networkidle' })
+    await appReady(page)
     await page.getByTestId('authoring-edit-toggle').click()
     await page.getByTestId('cart-tab-add').click()
     await page.getByTestId('authoring-add').click()
@@ -145,6 +153,7 @@ test.describe('adding content', () => {
 
   test('a new article can be put down without being thrown away', async ({ page }) => {
     await page.goto('/authoring', { waitUntil: 'networkidle' })
+    await appReady(page)
     await page.getByTestId('authoring-edit-toggle').click()
     await page.getByTestId('cart-tab-add').click()
     await page.getByTestId('authoring-add').click()
@@ -153,11 +162,14 @@ test.describe('adding content', () => {
     // it the only ways out were to discard the work or leave the form open.
     await page.getByTestId('authoring-add-done').click()
     await expect(page.getByTestId('authoring-add-done')).toHaveCount(0)
-    expect(await count(page)).toBe(1)
+    // Polled, not read once: the form closing and the entry landing in the
+    // store are two separate ticks, and reading between them saw nothing.
+    await expect.poll(() => count(page)).toBe(1)
   })
 
   test('the drawer can be opened with nothing staged in it', async ({ page }) => {
     await page.goto('/', { waitUntil: 'networkidle' })
+    await appReady(page)
     await page.getByTestId('authoring-edit-toggle').click()
 
     // Edit mode opens its own surface, and the toggle is there to shut it and
@@ -172,6 +184,7 @@ test.describe('adding content', () => {
 
   test('a deletion reads as a deletion, not as an edit', async ({ page }) => {
     await page.goto('/', { waitUntil: 'networkidle' })
+    await appReady(page)
     await page.evaluate(() =>
       window.$nuxt.$store.dispatch('authoringCart/stageDeletion', {
         type: 'node--article',
@@ -187,6 +200,7 @@ test.describe('adding content', () => {
 
   test('unticking a deletion holds it back rather than calling it off', async ({ page }) => {
     await page.goto('/', { waitUntil: 'networkidle' })
+    await appReady(page)
     await page.evaluate(() =>
       window.$nuxt.$store.dispatch('authoringCart/stageDeletion', {
         type: 'node--article',
@@ -210,6 +224,7 @@ test.describe('adding content', () => {
 
   test('the staged json reads as a change, not just its result', async ({ page }) => {
     await page.goto('/', { waitUntil: 'networkidle' })
+    await appReady(page)
     await stage(page, {
       type: 'node--article',
       id: 'abc',
@@ -228,6 +243,7 @@ test.describe('adding content', () => {
   test('adding content is reachable from any page', async ({ page }) => {
     // Editing became site-wide and adding was left on one route.
     await page.goto('/', { waitUntil: 'networkidle' })
+    await appReady(page)
     await page.getByTestId('authoring-edit-toggle').click()
     await page.getByTestId('cart-tab-add').click()
     await expect(page.getByTestId('authoring-add')).toBeVisible()
@@ -235,6 +251,7 @@ test.describe('adding content', () => {
 
   test('a pull request needs signing in, and says so', async ({ page }) => {
     await page.goto('/', { waitUntil: 'networkidle' })
+    await appReady(page)
     await stage(page, {
       type: 'node--article',
       id: 'abc',
@@ -260,6 +277,7 @@ test.describe('adding content', () => {
       })
     )
     await page.goto('/', { waitUntil: 'networkidle' })
+    await appReady(page)
     await stage(page, {
       type: 'node--article',
       id: 'abc',
@@ -268,6 +286,9 @@ test.describe('adding content', () => {
     })
     await page.evaluate(() => window.$nuxt.$store.dispatch('authoringCart/setDrawerOpen', true))
 
+    // Send, because that is where the GitHub controls are. They used to render
+    // under every tab, and these two tests were the reason nobody noticed.
+    await page.getByTestId('cart-tab-send').click()
     await page.getByTestId('github-repository').fill('o/r')
     await page.getByTestId('github-token').fill('not-a-real-token')
     await page.getByTestId('github-sign-in').click()
@@ -290,6 +311,7 @@ test.describe('adding content', () => {
       return json({ full_name: 'o/r', default_branch: 'main', permissions: { push: true } })
     })
     await page.goto('/', { waitUntil: 'networkidle' })
+    await appReady(page)
     await stage(page, {
       type: 'node--article',
       id: 'abc',
@@ -298,6 +320,9 @@ test.describe('adding content', () => {
     })
     await page.evaluate(() => window.$nuxt.$store.dispatch('authoringCart/setDrawerOpen', true))
 
+    // Send, because that is where the GitHub controls are. They used to render
+    // under every tab, and these two tests were the reason nobody noticed.
+    await page.getByTestId('cart-tab-send').click()
     await page.getByTestId('github-repository').fill('o/r')
     await page.getByTestId('github-token').fill('a-token')
     await page.getByTestId('github-sign-in').click()
@@ -349,6 +374,7 @@ test.describe('adding content', () => {
       return json({ full_name: 'o/r', default_branch: 'main', permissions: { push: true } })
     })
     await page.goto('/', { waitUntil: 'networkidle' })
+    await appReady(page)
     await page.getByTestId('authoring-edit-toggle').click()
     await page.getByTestId('cart-tab-send').click()
     await page.getByTestId('github-repository').fill('o/r')
@@ -411,6 +437,7 @@ test.describe('adding content', () => {
       return json({ full_name: 'o/r', default_branch: 'main', permissions: { push: true } })
     })
     await page.goto('/', { waitUntil: 'networkidle' })
+    await appReady(page)
     await page.getByTestId('authoring-edit-toggle').click()
     await page.getByTestId('cart-tab-send').click()
     await page.getByTestId('github-repository').fill('o/r')
@@ -453,6 +480,7 @@ test.describe('adding content', () => {
       return json({ full_name: 'o/r', default_branch: 'main', permissions: { push: true } })
     })
     await page.goto('/', { waitUntil: 'networkidle' })
+    await appReady(page)
     await stage(page, {
       type: 'node--article',
       id: 'abc',
@@ -501,6 +529,7 @@ test.describe('adding content', () => {
       return json({ full_name: 'o/r', default_branch: 'main', permissions: { push: true } })
     })
     await page.goto('/', { waitUntil: 'networkidle' })
+    await appReady(page)
     await stage(page, {
       type: 'node--article',
       id: 'abc',
@@ -537,6 +566,7 @@ test.describe('adding content', () => {
 
   test('the drawer is tabbed, and the changes tab counts them', async ({ page }) => {
     await page.goto('/', { waitUntil: 'networkidle' })
+    await appReady(page)
     await page.getByTestId('authoring-edit-toggle').click()
     await stage(page, {
       type: 'node--article',
@@ -557,10 +587,19 @@ test.describe('adding content', () => {
 
     await page.getByTestId('cart-tab-send').click()
     await expect(page.getByTestId('authoring-cart-commit')).toBeVisible()
+
+    // And Send's controls stay in Send. The GitHub panel escaped the tab once
+    // and rendered under every one of them, so somebody looking at their
+    // changes was shown a repository field and a sign-in button as well.
+    await page.getByTestId('cart-tab-changes').click()
+    await expect(page.getByTestId('github-repository')).toBeHidden()
+    await page.getByTestId('cart-tab-add').click()
+    await expect(page.getByTestId('github-repository')).toBeHidden()
   })
 
   test('a preview can be looked at at a real device width', async ({ page }) => {
     await page.goto('/', { waitUntil: 'networkidle' })
+    await appReady(page)
     await page.getByTestId('authoring-edit-toggle').click()
     await stage(page, {
       type: 'node--article',
@@ -586,6 +625,7 @@ test.describe('adding content', () => {
   test('a page wider than the window is scaled down to fit, not cut off', async ({ page }) => {
     await page.setViewportSize({ width: 1000, height: 800 })
     await page.goto('/', { waitUntil: 'networkidle' })
+    await appReady(page)
     await page.getByTestId('authoring-edit-toggle').click()
     await stage(page, {
       type: 'node--article',
@@ -631,6 +671,7 @@ test.describe('adding content', () => {
   test('a free preview can be dragged to a width, and a named one cannot', async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 900 })
     await page.goto('/', { waitUntil: 'networkidle' })
+    await appReady(page)
     await page.getByTestId('authoring-edit-toggle').click()
     await stage(page, {
       type: 'node--article',
@@ -682,6 +723,7 @@ test.describe('adding content', () => {
 
   test('the controls keep their own width whatever the page is set to', async ({ page }) => {
     await page.goto('/', { waitUntil: 'networkidle' })
+    await appReady(page)
     await page.getByTestId('authoring-edit-toggle').click()
     await stage(page, {
       type: 'node--article',
@@ -709,6 +751,7 @@ test.describe('adding content', () => {
 
   test('the preview covers the page rather than sitting inside the drawer', async ({ page }) => {
     await page.goto('/', { waitUntil: 'networkidle' })
+    await appReady(page)
     await page.getByTestId('authoring-edit-toggle').click()
     await stage(page, {
       type: 'node--article',
@@ -773,7 +816,12 @@ test.describe('adding content', () => {
     await page.goto(`/?backend=${encodeURIComponent('http://elsewhere.test')}`, {
       waitUntil: 'networkidle',
     })
-    await page.getByTestId('authoring-edit-toggle').click()
+    // Through the store, not the control. The control lives in Drupal's account
+    // menu, and connecting to a backend with no blocks takes the whole region
+    // away with it. What is under test here is which backend the interface
+    // thinks it is on, not how editing gets turned on.
+    await page.evaluate(() => window.$nuxt.$store.dispatch('authoringCart/setEditing', true))
+    await page.evaluate(() => window.$nuxt.$store.dispatch('authoringCart/setDrawerOpen', true))
     await page.getByTestId('cart-tab-send').click()
     await page.getByTestId('github-repository').fill('o/r')
     await page.getByTestId('github-token').fill('a-token')
@@ -801,6 +849,7 @@ test.describe('adding content', () => {
 
   test('each change says what it will do to the backend', async ({ page }) => {
     await page.goto('/', { waitUntil: 'networkidle' })
+    await appReady(page)
     await page.getByTestId('authoring-edit-toggle').click()
 
     // Taken from the request the commit will make, not described alongside it:
@@ -832,6 +881,7 @@ test.describe('adding content', () => {
 
   test('a visitor is offered no drawer at all', async ({ page }) => {
     await page.goto('/', { waitUntil: 'networkidle' })
+    await appReady(page)
     await expect(page.getByTestId('authoring-cart-toggle')).toHaveCount(0)
   })
 })
@@ -839,6 +889,7 @@ test.describe('adding content', () => {
 test.describe('the drawer as a review surface', () => {
   test('staged and unstaged are shown apart', async ({ page }) => {
     await page.goto('/', { waitUntil: 'networkidle' })
+    await appReady(page)
     await stage(page, {
       type: 'node--article',
       id: 'staged-one',
@@ -863,6 +914,7 @@ test.describe('the drawer as a review surface', () => {
 
   test('the checkbox moves a change between staged and unstaged', async ({ page }) => {
     await page.goto('/', { waitUntil: 'networkidle' })
+    await appReady(page)
     await stage(page, {
       type: 'node--article',
       id: 'abc',
@@ -885,6 +937,7 @@ test.describe('the drawer as a review surface', () => {
 
   test('a reference cannot be left out of a commit that needs it', async ({ page }) => {
     await page.goto('/', { waitUntil: 'networkidle' })
+    await appReady(page)
     const tagId = await page.evaluate(() =>
       window.$nuxt.$store.dispatch('authoringCart/stageNew', {
         type: 'taxonomy_term--tags',
@@ -911,14 +964,19 @@ test.describe('the drawer as a review surface', () => {
     await expect(page.getByTestId(`cart-select-${tagId}`)).toBeChecked()
   })
 
-  test('the first article written shows up on an empty front page', async ({ page }) => {
-    // The listing takes its rows from the backend, so something written in the
-    // browser appears nowhere and an author reasonably concludes it was lost.
-    // An empty listing was the case that could not work at all: with no rows
-    // there is no type to infer, so the view was asked what it lists instead.
+  test('something written in the browser shows up in the listing', async ({ page }) => {
+    // A listing is built from what the backend returned, so something written
+    // here appears nowhere and the work looks lost.
+    //
+    // This used to assert the front page said it had no content. The site now
+    // ships an article, so that page is not empty any more and the assertion
+    // was about the fixture rather than the behaviour. The empty case, which is
+    // the one that needed the view's own filters to be read, is covered in
+    // tests/unit/preview.test.mjs where an empty listing can actually be built.
     await page.goto('/', { waitUntil: 'networkidle' })
+    await appReady(page)
     const main = page.locator('main')
-    await expect(main).toContainText('No front page content has been created yet')
+    await expect(main).not.toContainText('Written in the browser')
 
     const id = await page.evaluate(() =>
       window.$nuxt.$store.dispatch('authoringCart/stageNew', {
@@ -928,7 +986,6 @@ test.describe('the drawer as a review surface', () => {
     )
 
     await expect(main).toContainText('Written in the browser')
-    await expect(main).not.toContainText('No front page content has been created yet')
 
     // And taking it back off again, because a preview that cannot be undone is
     // a page an author cannot get back.
@@ -937,7 +994,7 @@ test.describe('the drawer as a review surface', () => {
         window.$nuxt.$store.dispatch('authoringCart/discardOne', { type: 'node--article', id }),
       id
     )
-    await expect(main).toContainText('No front page content has been created yet')
+    await expect(main).not.toContainText('Written in the browser')
   })
 
   test('a reference cannot be thrown away while something still needs it', async ({ page }) => {
@@ -946,6 +1003,7 @@ test.describe('the drawer as a review surface', () => {
     // discarding takes it away entirely, leaving the article pointing at
     // nothing for the commit to fail on.
     await page.goto('/', { waitUntil: 'networkidle' })
+    await appReady(page)
     const tagId = await page.evaluate(() =>
       window.$nuxt.$store.dispatch('authoringCart/stageNew', {
         type: 'taxonomy_term--tags',

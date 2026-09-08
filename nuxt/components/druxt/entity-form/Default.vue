@@ -23,23 +23,55 @@
       </div>
     </details>
 
-    <!-- The authoring buttons, when this form is inside the authoring UI. -->
-    <div v-if="form" class="mt-4 flex flex-wrap gap-2">
+    <!--
+      The authoring buttons, when this form is inside the authoring UI.
+
+      Pinned to the bottom of the panel that scrolls them, because staging is
+      the point of the form and it was the one control you had to reach the end
+      of the fields to find.
+    -->
+    <div v-if="form" class="authoring-form-actions flex flex-wrap items-center gap-2">
+      <!--
+        Three states, not two, and they overlap.
+        A change can be staged and then edited again, which is neither "not
+        staged yet" nor "staged and done with". This used to be one control
+        showing Stage or Unstage, so after staging and typing again the only
+        button on the form was Unstage, and there was no way to add the new
+        edits without first undoing the old ones.
+
+        So: Stage is always offered, Unstage appears when there is something in
+        the cart, and Discard appears when there is unsent work on top of it.
+      -->
       <button
         type="button"
         class="rounded bg-accent px-3 py-1.5 text-sm text-accent-contrast hover:opacity-90"
         data-testid="authoring-stage"
         @click="form.stage()"
       >
-        Stage change
+        {{ form.staged && form.drafted ? 'Stage these too' : 'Stage change' }}
       </button>
       <button
+        v-if="form.staged"
+        type="button"
+        class="rounded border border-accent px-3 py-1.5 text-sm text-accent hover:bg-elevated"
+        data-testid="authoring-unstage"
+        @click="form.unstage()"
+      >
+        Unstage change
+      </button>
+      <!--
+        Throws away only what has not been staged. Everything staged stays in
+        the cart, which is the difference between this and Unstage, and the
+        thing that was previously only reachable from the drawer.
+      -->
+      <button
+        v-if="form.drafted"
         type="button"
         class="rounded border border-hairline px-3 py-1.5 text-sm text-body hover:border-ink"
-        data-testid="authoring-reset"
-        @click="form.reset()"
+        data-testid="authoring-discard-edits"
+        @click="form.discardEdits()"
       >
-        Reset
+        Discard edits
       </button>
       <p
         v-if="form.message"
@@ -72,7 +104,7 @@
  * The staging itself stays in `AuthoringEntityForm`, reached through inject
  * because Druxt gives the wrapper no way to emit back to the parent.
  */
-import { groupFields } from '../../../lib/form-groups.mjs'
+import { groupFields } from '../../../ice/src/form-groups.mjs'
 
 export default {
   name: 'DruxtEntityFormDefault',

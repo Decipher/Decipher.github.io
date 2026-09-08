@@ -12,7 +12,21 @@
     component name for every prefix of its options, so this one matches any
     theme's account menu rather than only Olivero's.
   -->
-  <div class="druxt-block-account" data-testid="block-account-menu">
+  <div class="druxt-block-account flex items-baseline gap-4" data-testid="block-account-menu">
+    <!--
+      Editing belongs with the account, because it is something an account can
+      do. It used to live in a toolbar of its own above the site, which is a lot
+      of page furniture for one link.
+    -->
+    <!--
+      The count of held work, beside the control that reveals it.
+
+      It used to be a floating pill over the bottom of the page, along with a
+      second way to leave edit mode. Two floating things competing with the edit
+      panel, saying what this menu already had room to say.
+    -->
+    <AuthoringCartToggle v-if="editing || changes" />
+    <AuthoringEditToggle />
     <!--
       The trigger only. The dialog is hosted by the layout, outside every Drupal
       region, because connecting a backend re-renders this one.
@@ -25,20 +39,31 @@
 export default {
   name: 'DruxtBlockSystemMenuBlockAccount',
 
+  computed: {
+    /**
+     * Whether edit mode is on.
+     *
+     * The way into the drawer has to exist before anything is in it, or there
+     * is no way to look at an empty cart, and no way to reach the Add tab.
+     */
+    editing() {
+      return this.$store.getters['authoringCart/editing']
+    },
+
+    /** Anything staged or typed, so held work is never without a way back. */
+    changes() {
+      return (
+        this.$store.getters['authoringCart/count'] +
+        Object.keys(this.$store.state.authoringCart.drafts || {}).length
+      )
+    },
+  },
+
   props: {
     // Declared so the template reads plainly. Unused: what this renders does
     // not come from Drupal's menu links.
     block: { type: Object, default: () => ({}) },
   },
 
-  // Tells the toolbar to stand down while this is on the page, so there is one
-  // account control rather than two.
-  created() {
-    if (this.$authoring) this.$authoring.claimAccountMenu(true)
-  },
-
-  beforeDestroy() {
-    if (this.$authoring) this.$authoring.claimAccountMenu(false)
-  },
 }
 </script>

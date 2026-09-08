@@ -39,6 +39,25 @@
           <span class="text-muted">{{ entry.key }}</span>
           <span class="break-all text-muted line-through">- {{ entry.was }}</span>
         </div>
+
+        <!--
+          For anything long, the part that actually changed.
+          The lines above show the value cut short, and two versions of a body
+          are identical for the first hundred characters, so an author who
+          edited the fourth paragraph saw two matching openings and no answer.
+        -->
+        <div
+          v-if="diffFor(entry)"
+          class="ml-4 mt-1 border-l border-hairline pl-2"
+          :data-testid="`json-diff-${entry.key}`"
+        >
+          <p v-if="diffFor(entry).removed" class="break-words text-muted">
+            <span aria-hidden="true">- </span>{{ diffFor(entry).removed }}
+          </p>
+          <p v-if="diffFor(entry).added" class="break-words text-accent">
+            <span aria-hidden="true">+ </span>{{ diffFor(entry).added }}
+          </p>
+        </div>
       </div>
     </li>
   </ul>
@@ -57,6 +76,8 @@
  * is the shape rather than a single collapsed row. Deeper levels stay shut,
  * because a body field with its format and summary is noise until wanted.
  */
+import { diffLines, isLong } from '../ice/src/diff.mjs'
+
 export default {
   name: 'AuthoringJsonTree',
 
@@ -94,7 +115,12 @@ export default {
           branch,
           summary: this.summarise(item),
           // Only a leaf says "changed": a branch says it about its own leaves.
-          changed: !branch && had && this.summarise(before[key]) !== this.summarise(item),
+          //
+          // Compared raw, not summarised. `summarise` cuts at eighty
+          // characters, so two versions of a body that differ in the fourth
+          // paragraph compared equal and the row reported no change at all:
+          // not a truncated diff, no diff.
+          changed: !branch && had && before[key] !== item,
           was: had ? this.summarise(before[key]) : '',
         }
       })
@@ -102,6 +128,25 @@ export default {
   },
 
   methods: {
+    /**
+     * The changed region of a long value, or nothing.
+     *
+     * Only for values long enough that showing them whole says nothing, and
+     * only for text: a changed number or boolean is already legible on the two
+     * lines above.
+     */
+    diffFor(entry) {
+      if (!entry.changed) return null
+      // The raw values, not `was` and `summary`: those have already been cut to
+      // eighty characters, and diffing two truncations of the same opening
+      // paragraph reports that nothing changed.
+      const before = entry.before
+      const after = entry.value
+      if (typeof before !== 'string' || typeof after !== 'string') return null
+      if (!isLong(before) && !isLong(after)) return null
+      return diffLines(before, after)
+    },
+
     isOpen(key) {
       // `opened` holds only what the author has changed their mind about, so
       // the default can depend on depth without writing a value per node.

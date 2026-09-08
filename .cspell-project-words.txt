@@ -2,10 +2,14 @@ Lando
 Landofile
 PKCE
 Stanislav
+adipiscing
+amet
 appserver
+autop
 behaviour
 bmewburn
 bootstrapvue
+colour
 commitlint
 davidanson
 dbaeumer
@@ -15,6 +19,8 @@ docroot
 drush
 druxt
 druxtjs
+eiusmod
+elit
 endswith
 extensionless
 gdlib
@@ -55,14 +61,17 @@ olivero
 opcache
 openssl
 openvscode
+optimise
 pathspec
 phpsab
 phpstan
 phpunit
+quantisation
 recognise
 recognised
 recognises
 repository
+serialised
 setuptools
 shivammathur
 starterkit
@@ -72,6 +81,7 @@ toolbarview
 travelled
 trixie
 unmatch
+unoptimised
 unparseable
 unranked
 unrecognised
@@ -85,3 +95,4 @@ valeryan
 vfox
 viewports
 xauth
+zoomable

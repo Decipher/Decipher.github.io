@@ -10,7 +10,7 @@
         />
       </div>
       <!-- eslint-disable-next-line vue/no-v-html -->
-      <div v-else class="prose-body" v-html="html" />
+      <div v-else ref="prose" class="prose-body" v-html="rewritten" />
     </template>
 
     <!-- ===== Form displays ===== -->
@@ -92,6 +92,7 @@
         v-else-if="isTypeWysiwyg"
         v-model="richText"
         :format="richTextFormat"
+        :upload="uploadTarget"
       />
 
       <!-- Select -->
@@ -198,7 +199,11 @@
 import { DruxtEntity, DruxtFieldMixin } from 'druxt-entity'
 import Draggable from 'vuedraggable'
 
-import { fromDateInput, toDateInput } from '../../../lib/datetime.mjs'
+import { fromDateInput, toDateInput } from '../../../ice/src/datetime.mjs'
+import { rewriteFileUrls } from '../../../ice/src/files.mjs'
+import { addCopyButtons, markZoomable } from '../../../lib/prose.mjs'
+import { applyCaptionFilter } from '../../../ice/src/captions.mjs'
+import { isTrimmed, teaserHtml } from '../../../lib/teaser.mjs'
 
 export default {
   components: { Draggable, DruxtEntity },
@@ -214,6 +219,21 @@ export default {
      * reason the form's buttons live in a wrapper component.
      */
     authoringForm: { from: 'authoringForm', default: null },
+  },
+
+  mounted() {
+    // An image field is a route bytes can be posted to, which is what an image
+    // in the body needs. The form collects them; only it can see them all.
+    if (this.isTypeImage && this.authoringForm) {
+      this.authoringForm.registerFileField(this.schema.id)
+    }
+    this.enhanceProse()
+  },
+
+  updated() {
+    // The field re-renders whenever the cart changes, and `v-html` replaces the
+    // markup wholesale each time, taking the listeners with it.
+    this.enhanceProse()
   },
 
   created() {
@@ -233,6 +253,22 @@ export default {
   },
 
   methods: {
+    /**
+     * Attach what rendered HTML cannot carry.
+     *
+     * A body field is markup from Drupal put in with `v-html`, so nothing in it
+     * is a component and nothing in it can hold a Vue handler.
+     */
+    enhanceProse() {
+      const root = this.$refs.prose
+      if (!root) return
+      addCopyButtons(root)
+      for (const image of markZoomable(root)) {
+        if (image.dataset.zoomBound) continue
+        image.dataset.zoomBound = '1'
+        image.addEventListener('click', () => this.$emit('zoom', image.src))
+      }
+    },
 
     onFile(chosen) {
       if (this.authoringForm) this.authoringForm.setPendingFile(this.schema.id, chosen)
@@ -240,6 +276,18 @@ export default {
   },
 
   computed: {
+    /**
+     * The rendered field, pointing at images the deployed site actually has.
+     *
+     * Drupal writes its own file URLs into body HTML, and those are served by
+     * Drupal. The build copies the files Tome exported into the static output
+     * and this points the markup at the copies, so a picture inserted through
+     * CKEditor survives the backend being switched off.
+     */
+    rewritten() {
+      return rewriteFileUrls(this.html)
+    },
+
     /** Shared control styling, so every input looks like the same site. */
     controlClass() {
       return 'w-full rounded border border-hairline bg-paper px-3 py-2 font-sans text-sm text-ink focus:border-accent focus:outline-none'
@@ -252,8 +300,21 @@ export default {
     /** One size fits all rendering for view displays. */
     html() {
       const model = this.model
-      if (typeof model === 'string') return model
-      return (model || {}).processed || (model || {}).value || ''
+      // The display's formatter, honoured here because that is the theme's job:
+      // Druxt hands over the schema and its settings, and what to do with them
+      // is a decision for whoever is rendering. Without this a front page of
+      // teasers renders whole articles.
+      if (isTrimmed(this.schema.type)) {
+        return teaserHtml(model, {
+          trimLength: ((this.schema.settings || {}).display || {}).trim_length,
+        })
+      }
+      if (typeof model === 'string') return applyCaptionFilter(model)
+      // `processed` has been through Drupal's filters and has its figures
+      // already. A value staged in the browser has not, so the caption filter
+      // is run here instead, or a preview of an edit loses every caption.
+      const value = (model || {}).processed
+      return value || applyCaptionFilter((model || {}).value || '')
     },
 
     inputType() {
@@ -307,6 +368,19 @@ export default {
     pendingFile() {
       const form = this.authoringForm
       return form && form.pendingFiles ? form.pendingFiles[this.schema.id] || null : null
+    },
+
+    /**
+     * Where an image dropped into the body should be posted.
+     *
+     * Null until the form has seen a field that takes files, which is also the
+     * signal to stop offering the button: an insert with nowhere to put the
+     * bytes is an insert that fails.
+     */
+    uploadTarget() {
+      const form = this.authoringForm
+      if (!form || !form.uploadField || !form.type) return null
+      return { resourceType: form.type, field: form.uploadField }
     },
 
     isTypeImage() {

@@ -5,5 +5,8 @@
   "ignore": ["nuxt/**", "drupal/**"],
   // `serve` is spawned by Playwright's `webServer` command, which is a string
   // knip cannot follow. Removing it would break every browser test.
-  "ignoreDependencies": ["serve"],
+  // `sharp` is resolved out of `nuxt/node_modules` on purpose: it is a native
+  // binary that `@nuxt/image` already installs, and listing it at the root
+  // would put it in every consumer's install for one script.
+  "ignoreDependencies": ["serve", "sharp"],
 }

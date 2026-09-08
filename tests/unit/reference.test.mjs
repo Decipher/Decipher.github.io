@@ -19,7 +19,7 @@ import {
   labelsUrl,
   targetResourceTypes,
   toRelationship,
-} from '../../nuxt/lib/reference.mjs'
+} from '../../nuxt/ice/src/reference.mjs'
 
 // node.article.field_tags, as druxt-schema assembles it.
 const tagsSchema = {

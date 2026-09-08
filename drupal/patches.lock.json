@@ -1,12 +1,12 @@
 {
-    "_hash": "1601ef66d5629423dcef9720ba0331a6a4dfb14b8be5c5bb2692a5a4d68b64bc",
+    "_hash": "e8fc533a467b277b79f68bee7de896f6139b1e649c0ae25b4d9caaefba2bcc0d",
     "patches": {
         "drupal/druxt": [
             {
                 "package": "drupal/druxt",
-                "description": "Fix ViewsPathTranslatorSubscriber crash on views with no JSON:API route",
-                "url": "patches/druxt-views-path-translator-route-name.patch",
-                "sha256": "fd5654d5cdcea769f3be061dd0e74e9fdf03af960b929959b8d806dbad147077",
+                "description": "Add ability to configure/extend exposed Druxt JSON:API resources (#3309969)",
+                "url": "patches/druxt-3309969-configurable-resources.patch",
+                "sha256": "e53e977489d0cb3988de2508d7eaf061a817224c31024a821bf6ca038ac0037e",
                 "depth": 1,
                 "extra": {
                     "provenance": "root"
@@ -29,6 +29,18 @@
                 "description": "Declare normalizer supported types so entity-specific normalizers are used",
                 "url": "patches/tome-normalizer-supported-types.patch",
                 "sha256": "c857235b91961a030bfb0d63673fd2756aca4d72025a3463ddd8445d3bae0b06",
+                "depth": 1,
+                "extra": {
+                    "provenance": "root"
+                }
+            }
+        ],
+        "drupal/decoupled_settings": [
+            {
+                "package": "drupal/decoupled_settings",
+                "description": "Expose the active theme's regions, labels and breakpoints (#15)",
+                "url": "patches/decoupled-settings-15-theme-manifest.patch",
+                "sha256": "e111ee6127ef737dc0427c2c57d48213d3fc4a983772b7fd8f1d16fa046b454e",
                 "depth": 1,
                 "extra": {
                     "provenance": "root"

@@ -15,6 +15,8 @@ import path from 'node:path'
 
 import { expect, test } from '@playwright/test'
 
+import { appReady } from './isolate.js'
+
 const BACKEND = 'http://backend.test'
 
 const FIXTURES = path.join(__dirname, '..', 'fixtures', 'jsonapi')
@@ -31,6 +33,10 @@ const COLLECTIONS = [
   ['/jsonapi/user/user', 'user_user'],
   ['/jsonapi/editor/editor', 'editor'],
   ['/jsonapi/node/article', 'node_article'],
+  // The site renders Drupal's regions, and the account menu in them carries the
+  // control that turns editing on. A stub with no blocks renders no regions, so
+  // the page under test had no way into edit mode at all.
+  ['/jsonapi/block/block', 'block_block'],
 ]
 
 const ARTICLE = '34156cc1-48f9-4ee9-acd7-e3970ca00554'
@@ -126,6 +132,7 @@ async function stubBackend(page) {
 /** Connect, sign in, turn on edit mode and open the first article's form. */
 async function openForm(page) {
   await page.goto('/')
+  await appReady(page)
   await page.evaluate((backend) => {
     localStorage.setItem('authoring.backend', JSON.stringify({ url: backend, clientId: null }))
     sessionStorage.setItem(
@@ -135,6 +142,7 @@ async function openForm(page) {
   }, BACKEND)
 
   await page.goto('/authoring', { waitUntil: 'networkidle' })
+  await appReady(page)
   await page.getByTestId('authoring-edit-toggle').click()
   await page.getByTestId(`edit-node--article-${ARTICLE}`).click()
   await expect(page.getByTestId('authoring-stage')).toBeVisible()
@@ -289,6 +297,7 @@ test.describe('the edit form', () => {
     // something else happened to provoke a re-render, which read as lag.
     await stubBackend(page)
     await page.goto('/')
+    await appReady(page)
     await page.evaluate((backend) => {
       localStorage.setItem('authoring.backend', JSON.stringify({ url: backend, clientId: null }))
       sessionStorage.setItem(
@@ -297,6 +306,7 @@ test.describe('the edit form', () => {
       )
     }, BACKEND)
     await page.goto('/authoring', { waitUntil: 'networkidle' })
+    await appReady(page)
     await page.getByTestId('authoring-edit-toggle').click()
 
     await page.evaluate(() => window.$nuxt.$store.dispatch('authoringCart/setDrawerOpen', true))
@@ -328,6 +338,56 @@ test.describe('the edit form', () => {
       await paint()
       expect(await rendered.innerText()).toContain(expected)
     }
+  })
+
+  test('discarding a change puts the form it is open in back', async ({ page }) => {
+    // The form kept showing the discarded text, and the next keystroke wrote it
+    // straight back as a new draft: the discard undid itself and nothing said
+    // so. No confirmation to dismiss either, because every keystroke is already
+    // in the cart, so there is nothing here that discarding would lose which
+    // discarding was not meant to lose.
+    await stubBackend(page)
+    await openForm(page)
+
+    const field = page.getByTestId('field-input').first()
+    const original = await field.inputValue()
+    await field.fill('Discarded before it was sent')
+    // Asserted on the cart, not on the badge: the badge is drawn on the
+    // rendered entity, and the open form is standing where that was.
+    await expect
+      .poll(() =>
+        page.evaluate(() => Object.keys(window.$nuxt.$store.state.authoringCart.drafts).length)
+      )
+      .toBe(1)
+
+    await page.evaluate(
+      (id) =>
+        window.$nuxt.$store.dispatch('authoringCart/discardOne', { type: 'node--article', id }),
+      ARTICLE
+    )
+
+    await expect(field).toHaveValue(original)
+
+    // The part that mattered. Without the revert the form still held the
+    // discarded text, so the next keystroke wrote it back as a fresh draft and
+    // the discard quietly undid itself. Typing here has to produce a change
+    // measured against the backend's value, not against the thrown-away one.
+    //
+    // Worth knowing: this passes against the stub either way. The failure needs
+    // a real backend, where the entity is rendered through a view and nothing
+    // remounts the form when the cart empties; on this page it is remounted and
+    // reverts by accident. So this guards the behaviour rather than catching
+    // that regression, and the regression was verified by hand against a live
+    // Drupal.
+    await field.fill(`${original} again`)
+    await expect
+      .poll(() =>
+        page.evaluate(() => {
+          const drafts = Object.values(window.$nuxt.$store.state.authoringCart.drafts)
+          return (drafts[0] || {}).attributes?.title ?? null
+        })
+      )
+      .toBe(`${original} again`)
   })
 
   test('an edit that was never staged is kept, not reverted', async ({ page }) => {
@@ -485,5 +545,55 @@ test.describe('the edit form', () => {
 
     await page.getByTestId('authoring-stage').click()
     await expect(page.getByTestId('authoring-stage-message')).toContainText('Nothing changed')
+  })
+
+  test('editing after staging offers a way to stage the rest, and to drop it', async ({ page }) => {
+    // Staging part of an edit and then typing again is neither "not staged" nor
+    // "staged and done". The form used to show one control, so after staging
+    // the only button was Unstage, and adding the new edits meant undoing the
+    // old ones first.
+    await stubBackend(page)
+    await openForm(page)
+    const title = page.getByTestId('field-input').first()
+
+    await title.fill('First edit')
+    await expect(page.getByTestId('authoring-discard-edits')).toBeVisible()
+    await expect(page.getByTestId('authoring-unstage')).toHaveCount(0)
+
+    await page.getByTestId('authoring-stage').click()
+    await expect(page.getByTestId('authoring-unstage')).toBeVisible()
+    await expect(page.getByTestId('authoring-discard-edits')).toHaveCount(0)
+
+    await title.fill('First edit, then more')
+    await expect(page.getByTestId('authoring-stage')).toHaveText('Stage these too')
+    await expect(page.getByTestId('authoring-unstage')).toBeVisible()
+    await expect(page.getByTestId('authoring-discard-edits')).toBeVisible()
+
+    // Discard drops only the unsent part. What was staged stays staged.
+    await page.getByTestId('authoring-discard-edits').click()
+    await expect(title).toHaveValue('First edit')
+    await expect(page.getByTestId('authoring-unstage')).toBeVisible()
+  })
+
+  test('discarding an unstaged edit goes back to what was staged, not to the backend', async ({
+    page,
+  }) => {
+    await stubBackend(page)
+    // Stage something, change it again, then throw away only the second change.
+    // The form used to jump all the way back to the backend's version, taking the
+    // staged work with it: an image staged into a body vanished this way.
+    await openForm(page)
+
+    const title = page.getByTestId('field-input').first()
+    await title.fill('The staged title')
+    await page.getByTestId('authoring-stage').click()
+    await expect(page.getByTestId('authoring-unstage')).toBeVisible()
+
+    await title.fill('A further edit nobody kept')
+    const discard = page.locator('[data-testid^="cart-discard-draft-"]').first()
+    await expect(discard).toBeVisible()
+    await discard.click()
+
+    await expect(title).toHaveValue('The staged title')
   })
 })
