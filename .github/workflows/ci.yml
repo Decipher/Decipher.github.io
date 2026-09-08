@@ -309,7 +309,7 @@ jobs:
           persist-credentials: false
 
       - name: Fetch the static build the generate job produced
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           name: nuxt-dist
           path: nuxt/dist
@@ -349,7 +349,7 @@ jobs:
           persist-credentials: false
 
       - name: Fetch the static build the generate job produced
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           name: nuxt-dist
           path: nuxt/dist
