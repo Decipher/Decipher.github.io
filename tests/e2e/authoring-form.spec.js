@@ -547,6 +547,34 @@ test.describe('the edit form', () => {
     await expect(page.getByTestId('authoring-stage-message')).toContainText('Nothing changed')
   })
 
+  test('editing after staging offers a way to stage the rest, and to drop it', async ({ page }) => {
+    // Staging part of an edit and then typing again is neither "not staged" nor
+    // "staged and done". The form used to show one control, so after staging
+    // the only button was Unstage, and adding the new edits meant undoing the
+    // old ones first.
+    await stubBackend(page)
+    await openForm(page)
+    const title = page.getByTestId('field-input').first()
+
+    await title.fill('First edit')
+    await expect(page.getByTestId('authoring-discard-edits')).toBeVisible()
+    await expect(page.getByTestId('authoring-unstage')).toHaveCount(0)
+
+    await page.getByTestId('authoring-stage').click()
+    await expect(page.getByTestId('authoring-unstage')).toBeVisible()
+    await expect(page.getByTestId('authoring-discard-edits')).toHaveCount(0)
+
+    await title.fill('First edit, then more')
+    await expect(page.getByTestId('authoring-stage')).toHaveText('Stage these too')
+    await expect(page.getByTestId('authoring-unstage')).toBeVisible()
+    await expect(page.getByTestId('authoring-discard-edits')).toBeVisible()
+
+    // Discard drops only the unsent part. What was staged stays staged.
+    await page.getByTestId('authoring-discard-edits').click()
+    await expect(title).toHaveValue('First edit')
+    await expect(page.getByTestId('authoring-unstage')).toBeVisible()
+  })
+
   test('discarding an unstaged edit goes back to what was staged, not to the backend', async ({
     page,
   }) => {
