@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "81ee08803fc18d5517ca551b9a7ea691",
+    "content-hash": "29e6e98074d1af8303f4ecb493ad6a0d",
     "packages": [
         {
             "name": "asm89/stack-cors",
@@ -1682,32 +1682,29 @@
         },
         {
             "name": "drupal/druxt",
-            "version": "1.2.1",
+            "version": "dev-1.2.x",
             "source": {
                 "type": "git",
                 "url": "https://git.drupalcode.org/project/druxt.git",
-                "reference": "1.2.1"
-            },
-            "dist": {
-                "type": "zip",
-                "url": "https://ftp.drupal.org/files/projects/druxt-1.2.1.zip",
-                "reference": "1.2.1",
-                "shasum": "e12e8e22b172ac1cff11f92cd9de14a500ad927b"
+                "reference": "f71640a7d92d4f02f824380cef06170194161f56"
             },
             "require": {
-                "drupal/core": "^8.8 || ^9 || ^10 || ^11",
+                "drupal/core": "^10 || ^11 || ^12",
                 "drupal/decoupled_router": "^2.0",
                 "drupal/jsonapi_menu_items": "^1.2",
                 "drupal/jsonapi_views": "^1.1"
             },
             "type": "drupal-module",
             "extra": {
+                "branch-alias": {
+                    "dev-1.2.x": "1.2.x-dev"
+                },
                 "drupal": {
-                    "version": "1.2.1",
-                    "datestamp": "1754365299",
+                    "version": "1.2.2+0-dev",
+                    "datestamp": "1788584817",
                     "security-coverage": {
-                        "status": "covered",
-                        "message": "Covered by Drupal's security advisory policy"
+                        "status": "not-covered",
+                        "message": "Dev releases are not covered by Drupal security advisories."
                     }
                 }
             },
@@ -8176,7 +8173,8 @@
     "minimum-stability": "dev",
     "stability-flags": {
         "cweagans/composer-patches": 10,
-        "drupal/decoupled_settings": 10
+        "drupal/decoupled_settings": 10,
+        "drupal/druxt": 20
     },
     "prefer-stable": true,
     "prefer-lowest": false,

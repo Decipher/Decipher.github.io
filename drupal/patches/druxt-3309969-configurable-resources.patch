@@ -1,0 +1,1797 @@
+# druxt #3309969: configure/extend exposed JSON:API resources.
+#
+# https://www.drupal.org/i/3309969
+# https://git.drupalcode.org/project/druxt/-/merge_requests/24
+#
+# Taken from the merge request diff, with the hunks for files a packaged
+# release does not ship removed, because patch cannot apply those and stops:
+#   .cspell.json, .github/workflows/test.yml, CHANGELOG.md
+#
+# Dogfooding the configurable resource list. This site exposes
+# editor--editor and filter_format--filter_format, which stock Druxt does
+# not, so the editor can read the toolbar and filters a text format is
+# configured for instead of baking them into the build.
+diff --git a/.gitlab-ci.yml b/.gitlab-ci.yml
+index 5670f2c97ade0875dd32341c00a5038adec6a895..f3d2928ae1d4ff08850d91cee79f4e916204df83 100644
+--- a/.gitlab-ci.yml
++++ b/.gitlab-ci.yml
+@@ -27,7 +27,7 @@ variables:
+   SKIP_ESLINT: '1'
+   SKIP_STYLELINT: '1'
+   _PHPUNIT_EXTRA: '--configuration=phpunit.gitlab-ci.xml'
+-  _CSPELL_WORDS: 'Nuxt, nuxt, druxt, Fieldable, cloudflared, pushd, popd, phpcbf, phpcs, phpstan, rector, drush, pcov, langcode, simpleset, twigcsfixer, ddev, lando, drevops, skrypnyk, normalise, initialisation, initialised, langid, multisite, analyse, synchronisation'
++  _CSPELL_WORDS: 'addtogroup, Nuxt, nuxt, druxt, Fieldable, cloudflared, pushd, popd, phpcbf, phpcs, phpstan, rector, drush, pcov, langcode, simpleset, twigcsfixer, ddev, lando, drevops, skrypnyk, normalise, initialisation, initialised, langid, multisite, analyse, synchronisation'
+   OPT_IN_TEST_NEXT_MINOR: '1'
+   OPT_IN_TEST_NEXT_MAJOR: '0'
+   OPT_IN_TEST_MAX_PHP: '1'
+diff --git a/README.md b/README.md
+index 207c67463868bd6b296427f33e4d52ba11c9532f..39454e368322f69a4ecb46adfea4fc8bea4c12aa 100644
+--- a/README.md
++++ b/README.md
+@@ -19,6 +19,7 @@ Submit bug reports and feature suggestions, or track changes in the
+ - Installation
+ - Configuration
+ - Features
++- Exposing additional resources
+ - Maintainers
+ 
+ 
+@@ -84,6 +85,53 @@ resources required by the DruxtJS frontend.
+ - Ensures EntityViewDisplay configuration available for [DruxtSchema](https://schema.druxtjs.org) module.
+ 
+ 
++## Exposing additional resources
++
++Druxt exposes a fixed set of JSON:API resources to anyone holding the
++"access druxt resources" permission. A site can change that set at
++Configuration > Web services > Druxt, or at
++`/admin/config/services/druxt`.
++
++Editing the list needs the "administer druxt" permission, which is separate:
++"access druxt resources" controls what a frontend may read at runtime and
++does not grant access to the settings page.
++
++Only configuration entities are offered. Everything on the list is readable
++by everyone holding the permission, and there is no way to scope it to a
++role or a consumer, so a content entity type would expose every entity of
++that type including unpublished ones. Configuration carries no per-entity
++access and no unpublished state, so a list-wide grant costs little.
++
++`menu_link_content` is the exception. It is a content entity and it shipped
++in the list this configuration replaced, so removing it would break existing
++sites. It is accepted on impact, a disabled menu link being low risk, rather
++than because the rule does not apply to it.
++
++A worked example is `editor--editor`. A frontend that builds its editor
++toolbar from the text format's own configuration has to read it, and no
++permission short of "administer filters" grants that, which is not something
++to give an author because it also lets them edit text formats. Checking
++`editor--editor` lets an author's toolbar match what the site is configured
++for, and a change to a text format reaches the frontend without a rebuild.
++It is not enabled by default: a site that does not render Drupal's toolbars
++has no reason to expose the configuration.
++
++A module can add what it needs in code instead, so installing it is all a
++site has to do:
++
++```php
++/**
++ * Implements hook_druxt_resources_alter().
++ */
++function my_module_druxt_resources_alter(array &$resources): void {
++  $resources[] = 'my_module_settings--my_module_settings';
++}
++```
++
++See `druxt.api.php` for the full documentation. Unlike the settings form,
++the hook can expose any resource, because a change there is reviewable code
++rather than a checkbox.
++
+ ## Maintainers
+ 
+ - Stuart Clark - [Deciphered](https://www.drupal.org/u/deciphered)
+diff --git a/codecov.yml b/codecov.yml
+new file mode 100644
+index 0000000000000000000000000000000000000000..574d9742735ff201711a052c1c5a1210045227ef
+--- /dev/null
++++ b/codecov.yml
+@@ -0,0 +1,8 @@
++# druxt.api.php documents the hooks this module invokes. Nothing loads it, so
++# its sample implementations can only ever count as uncovered lines.
++#
++# PHPUnit's own <source> exclude cannot do this. The extension reaches the
++# build directory as a tree of symlinks, and coverage is keyed by the path
++# PHP resolves, so a web/modules/custom/... exclude never matches.
++ignore:
++  - "druxt.api.php"
+diff --git a/config/install/druxt.settings.yml b/config/install/druxt.settings.yml
+new file mode 100644
+index 0000000000000000000000000000000000000000..026f422d6bd3a654997735dcbdc52532d44238de
+--- /dev/null
++++ b/config/install/druxt.settings.yml
+@@ -0,0 +1,13 @@
++resources:
++  - block--block
++  - configurable_language--configurable_language
++  - entity_form_display--entity_form_display
++  - entity_form_mode--entity_form_mode
++  - entity_view_display--entity_view_display
++  - entity_view_mode--entity_view_mode
++  - field_config--field_config
++  - field_storage_config--field_storage_config
++  - jsonapi_resource_config--jsonapi_resource_config
++  - menu--menu
++  - menu_link_content--menu_link_content
++  - view--view
+diff --git a/config/schema/druxt.schema.yml b/config/schema/druxt.schema.yml
+new file mode 100644
+index 0000000000000000000000000000000000000000..e7c5151c92f176c87a7c0cb3d1ab1faf208207be
+--- /dev/null
++++ b/config/schema/druxt.schema.yml
+@@ -0,0 +1,12 @@
++druxt.settings:
++  type: config_object
++  label: 'DruxtJS settings'
++  mapping:
++    resources:
++      type: sequence
++      label: 'Exposed JSON:API resources'
++      sequence:
++        type: string
++        label: 'Resource type id'
++        constraints:
++          DruxtResource: ~
+diff --git a/druxt.api.php b/druxt.api.php
+new file mode 100644
+index 0000000000000000000000000000000000000000..6dc55b9e6c2d06a3b21393cab65074c363f30ace
+--- /dev/null
++++ b/druxt.api.php
+@@ -0,0 +1,49 @@
++<?php
++
++/**
++ * @file
++ * Hooks provided by the Druxt module.
++ */
++
++declare(strict_types=1);
++
++/**
++ * @addtogroup hooks
++ * @{
++ */
++
++/**
++ * Alters the JSON:API resources Druxt exposes.
++ *
++ * A resource on this list is readable by anyone holding the "access druxt
++ * resources" permission, whatever the site would otherwise allow, because
++ * druxt_entity_access() returns an allowed result and
++ * druxt_jsonapi_entity_filter_access() lifts the filtering restriction for
++ * the request. Add a resource only when a decoupled frontend needs it to
++ * render what Drupal intended.
++ *
++ * Use this hook when a module knows which resource it needs, so a site
++ * builder does not have to find the setting and tick a box. The settings
++ * form offers configuration entities only, because the list is granted to
++ * everyone holding the permission with no way to scope it to a role or a
++ * consumer. This hook has no such limit, since a change here is reviewable
++ * code rather than a checkbox: adding a content entity type exposes every
++ * entity of that type to anyone holding the permission, which is commonly
++ * granted to anonymous.
++ *
++ * @param string[] $resources
++ *   Resource type ids, as they appear in a JSON:API route, in the form
++ *   "entity_type--bundle".
++ */
++function hook_druxt_resources_alter(array &$resources): void {
++  // A module that a frontend reads configuration from adds its own resource,
++  // so installing the module is all a site has to do.
++  $resources[] = 'my_module_settings--my_module_settings';
++
++  // A distribution may remove one it does not want exposed.
++  $resources = array_values(array_diff($resources, ['menu_link_content--menu_link_content']));
++}
++
++/**
++ * @} End of "addtogroup hooks".
++ */
+diff --git a/druxt.install b/druxt.install
+index bb09db4a17ddb8e4838e5384882b587708e4e6ad..a26426e40006bde4e8c5272a2ef22d04e2575886 100644
+--- a/druxt.install
++++ b/druxt.install
+@@ -12,6 +12,21 @@ use Drupal\Core\Extension\Requirement\RequirementSeverity;
+ use Drupal\Core\Link;
+ use Drupal\Core\Url;
+ 
++/**
++ * Gets the resources the status report checks.
++ *
++ * The same list access is granted for, so the report cannot describe a set
++ * nobody is granted. This file carried its own hardcoded copy, which had
++ * already drifted: it omitted configurable_language and
++ * jsonapi_resource_config.
++ *
++ * @return string[]
++ *   Resource type ids, as they appear in a JSON:API route.
++ */
++function druxt_required_resources(): array {
++  return druxt_resources();
++}
++
+ /**
+  * Implements hook_install().
+  */
+@@ -29,18 +44,7 @@ function druxt_requirements(string $phase): array {
+     $module_handler = \Drupal::service('module_handler');
+     $resource_type_repository = \Drupal::service('jsonapi.resource_type.repository');
+ 
+-    $required_resources = [
+-      'block--block',
+-      'entity_form_display--entity_form_display',
+-      'entity_form_mode--entity_form_mode',
+-      'entity_view_display--entity_view_display',
+-      'entity_view_mode--entity_view_mode',
+-      'field_config--field_config',
+-      'field_storage_config--field_storage_config',
+-      'menu--menu',
+-      'menu_link_content--menu_link_content',
+-      'view--view',
+-    ];
++    $required_resources = druxt_required_resources();
+     $disabled_resources = [];
+     $missing_resources = [];
+     foreach ($required_resources as $resource) {
+@@ -109,3 +113,10 @@ function druxt_requirements(string $phase): array {
+ function druxt_update_9000(): void {
+   druxt_ensure_entity_view_displays();
+ }
++
++/**
++ * Move the exposed resource list into configuration.
++ */
++function druxt_update_10301(): void {
++  \Drupal::service('config.installer')->installDefaultConfig('module', 'druxt');
++}
+diff --git a/druxt.links.menu.yml b/druxt.links.menu.yml
+new file mode 100644
+index 0000000000000000000000000000000000000000..7bca900b24311e1b150d5a48eae1f9c70c44d0dc
+--- /dev/null
++++ b/druxt.links.menu.yml
+@@ -0,0 +1,5 @@
++druxt.settings:
++  title: 'Druxt'
++  description: 'Choose which JSON:API resources Druxt exposes.'
++  route_name: druxt.settings
++  parent: system.admin_config_services
+diff --git a/druxt.module b/druxt.module
+index 6986ad7ce016ed9d32b58ce4cb3a0b0ffd0cc743..3b7630447704f72741e3e24fc892dab13c2c486e 100644
+--- a/druxt.module
++++ b/druxt.module
+@@ -11,6 +11,7 @@ use Drupal\Component\Utility\DeprecationHelper;
+ use Drupal\jsonapi\JsonApiFilter;
+ use Drupal\Core\Access\AccessResult;
+ use Drupal\Core\Entity\Entity\EntityViewDisplay;
++use Drupal\Core\Config\Entity\ConfigEntityInterface;
+ use Drupal\Core\Entity\EntityInterface;
+ use Drupal\Core\Entity\EntityTypeInterface;
+ use Drupal\Core\Entity\FieldableEntityInterface;
+@@ -18,23 +19,88 @@ use Drupal\Core\Session\AccountInterface;
+ use Drupal\jsonapi\Routing\Routes;
+ 
+ /**
+- * Checks for Druxt route access.
++ * Gets the resources that predate the configuration entity rule.
++ *
++ * The menu_link_content resource shipped in the hardcoded list this
++ * configuration replaced. Refusing it now would break a site on update, so
++ * it is grandfathered rather than treated as precedent for content
++ * entities.
++ *
++ * @return string[]
++ *   Resource type ids that stay allowed whatever their entity type.
+  */
+-function druxt_access_check(AccountInterface $account) {
+-  $route = \Drupal::routeMatch()->getRouteObject();
+-  if (!$route) {
++function druxt_grandfathered_resources(): array {
++  return [
++    'menu_link_content--menu_link_content',
++  ];
++}
++
++/**
++ * Checks whether a resource may be added to the exposed list.
++ *
++ * Being on the list grants a blanket entity access result and unrestricted
++ * filtering for the request, so it is limited to configuration entities.
++ * Those carry no per-entity access, no personal data and no publishing
++ * state, which is what makes a blanket grant defensible. A module may still
++ * add anything through hook_druxt_resources_alter(), where the change is
++ * reviewable code rather than a checkbox.
++ *
++ * @param string $resource
++ *   A resource type id, as it appears in a JSON:API route.
++ *
++ * @return bool
++ *   TRUE when the resource may be configured.
++ */
++function druxt_resource_is_allowed(string $resource): bool {
++  if (in_array($resource, druxt_grandfathered_resources(), TRUE)) {
++    return TRUE;
++  }
++
++  [$entity_type_id] = explode('--', $resource, 2);
++  $definitions = \Drupal::entityTypeManager()->getDefinitions();
++  if (!isset($definitions[$entity_type_id])) {
+     return FALSE;
+   }
+ 
+-  $defaults = $route->getDefaults();
++  return $definitions[$entity_type_id]->entityClassImplements(ConfigEntityInterface::class);
++}
+ 
+-  // Is the route a JSON API request?
+-  if (!Routes::isJsonApiRequest($defaults)) {
+-    return FALSE;
++/**
++ * Checks whether a stored resource may still be granted.
++ *
++ * Wider than druxt_resource_is_allowed(), and deliberately so. The form must
++ * not offer a resource this site cannot serve, but configuration must be
++ * able to name one, because a site sharing configuration with another may
++ * not have the module that provides it. An entity type that is not installed
++ * grants nothing, since no route exists for it.
++ *
++ * @param string $resource
++ *   A resource type id, as it appears in a JSON:API route.
++ *
++ * @return bool
++ *   TRUE when the resource may be stored and granted.
++ */
++function druxt_resource_is_permitted(string $resource): bool {
++  [$entity_type_id] = explode('--', $resource, 2);
++  if (!isset(\Drupal::entityTypeManager()->getDefinitions()[$entity_type_id])) {
++    return TRUE;
+   }
+ 
+-  // Is the JSON API resource a Druxt resource?
+-  $resources = [
++  return druxt_resource_is_allowed($resource);
++}
++
++/**
++ * Gets the JSON:API resources DruxtJS exposes by default.
++ *
++ * Shipped as druxt.settings in config/install. Kept here as well so a site
++ * that has not run the update hook yet still serves its frontend, and so the
++ * access check has an answer before the module is configured.
++ *
++ * @return string[]
++ *   Resource type ids, as they appear in a JSON:API route.
++ */
++function druxt_default_resources(): array {
++  return [
+     'block--block',
+     'configurable_language--configurable_language',
+     'entity_form_display--entity_form_display',
+@@ -48,7 +114,54 @@ function druxt_access_check(AccountInterface $account) {
+     'menu_link_content--menu_link_content',
+     'view--view',
+   ];
+-  if (!in_array($defaults['resource_type'], $resources)) {
++}
++
++/**
++ * Gets the JSON:API resources DruxtJS exposes.
++ *
++ * An absent value falls back to the defaults, because a site updating from a
++ * release that hardcoded the list has no configuration yet. An empty list is
++ * a deliberate choice and is returned as it stands.
++ *
++ * @return string[]
++ *   Resource type ids, as they appear in a JSON:API route.
++ */
++function druxt_resources(): array {
++  $resources = \Drupal::config('druxt.settings')->get('resources');
++  $resources ??= druxt_default_resources();
++
++  // Recheck rather than trust what is stored. Configuration can hold a
++  // resource that is not safe to grant: written before this validation
++  // existed, or naming an entity type that has appeared since. Validation
++  // on import cannot catch either. The stored value is left alone, so a
++  // site sharing configuration keeps entries for modules it lacks.
++  $resources = array_values(array_filter($resources, druxt_resource_is_permitted(...)));
++
++  // After the recheck, so a module can still expose what configuration may
++  // not. A change here is reviewable code rather than a checkbox.
++  \Drupal::moduleHandler()->alter('druxt_resources', $resources);
++
++  return array_values($resources);
++}
++
++/**
++ * Checks for Druxt route access.
++ */
++function druxt_access_check(AccountInterface $account) {
++  $route = \Drupal::routeMatch()->getRouteObject();
++  if (!$route) {
++    return FALSE;
++  }
++
++  $defaults = $route->getDefaults();
++
++  // Is the route a JSON API request?
++  if (!Routes::isJsonApiRequest($defaults)) {
++    return FALSE;
++  }
++
++  // Is the JSON API resource a Druxt resource?
++  if (!in_array($defaults['resource_type'], druxt_resources())) {
+     return FALSE;
+   }
+ 
+@@ -64,7 +177,12 @@ function druxt_access_check(AccountInterface $account) {
+  * Implements hook_entity_access().
+  */
+ function druxt_entity_access(EntityInterface $entity, string $operation, AccountInterface $account) {
+-  return druxt_access_check($account) ? AccessResult::allowed() : AccessResult::neutral();
++  $access = druxt_access_check($account) ? AccessResult::allowed() : AccessResult::neutral();
++
++  // The answer was read from the resource list, so anything that caches it
++  // has to be invalidated when that list changes. While the list was
++  // hardcoded there was nothing to depend on.
++  return $access->addCacheableDependency(\Drupal::config('druxt.settings'));
+ }
+ 
+ /**
+@@ -87,7 +205,8 @@ function druxt_jsonapi_entity_filter_access(EntityTypeInterface $entity_type, Ac
+ 
+   $jsonapi_filter = DeprecationHelper::backwardsCompatibleCall(\Drupal::VERSION, '11.3.0', fn(): string => JsonApiFilter::AMONG_ALL, fn() => JSONAPI_FILTER_AMONG_ALL);
+   return [
+-    $jsonapi_filter => AccessResult::allowed(),
++    $jsonapi_filter => AccessResult::allowed()
++      ->addCacheableDependency(\Drupal::config('druxt.settings')),
+   ];
+ }
+ 
+diff --git a/druxt.permissions.yml b/druxt.permissions.yml
+index 45979a5d7af7d08ca96b0edae96717d57a466469..c4489e5a3023f1df77c529d09e07c2c0d7d66d0a 100644
+--- a/druxt.permissions.yml
++++ b/druxt.permissions.yml
+@@ -1,2 +1,6 @@
+ 'access druxt resources':
+   title: 'Access DruxtJS JSON:API resources.'
++'administer druxt':
++  title: 'Administer Druxt'
++  description: 'Choose which JSON:API resources Druxt exposes.'
++  restrict access: true
+diff --git a/druxt.routing.yml b/druxt.routing.yml
+new file mode 100644
+index 0000000000000000000000000000000000000000..4bd5911acf19bd9fbbe08d3adb7e764ce72ab4c9
+--- /dev/null
++++ b/druxt.routing.yml
+@@ -0,0 +1,7 @@
++druxt.settings:
++  path: '/admin/config/services/druxt'
++  defaults:
++    _form: '\Drupal\druxt\Form\DruxtSettingsForm'
++    _title: 'Druxt'
++  requirements:
++    _permission: 'administer druxt'
+diff --git a/druxt.services.yml b/druxt.services.yml
+index 78bbb478ac40361d3b9367080bded9dd970b8583..6a45f15b7f772d39e2759c14adccb9aab7e9642a 100644
+--- a/druxt.services.yml
++++ b/druxt.services.yml
+@@ -18,3 +18,9 @@ services:
+     parent: decoupled_router.router_path_translator.subscriber
+     tags:
+       - { name: event_subscriber }
++
++  druxt.config_import.subscriber:
++    class: Drupal\druxt\EventSubscriber\DruxtConfigImportSubscriber
++    arguments: ['@config.typed']
++    tags:
++      - { name: event_subscriber }
+diff --git a/src/EventSubscriber/DruxtConfigImportSubscriber.php b/src/EventSubscriber/DruxtConfigImportSubscriber.php
+new file mode 100644
+index 0000000000000000000000000000000000000000..07e6913d0484c7baf8ac488b54618de727dca00e
+--- /dev/null
++++ b/src/EventSubscriber/DruxtConfigImportSubscriber.php
+@@ -0,0 +1,93 @@
++<?php
++
++declare(strict_types=1);
++
++namespace Drupal\druxt\EventSubscriber;
++
++use Drupal\Core\Config\ConfigEvents;
++use Drupal\Core\Config\ConfigImporterEvent;
++use Drupal\Core\Config\StorageInterface;
++use Drupal\Core\Config\TypedConfigManagerInterface;
++use Drupal\Core\StringTranslation\StringTranslationTrait;
++use Symfony\Component\EventDispatcher\EventSubscriberInterface;
++
++/**
++ * Refuses a configuration import that would expose an unsafe resource.
++ *
++ * The configuration schema carries the rule, but nothing runs schema
++ * constraints on save or on import, so a hand-edited or imported
++ * druxt.settings would otherwise be accepted. Being on the list grants a
++ * blanket entity access result, so the rule has to hold here too.
++ */
++class DruxtConfigImportSubscriber implements EventSubscriberInterface {
++
++  use StringTranslationTrait;
++
++  /**
++   * The configuration name this subscriber guards.
++   */
++  private const CONFIG_NAME = 'druxt.settings';
++
++  /**
++   * Constructs the subscriber.
++   *
++   * @param \Drupal\Core\Config\TypedConfigManagerInterface $typedConfigManager
++   *   The typed configuration manager.
++   */
++  public function __construct(
++    protected TypedConfigManagerInterface $typedConfigManager,
++  ) {}
++
++  /**
++   * {@inheritdoc}
++   */
++  public static function getSubscribedEvents(): array {
++    return [ConfigEvents::IMPORT_VALIDATE => ['onConfigImportValidate', 20]];
++  }
++
++  /**
++   * Checks the resource list an import would store.
++   *
++   * @param \Drupal\Core\Config\ConfigImporterEvent $event
++   *   The configuration import event.
++   */
++  public function onConfigImportValidate(ConfigImporterEvent $event): void {
++    $importer = $event->getConfigImporter();
++    $comparer = $importer->getStorageComparer();
++
++    // Every collection, not just the default one. A language collection
++    // holds configuration overrides, so druxt.settings in language.es would
++    // otherwise reach a site without being checked.
++    foreach ($comparer->getAllCollectionNames() as $collection) {
++      foreach (['create', 'update'] as $op) {
++        if (!in_array(self::CONFIG_NAME, $importer->getUnprocessedConfiguration($op, $collection), TRUE)) {
++          continue;
++        }
++
++        $data = $comparer->getSourceStorage($collection)->read(self::CONFIG_NAME);
++        if (!is_array($data)) {
++          continue;
++        }
++
++        $violations = $this->typedConfigManager
++          ->createFromNameAndData(self::CONFIG_NAME, $data)
++          ->validate();
++
++        // The default collection is named by the empty string, which reads
++        // as a missing word in an error a deploy job prints.
++        $label = $collection === StorageInterface::DEFAULT_COLLECTION
++          ? $this->t('the default collection')
++          : $collection;
++
++        foreach ($violations as $violation) {
++          $importer->logError((string) $this->t('@config in @collection: @message', [
++            '@config' => self::CONFIG_NAME,
++            '@collection' => $label,
++            '@message' => strip_tags((string) $violation->getMessage()),
++          ]));
++        }
++      }
++    }
++  }
++
++}
+diff --git a/src/Form/DruxtSettingsForm.php b/src/Form/DruxtSettingsForm.php
+new file mode 100644
+index 0000000000000000000000000000000000000000..c8d072e493aead6408a23b2c9ac9eba27a0bec92
+--- /dev/null
++++ b/src/Form/DruxtSettingsForm.php
+@@ -0,0 +1,130 @@
++<?php
++
++declare(strict_types=1);
++
++namespace Drupal\druxt\Form;
++
++use Drupal\Core\Form\ConfigFormBase;
++use Drupal\Core\Form\FormStateInterface;
++use Drupal\jsonapi\ResourceType\ResourceTypeRepositoryInterface;
++use Symfony\Component\DependencyInjection\ContainerInterface;
++
++/**
++ * Chooses which JSON:API resources Druxt exposes.
++ */
++class DruxtSettingsForm extends ConfigFormBase {
++
++  /**
++   * The JSON:API resource type repository.
++   */
++  protected ResourceTypeRepositoryInterface $resourceTypeRepository;
++
++  /**
++   * {@inheritdoc}
++   */
++  #[\Override]
++  public static function create(ContainerInterface $container): static {
++    $form = parent::create($container);
++    $form->resourceTypeRepository = $container->get('jsonapi.resource_type.repository');
++    return $form;
++  }
++
++  /**
++   * {@inheritdoc}
++   */
++  public function getFormId(): string {
++    return 'druxt_settings';
++  }
++
++  /**
++   * {@inheritdoc}
++   */
++  protected function getEditableConfigNames(): array {
++    return ['druxt.settings'];
++  }
++
++  /**
++   * {@inheritdoc}
++   */
++  #[\Override]
++  public function buildForm(array $form, FormStateInterface $form_state): array {
++    $configured = $this->storedResources();
++    $options = $this->resourceOptions();
++
++    $form['resources'] = [
++      '#type' => 'checkboxes',
++      '#title' => $this->t('Exposed resources'),
++      '#options' => $options,
++      '#default_value' => array_values(array_intersect($configured, array_keys($options))),
++      '#description' => $this->t('A checked resource is readable by anyone with the "access druxt resources" permission, whatever the site would otherwise allow, and cannot be scoped to a role or a consumer. Unchecking one can stop a frontend rendering. Only configuration is listed here; a module can expose anything else with hook_druxt_resources_alter().'),
++    ];
++
++    return parent::buildForm($form, $form_state);
++  }
++
++  /**
++   * {@inheritdoc}
++   */
++  #[\Override]
++  public function submitForm(array &$form, FormStateInterface $form_state): void {
++    $offered = array_keys($this->resourceOptions());
++    $chosen = array_values(array_filter($form_state->getValue('resources')));
++
++    // A resource configured for a module that is not installed here is not on
++    // the form, so keep it rather than dropping it on save. Otherwise saving
++    // on a site without Views would quietly remove view--view for every site
++    // sharing the configuration.
++    $absent = array_values(array_diff($this->storedResources(), $offered));
++
++    $resources = array_values(array_unique(array_merge($chosen, $absent)));
++    sort($resources);
++
++    $this->config('druxt.settings')->set('resources', $resources)->save();
++
++    // Druxt's own route translation and schema handling read some of these.
++    // The module cannot know what a given frontend renders, so say what was
++    // removed rather than refusing to remove it.
++    $removed = array_intersect(array_diff(druxt_default_resources(), $resources), $offered);
++    if ($removed !== []) {
++      $this->messenger()->addWarning($this->t('Druxt no longer exposes @resources. A frontend that reads them will stop rendering that part of the site.', [
++        '@resources' => implode(', ', $removed),
++      ]));
++    }
++
++    parent::submitForm($form, $form_state);
++  }
++
++  /**
++   * Gets the resource list as it is stored.
++   *
++   * Not druxt_resources(), which rechecks the list and applies
++   * hook_druxt_resources_alter(). Saving that would persist what a module
++   * added in code, and delete what a module removed.
++   *
++   * @return string[]
++   *   Resource type ids, as configuration holds them.
++   */
++  protected function storedResources(): array {
++    return $this->config('druxt.settings')->get('resources') ?? druxt_default_resources();
++  }
++
++  /**
++   * Builds the offered resource options.
++   *
++   * @return array<string, string>
++   *   Resource type ids, keyed and labelled.
++   */
++  protected function resourceOptions(): array {
++    $options = [];
++    foreach ($this->resourceTypeRepository->all() as $resource_type) {
++      $name = $resource_type->getTypeName();
++      if ($resource_type->isInternal() || !druxt_resource_is_allowed($name)) {
++        continue;
++      }
++      $options[$name] = $name;
++    }
++    ksort($options);
++    return $options;
++  }
++
++}
+diff --git a/src/Plugin/Validation/Constraint/DruxtResourceConstraint.php b/src/Plugin/Validation/Constraint/DruxtResourceConstraint.php
+new file mode 100644
+index 0000000000000000000000000000000000000000..14493d6c8587bf233b17f1a70b6b121c2e04e815
+--- /dev/null
++++ b/src/Plugin/Validation/Constraint/DruxtResourceConstraint.php
+@@ -0,0 +1,25 @@
++<?php
++
++declare(strict_types=1);
++
++namespace Drupal\druxt\Plugin\Validation\Constraint;
++
++use Drupal\Core\Validation\Attribute\Constraint;
++use Drupal\Core\StringTranslation\TranslatableMarkup;
++use Symfony\Component\Validator\Constraint as SymfonyConstraint;
++
++/**
++ * Checks that an exposed resource is safe to expose.
++ */
++#[Constraint(
++  id: 'DruxtResource',
++  label: new TranslatableMarkup('Druxt exposed resource', [], ['context' => 'Validation']),
++)]
++class DruxtResourceConstraint extends SymfonyConstraint {
++
++  /**
++   * The violation message.
++   */
++  public string $message = '%resource cannot be added to this list, because @entity_type is a content entity type. Everything on this list is readable by everyone holding the access druxt resources permission, and there is no way to scope it to a role or a consumer, so adding a content entity type would expose every entity of that type including unpublished ones. A module may expose it with hook_druxt_resources_alter() instead, where the change is reviewable code.';
++
++}
+diff --git a/src/Plugin/Validation/Constraint/DruxtResourceConstraintValidator.php b/src/Plugin/Validation/Constraint/DruxtResourceConstraintValidator.php
+new file mode 100644
+index 0000000000000000000000000000000000000000..54a9b42951bdc15ebff48d347bcbe559dc65a973
+--- /dev/null
++++ b/src/Plugin/Validation/Constraint/DruxtResourceConstraintValidator.php
+@@ -0,0 +1,72 @@
++<?php
++
++declare(strict_types=1);
++
++namespace Drupal\druxt\Plugin\Validation\Constraint;
++
++use Drupal\Core\DependencyInjection\ContainerInjectionInterface;
++use Drupal\Core\Entity\EntityTypeManagerInterface;
++use Symfony\Component\DependencyInjection\ContainerInterface;
++use Symfony\Component\Validator\Constraint;
++use Symfony\Component\Validator\ConstraintValidator;
++use Symfony\Component\Validator\Exception\UnexpectedTypeException;
++
++/**
++ * Validates the DruxtResource constraint.
++ */
++final class DruxtResourceConstraintValidator extends ConstraintValidator implements ContainerInjectionInterface {
++
++  /**
++   * Constructs the validator.
++   *
++   * @param \Drupal\Core\Entity\EntityTypeManagerInterface $entityTypeManager
++   *   The entity type manager.
++   */
++  public function __construct(
++    protected EntityTypeManagerInterface $entityTypeManager,
++  ) {}
++
++  /**
++   * {@inheritdoc}
++   */
++  public static function create(ContainerInterface $container): static {
++    return new self($container->get('entity_type.manager'));
++  }
++
++  /**
++   * {@inheritdoc}
++   */
++  public function validate(mixed $value, Constraint $constraint): void {
++    if (!$constraint instanceof DruxtResourceConstraint) {
++      throw new UnexpectedTypeException($constraint, DruxtResourceConstraint::class);
++    }
++
++    if ($value === NULL || $value === '') {
++      return;
++    }
++
++    $resource = (string) $value;
++    if (in_array($resource, druxt_grandfathered_resources(), TRUE)) {
++      return;
++    }
++
++    [$entity_type_id] = explode('--', $resource, 2);
++
++    // An entity type this site does not have grants nothing, because no
++    // route exists for it. Rejecting it would stop a site sharing
++    // configuration with one that does have the module.
++    if (!isset($this->entityTypeManager->getDefinitions()[$entity_type_id])) {
++      return;
++    }
++
++    if (druxt_resource_is_allowed($resource)) {
++      return;
++    }
++
++    $this->context->addViolation($constraint->message, [
++      '%resource' => $resource,
++      '@entity_type' => $entity_type_id,
++    ]);
++  }
++
++}
+diff --git a/tests/modules/druxt_resources_test/druxt_resources_test.info.yml b/tests/modules/druxt_resources_test/druxt_resources_test.info.yml
+new file mode 100644
+index 0000000000000000000000000000000000000000..d58828c106690f6db83ebe33f166b7d1484d8c09
+--- /dev/null
++++ b/tests/modules/druxt_resources_test/druxt_resources_test.info.yml
+@@ -0,0 +1,7 @@
++name: 'DruxtJS resources test'
++type: module
++description: 'Alters the exposed resource list, for testing the alter hook.'
++package: Testing
++core_version_requirement: ^10 || ^11 || ^12
++dependencies:
++  - drupal:druxt
+diff --git a/tests/modules/druxt_resources_test/druxt_resources_test.module b/tests/modules/druxt_resources_test/druxt_resources_test.module
+new file mode 100644
+index 0000000000000000000000000000000000000000..5634d602c18ba1d3269fda637121e60cdf48fa33
+--- /dev/null
++++ b/tests/modules/druxt_resources_test/druxt_resources_test.module
+@@ -0,0 +1,20 @@
++<?php
++
++/**
++ * @file
++ * Alters the exposed resource list, for testing the alter hook.
++ */
++
++declare(strict_types=1);
++
++/**
++ * Implements hook_druxt_resources_alter().
++ */
++function druxt_resources_test_druxt_resources_alter(array &$resources): void {
++  // A module may add a resource the user interface refuses to offer, because
++  // code review is the gate there rather than a checkbox.
++  $resources[] = 'user--user';
++
++  // A module may also take one away.
++  $resources = array_values(array_diff($resources, ['view--view']));
++}
+diff --git a/tests/src/Functional/DruxtSettingsFormTest.php b/tests/src/Functional/DruxtSettingsFormTest.php
+new file mode 100644
+index 0000000000000000000000000000000000000000..7e9cbfd57a8ae4ff63c10be2f3054a11caad9cdf
+--- /dev/null
++++ b/tests/src/Functional/DruxtSettingsFormTest.php
+@@ -0,0 +1,121 @@
++<?php
++
++declare(strict_types=1);
++
++namespace Drupal\Tests\druxt\Functional;
++
++use Drupal\Tests\BrowserTestBase;
++use PHPUnit\Framework\Attributes\Group;
++use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
++
++/**
++ * Tests the settings form for the exposed JSON:API resources.
++ *
++ * @group druxt
++ */
++#[Group('druxt')]
++#[RunTestsInSeparateProcesses]
++class DruxtSettingsFormTest extends BrowserTestBase {
++
++  /**
++   * {@inheritdoc}
++   */
++  protected static $modules = [
++    'druxt',
++    'block',
++    'editor',
++    'menu_link_content',
++    'node',
++    'views',
++  ];
++
++  /**
++   * {@inheritdoc}
++   */
++  protected $defaultTheme = 'stark';
++
++  /**
++   * The settings form path.
++   */
++  private const PATH = '/admin/config/services/druxt';
++
++  /**
++   * Tests that the form needs its own permission.
++   */
++  public function testFormRequiresPermission(): void {
++    $this->drupalGet(self::PATH);
++    $this->assertSession()->statusCodeEquals(403);
++
++    // Access to the resources is not permission to change which are exposed.
++    $this->drupalLogin($this->drupalCreateUser(['access druxt resources']));
++    $this->drupalGet(self::PATH);
++    $this->assertSession()->statusCodeEquals(403);
++
++    $this->drupalLogin($this->drupalCreateUser(['administer druxt']));
++    $this->drupalGet(self::PATH);
++    $this->assertSession()->statusCodeEquals(200);
++  }
++
++  /**
++   * Tests that the form offers config resources and refuses content ones.
++   */
++  public function testFormOffersConfigResourcesOnly(): void {
++    $this->drupalLogin($this->drupalCreateUser(['administer druxt']));
++    $this->drupalGet(self::PATH);
++
++    // A config resource a site may want is offered, but not chosen for it.
++    $this->assertSession()->fieldExists('resources[editor--editor]');
++    $this->assertSession()->checkboxNotChecked('resources[editor--editor]');
++
++    // One that ships enabled stays ticked.
++    $this->assertSession()->checkboxChecked('resources[view--view]');
++
++    // A content resource is not offered at all. Being on the list grants a
++    // blanket entity access result, so this one would publish every
++    // account's mail to anyone holding the access permission.
++    $this->assertSession()->fieldNotExists('resources[user--user]');
++
++    // The one grandfathered content resource stays offered, because it
++    // shipped in the list this configuration replaced.
++    $this->assertSession()->fieldExists('resources[menu_link_content--menu_link_content]');
++  }
++
++  /**
++   * Tests that unchecking a resource is saved and takes effect.
++   */
++  public function testSavingUpdatesTheResourceList(): void {
++    $this->drupalLogin($this->drupalCreateUser(['administer druxt']));
++    $this->drupalGet(self::PATH);
++
++    $this->submitForm(['resources[editor--editor]' => TRUE], 'Save configuration');
++    $this->assertSession()->statusCodeEquals(200);
++
++    $resources = $this->config('druxt.settings')->get('resources');
++    $this->assertContains('editor--editor', $resources);
++    $this->assertContains('view--view', $resources);
++  }
++
++  /**
++   * Tests that saving keeps resources the form cannot offer.
++   *
++   * A resource belonging to a module this site does not have is not on the
++   * form. Saving must not drop it, or a site without that module would
++   * quietly delete the entry for every site sharing the configuration.
++   */
++  public function testSavingKeepsResourcesNotOnTheForm(): void {
++    $this->config('druxt.settings')
++      ->set('resources', array_merge(druxt_default_resources(), ['comment_type--comment_type']))
++      ->save();
++
++    $this->drupalLogin($this->drupalCreateUser(['administer druxt']));
++    $this->drupalGet(self::PATH);
++
++    // The comment module is not installed, so the resource cannot be offered.
++    $this->assertSession()->fieldNotExists('resources[comment_type--comment_type]');
++
++    $this->submitForm([], 'Save configuration');
++
++    $this->assertContains('comment_type--comment_type', $this->config('druxt.settings')->get('resources'));
++  }
++
++}
+diff --git a/tests/src/Kernel/DruxtConfigImportKernelTest.php b/tests/src/Kernel/DruxtConfigImportKernelTest.php
+new file mode 100644
+index 0000000000000000000000000000000000000000..bb7df6ae493ee807ff933bd7d48c59274fe18858
+--- /dev/null
++++ b/tests/src/Kernel/DruxtConfigImportKernelTest.php
+@@ -0,0 +1,162 @@
++<?php
++
++declare(strict_types=1);
++
++namespace Drupal\Tests\druxt\Kernel;
++
++use Drupal\Core\Config\ConfigImporter;
++use Drupal\Core\Config\ConfigImporterException;
++use Drupal\Core\Config\StorageComparer;
++use Drupal\KernelTests\KernelTestBase;
++use PHPUnit\Framework\Attributes\Group;
++use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
++
++/**
++ * Tests that a configuration import cannot expose an unsafe resource.
++ *
++ * The schema carries the rule, but Drupal does not run schema constraints
++ * on save or on import, so the rule needs enforcing here as well. A sync
++ * directory applied by a deploy job is not reviewed code, and it reaches
++ * the same place the settings form does.
++ *
++ * @group druxt
++ */
++#[Group('druxt')]
++#[RunTestsInSeparateProcesses]
++class DruxtConfigImportKernelTest extends KernelTestBase {
++
++  /**
++   * {@inheritdoc}
++   */
++  protected static $modules = [
++    'system',
++    'user',
++    'serialization',
++    'field',
++    'file',
++    'text',
++    'filter',
++    'path_alias',
++    'decoupled_router',
++    'jsonapi',
++    'views',
++    'druxt',
++  ];
++
++  /**
++   * {@inheritdoc}
++   */
++  protected function setUp(): void {
++    parent::setUp();
++    // Core refuses an import with no system.site, before druxt is consulted.
++    $this->installConfig(['system', 'druxt']);
++    $this->copyConfig(
++      $this->container->get('config.storage'),
++      $this->container->get('config.storage.sync')
++    );
++  }
++
++  /**
++   * Builds an importer for the current sync storage.
++   */
++  private function importer(): ConfigImporter {
++    $comparer = new StorageComparer(
++      $this->container->get('config.storage.sync'),
++      $this->container->get('config.storage')
++    );
++    $comparer->createChangelist();
++
++    return new ConfigImporter(
++      $comparer,
++      $this->container->get('event_dispatcher'),
++      $this->container->get('config.manager'),
++      $this->container->get('lock'),
++      $this->container->get('config.typed'),
++      $this->container->get('module_handler'),
++      $this->container->get('module_installer'),
++      $this->container->get('theme_handler'),
++      $this->container->get('string_translation'),
++      $this->container->get('extension.list.module'),
++      $this->container->get('extension.list.theme')
++    );
++  }
++
++  /**
++   * Returns the validation errors an import reports.
++   */
++  private function validationErrors(ConfigImporter $importer): array {
++    try {
++      $importer->validate();
++    }
++    catch (ConfigImporterException) {
++      // The errors are what is under test, so a refusal is expected here.
++    }
++
++    return $importer->getErrors();
++  }
++
++  /**
++   * Writes a resource list into the sync storage.
++   *
++   * @param string[] $resources
++   *   The resource list to stage.
++   * @param string|null $collection
++   *   A collection name, or NULL for the default collection.
++   */
++  private function stage(array $resources, ?string $collection = NULL): void {
++    $sync = $this->container->get('config.storage.sync');
++    if ($collection !== NULL) {
++      $sync = $sync->createCollection($collection);
++    }
++    $sync->write('druxt.settings', ['resources' => $resources]);
++  }
++
++  /**
++   * Tests that importing a content entity resource is refused.
++   */
++  public function testImportOfContentEntityResourceIsRefused(): void {
++    $this->stage(['view--view', 'user--user']);
++
++    $errors = $this->validationErrors($this->importer());
++    $this->assertNotEmpty($errors, 'The import reported an error.');
++    $this->assertStringContainsString('user--user', implode("\n", $errors));
++  }
++
++  /**
++   * Tests that a valid import is not refused.
++   */
++  public function testValidImportIsAccepted(): void {
++    $this->stage(['view--view', 'menu--menu']);
++
++    $this->assertSame([], $this->validationErrors($this->importer()));
++  }
++
++  /**
++   * Tests that a non-default collection is checked too.
++   *
++   * A language collection holds configuration overrides, so a resource
++   * staged there reaches the site without passing through the default
++   * collection.
++   */
++  public function testNonDefaultCollectionIsChecked(): void {
++    $this->stage(['view--view']);
++    $this->stage(['user--user'], 'language.es');
++
++    $errors = $this->validationErrors($this->importer());
++    $this->assertNotEmpty($errors, 'The import reported an error.');
++    $this->assertStringContainsString('language.es', implode("\n", $errors));
++  }
++
++  /**
++   * Tests that a resource for an uninstalled module imports.
++   *
++   * Configuration is shared between sites, so it may legitimately name a
++   * resource this one cannot serve.
++   */
++  public function testResourceForUninstalledModuleIsAccepted(): void {
++    $this->stage(['view--view', 'comment_type--comment_type']);
++
++    $this->assertSame([], $this->validationErrors($this->importer()));
++  }
++
++}
+diff --git a/tests/src/Kernel/DruxtResourceValidationKernelTest.php b/tests/src/Kernel/DruxtResourceValidationKernelTest.php
+new file mode 100644
+index 0000000000000000000000000000000000000000..8c0675e435dd76cdb854387cf4c323ae963111eb
+--- /dev/null
++++ b/tests/src/Kernel/DruxtResourceValidationKernelTest.php
+@@ -0,0 +1,115 @@
++<?php
++
++declare(strict_types=1);
++
++namespace Drupal\Tests\druxt\Kernel;
++
++use Drupal\KernelTests\KernelTestBase;
++use PHPUnit\Framework\Attributes\Group;
++use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
++
++/**
++ * Tests that configuration cannot expose a content entity resource.
++ *
++ * The settings form only offers configuration entities, but configuration
++ * can also arrive by import or by hand, which the form never sees. Being on
++ * the list grants a blanket entity access result, so the rule has to hold
++ * wherever the value comes from.
++ *
++ * @group druxt
++ */
++#[Group('druxt')]
++#[RunTestsInSeparateProcesses]
++class DruxtResourceValidationKernelTest extends KernelTestBase {
++
++  /**
++   * {@inheritdoc}
++   */
++  protected static $modules = [
++    'system',
++    'user',
++    'serialization',
++    'field',
++    'file',
++    'text',
++    'filter',
++    'path_alias',
++    'decoupled_router',
++    'jsonapi',
++    'views',
++    'druxt',
++  ];
++
++  /**
++   * {@inheritdoc}
++   */
++  protected function setUp(): void {
++    parent::setUp();
++    $this->installConfig(['druxt']);
++  }
++
++  /**
++   * Validates a resource list against the configuration schema.
++   *
++   * @param string[] $resources
++   *   The resource list to validate.
++   *
++   * @return int
++   *   The number of constraint violations.
++   */
++  private function violations(array $resources): int {
++    $typed = \Drupal::service('config.typed')
++      ->createFromNameAndData('druxt.settings', ['resources' => $resources]);
++    return count($typed->validate());
++  }
++
++  /**
++   * Tests that a configuration entity resource validates.
++   */
++  public function testConfigEntityResourceValidates(): void {
++    $this->assertSame(0, $this->violations(['view--view']));
++  }
++
++  /**
++   * Tests that a content entity resource does not validate.
++   */
++  public function testContentEntityResourceDoesNotValidate(): void {
++    $this->assertSame(1, $this->violations(['user--user']));
++  }
++
++  /**
++   * Tests that the grandfathered resource validates.
++   */
++  public function testGrandfatheredResourceValidates(): void {
++    $this->assertSame(0, $this->violations(['menu_link_content--menu_link_content']));
++  }
++
++  /**
++   * Tests that a resource for an uninstalled module validates.
++   *
++   * The form cannot offer it and saving must not drop it, so validation
++   * must not reject it either. It grants nothing, because a route for it
++   * does not exist on this site.
++   */
++  public function testResourceForUninstalledModuleValidates(): void {
++    $this->assertSame(0, $this->violations(['comment_type--comment_type']));
++  }
++
++  /**
++   * Tests that an empty entry validates.
++   *
++   * It names no entity type, so it grants nothing. Refusing it would block
++   * an import over a value that does nothing.
++   */
++  public function testEmptyResourceValidates(): void {
++    $this->assertSame(0, $this->violations(['']));
++  }
++
++  /**
++   * Tests that the shipped default validates.
++   */
++  public function testShippedDefaultValidates(): void {
++    $this->assertSame(0, $this->violations(druxt_default_resources()));
++  }
++
++}
+diff --git a/tests/src/Kernel/DruxtResourcesKernelTest.php b/tests/src/Kernel/DruxtResourcesKernelTest.php
+new file mode 100644
+index 0000000000000000000000000000000000000000..1fcb7b620c09e0266c1bbd6f4bd60f44f9bcb0e2
+--- /dev/null
++++ b/tests/src/Kernel/DruxtResourcesKernelTest.php
+@@ -0,0 +1,246 @@
++<?php
++
++declare(strict_types=1);
++
++namespace Drupal\Tests\druxt\Kernel;
++
++use Drupal\Core\Session\AccountInterface;
++use Drupal\KernelTests\KernelTestBase;
++use Drupal\system\Entity\Menu;
++use PHPUnit\Framework\Attributes\Group;
++use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
++
++/**
++ * Tests the configurable list of exposed JSON:API resources.
++ *
++ * The list used to be a hardcoded array in druxt_access_check(). It is now
++ * configuration, so a site can expose the resources its frontend needs
++ * without patching the module.
++ *
++ * @group druxt
++ */
++#[Group('druxt')]
++#[RunTestsInSeparateProcesses]
++class DruxtResourcesKernelTest extends KernelTestBase {
++
++  /**
++   * {@inheritdoc}
++   */
++  protected static $modules = [
++    'system',
++    'user',
++    'serialization',
++    'field',
++    'file',
++    'text',
++    'filter',
++    'path_alias',
++    'decoupled_router',
++    'jsonapi',
++    'views',
++    'editor',
++    'druxt',
++  ];
++
++  /**
++   * {@inheritdoc}
++   */
++  protected function setUp(): void {
++    parent::setUp();
++    $this->installConfig(['druxt']);
++  }
++
++  /**
++   * Tests that the status report checks the resources access actually grants.
++   *
++   * Druxt.install carried its own hardcoded list of ten, which had already
++   * drifted from the twelve the access check used: it omitted
++   * configurable_language and jsonapi_resource_config. Both now read the
++   * same source, so the report cannot describe a set nobody is granted.
++   */
++  public function testRequirementsUseTheSameResourceList(): void {
++    \Drupal::moduleHandler()->loadInclude('druxt', 'install');
++
++    $this->config('druxt.settings')
++      ->set('resources', ['view--view'])
++      ->save();
++
++    $this->assertSame(['view--view'], druxt_required_resources());
++  }
++
++  /**
++   * Tests that a config entity resource is allowed.
++   */
++  public function testConfigEntityResourceIsAllowed(): void {
++    $this->assertTrue(druxt_resource_is_allowed('view--view'));
++    $this->assertTrue(druxt_resource_is_allowed('editor--editor'));
++  }
++
++  /**
++   * Tests that a content entity resource is refused.
++   *
++   * The list grants a blanket entity access bypass and unrestricted
++   * filtering, so a content resource would publish per-entity access and
++   * unpublished content to anyone holding the permission.
++   */
++  public function testContentEntityResourceIsRefused(): void {
++    $this->assertFalse(druxt_resource_is_allowed('user--user'));
++    $this->assertFalse(druxt_resource_is_allowed('node--article'));
++  }
++
++  /**
++   * Tests that the one pre-existing content resource stays allowed.
++   *
++   * Menu_link_content shipped in the hardcoded list, so refusing it would
++   * break sites on update. It is grandfathered rather than treated as
++   * precedent for the category.
++   */
++  public function testGrandfatheredContentResourceIsAllowed(): void {
++    $this->assertTrue(druxt_resource_is_allowed('menu_link_content--menu_link_content'));
++  }
++
++  /**
++   * Tests that an unknown resource is refused.
++   */
++  public function testUnknownResourceIsRefused(): void {
++    $this->assertFalse(druxt_resource_is_allowed('nonsense--nonsense'));
++  }
++
++  /**
++   * Tests that a resource stored in configuration is rechecked at runtime.
++   *
++   * Configuration can hold a resource that is not safe to grant: written
++   * before this validation existed, or for an entity type that has appeared
++   * since the value was stored. Validation on import cannot catch either,
++   * so the access check has to recheck rather than trust what it reads.
++   */
++  public function testStoredContentEntityResourceIsNotGranted(): void {
++    // Write past validation, the way an older release or a direct
++    // Config::save() would have.
++    \Drupal::configFactory()->getEditable('druxt.settings')
++      ->set('resources', ['view--view', 'user--user'])
++      ->save();
++
++    $resources = druxt_resources();
++
++    $this->assertContains('view--view', $resources);
++    $this->assertNotContains('user--user', $resources);
++  }
++
++  /**
++   * Tests that the recheck runs before the alter hook, not after.
++   *
++   * A module may expose a content entity deliberately, because a change in
++   * code is reviewable. Filtering after the hook would take that away.
++   */
++  public function testAlterHookStillAddsWhatConfigurationCannot(): void {
++    \Drupal::service('module_installer')->install(['druxt_resources_test']);
++
++    // The test module adds user--user, which configuration may not.
++    $this->assertContains('user--user', druxt_resources());
++  }
++
++  /**
++   * Tests that a module may alter the resource list in code.
++   */
++  public function testAlterHookAddsAndRemoves(): void {
++    \Drupal::service('module_installer')->install(['druxt_resources_test']);
++
++    $resources = druxt_resources();
++
++    // The hook may add a resource the user interface would refuse.
++    $this->assertContains('user--user', $resources);
++    // And may remove one the default ships.
++    $this->assertNotContains('view--view', $resources);
++  }
++
++  /**
++   * Tests that an absent configuration falls back to the shipped defaults.
++   *
++   * A site updating from a release that had the list hardcoded has no
++   * druxt.settings until the update hook runs. Returning nothing there would
++   * deny every resource the frontend asks for.
++   */
++  public function testAbsentConfigurationFallsBackToDefaults(): void {
++    \Drupal::configFactory()->getEditable('druxt.settings')->delete();
++
++    $this->assertSame(druxt_default_resources(), druxt_resources());
++  }
++
++  /**
++   * Tests that an empty list is respected rather than treated as absent.
++   */
++  public function testEmptyListIsHonoured(): void {
++    $this->config('druxt.settings')->set('resources', [])->save();
++
++    $this->assertSame([], druxt_resources());
++  }
++
++  /**
++   * Tests that the shipped configuration matches the code default.
++   *
++   * The two are separate files and would otherwise drift, which is the fault
++   * this issue is fixing in the first place.
++   */
++  public function testShippedConfigurationMatchesTheCodeDefault(): void {
++    $this->assertSame(druxt_default_resources(), druxt_resources());
++  }
++
++  /**
++   * Tests that the resource list is read from configuration.
++   */
++  public function testResourcesComeFromConfiguration(): void {
++    $this->config('druxt.settings')
++      ->set('resources', ['view--view'])
++      ->save();
++
++    $this->assertSame(['view--view'], druxt_resources());
++  }
++
++  /**
++   * Tests that the shipped default covers the resources a frontend needs.
++   */
++  public function testDefaultResourcesAreInstalled(): void {
++    $resources = druxt_resources();
++
++    // The twelve the hardcoded array carried, so an existing site sees no
++    // change on update.
++    $this->assertContains('block--block', $resources);
++    $this->assertContains('configurable_language--configurable_language', $resources);
++    $this->assertContains('entity_form_display--entity_form_display', $resources);
++    $this->assertContains('entity_form_mode--entity_form_mode', $resources);
++    $this->assertContains('entity_view_display--entity_view_display', $resources);
++    $this->assertContains('entity_view_mode--entity_view_mode', $resources);
++    $this->assertContains('field_config--field_config', $resources);
++    $this->assertContains('field_storage_config--field_storage_config', $resources);
++    $this->assertContains('jsonapi_resource_config--jsonapi_resource_config', $resources);
++    $this->assertContains('menu--menu', $resources);
++    $this->assertContains('menu_link_content--menu_link_content', $resources);
++    $this->assertContains('view--view', $resources);
++
++    // Nothing is added to the default. Making the list configurable must not
++    // change what an existing site exposes. A site that wants more, such as
++    // editor--editor for a frontend that renders a text format's toolbar,
++    // chooses it.
++    $this->assertNotContains('editor--editor', $resources);
++    $this->assertCount(12, $resources);
++  }
++
++  /**
++   * Tests that an access answer records where it was read from.
++   *
++   * The answer comes from the resource list, which is now configuration a
++   * user can change. Without the dependency, a cached response keeps
++   * whatever the list said when it was written: ticking a resource has no
++   * visible effect until the caches are rebuilt.
++   */
++  public function testEntityAccessDependsOnTheSettings(): void {
++    $menu = Menu::create(['id' => 'test', 'label' => 'Test']);
++    $account = $this->createMock(AccountInterface::class);
++
++    $result = druxt_entity_access($menu, 'view', $account);
++
++    $this->assertContains('config:druxt.settings', $result->getCacheTags());
++  }
++
++}
+diff --git a/tests/src/Kernel/DruxtSettingsFormKernelTest.php b/tests/src/Kernel/DruxtSettingsFormKernelTest.php
+new file mode 100644
+index 0000000000000000000000000000000000000000..c8031852155fc0ede3a2ffd3f27c0f789e0eb54d
+--- /dev/null
++++ b/tests/src/Kernel/DruxtSettingsFormKernelTest.php
+@@ -0,0 +1,201 @@
++<?php
++
++declare(strict_types=1);
++
++namespace Drupal\Tests\druxt\Kernel;
++
++use Drupal\Core\Form\FormState;
++use Drupal\KernelTests\KernelTestBase;
++use Drupal\druxt\Form\DruxtSettingsForm;
++use PHPUnit\Framework\Attributes\Group;
++use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
++
++/**
++ * Tests the settings form logic in process.
++ *
++ * The functional test drives the same form through a browser, which proves
++ * the routing and the permission. It runs the site in the webserver process,
++ * so it exercises none of this code where a coverage run can see it, and the
++ * two paths below have no browser equivalent at all.
++ *
++ * @group druxt
++ */
++#[Group('druxt')]
++#[RunTestsInSeparateProcesses]
++class DruxtSettingsFormKernelTest extends KernelTestBase {
++
++  /**
++   * {@inheritdoc}
++   */
++  protected static $modules = [
++    'system',
++    'user',
++    'serialization',
++    'field',
++    'file',
++    'text',
++    'filter',
++    'path_alias',
++    'menu_link_content',
++    'link',
++    'decoupled_router',
++    'jsonapi',
++    'views',
++    'editor',
++    'druxt',
++  ];
++
++  /**
++   * {@inheritdoc}
++   */
++  protected function setUp(): void {
++    parent::setUp();
++    $this->installEntitySchema('menu_link_content');
++    $this->installConfig(['druxt']);
++  }
++
++  /**
++   * Builds the form and returns the resources element.
++   *
++   * @return array
++   *   The built checkboxes element.
++   */
++  private function resourcesElement(): array {
++    $form = \Drupal::formBuilder()->getForm(DruxtSettingsForm::class);
++    return $form['resources'];
++  }
++
++  /**
++   * Submits the form with the given checkbox values.
++   *
++   * @param string[] $checked
++   *   The resource ids to tick.
++   */
++  private function submit(array $checked): void {
++    // A browser omits a checkbox that is not ticked, and a programmed
++    // submission is validated against the options, so an explicit 0 is
++    // refused here.
++    $form_state = new FormState();
++    $form_state->setValues(['resources' => array_combine($checked, $checked)]);
++    \Drupal::formBuilder()->submitForm(DruxtSettingsForm::class, $form_state);
++
++    // A form that failed validation silently saves nothing, which would make
++    // every assertion below pass or fail for the wrong reason.
++    $this->assertSame([], $form_state->getErrors());
++  }
++
++  /**
++   * Returns the stored resource list.
++   *
++   * @return string[]
++   *   The resource ids configuration holds.
++   */
++  private function stored(): array {
++    return $this->config('druxt.settings')->get('resources');
++  }
++
++  /**
++   * Tests that the form offers no content entity resource.
++   */
++  public function testFormOffersNoContentEntityResource(): void {
++    $options = $this->resourcesElement()['#options'];
++
++    $this->assertArrayHasKey('view--view', $options);
++    $this->assertArrayHasKey('editor--editor', $options);
++    $this->assertArrayNotHasKey('user--user', $options);
++
++    // The one content resource that shipped in the hardcoded list stays,
++    // because removing it would break sites on upgrade.
++    $this->assertArrayHasKey('menu_link_content--menu_link_content', $options);
++  }
++
++  /**
++   * Tests that a resource shipped unchecked is offered unchecked.
++   */
++  public function testShippedDefaultsAreTicked(): void {
++    $element = $this->resourcesElement();
++
++    $this->assertContains('view--view', $element['#default_value']);
++    $this->assertNotContains('editor--editor', $element['#default_value']);
++  }
++
++  /**
++   * Tests that the form shows configuration, not the altered list.
++   *
++   * The alter hook runs on read. If the form showed its result, saving
++   * would write what a module added into configuration, and delete what a
++   * module removed.
++   */
++  public function testFormIgnoresTheAlterHook(): void {
++    \Drupal::service('module_installer')->install(['druxt_resources_test']);
++
++    $element = $this->resourcesElement();
++
++    // The hook removes this one, but configuration still holds it.
++    $this->assertContains('view--view', $element['#default_value']);
++
++    // The hook adds this one, which the form must never offer or tick.
++    $this->assertArrayNotHasKey('user--user', $element['#options']);
++    $this->assertNotContains('user--user', $element['#default_value']);
++  }
++
++  /**
++   * Tests that saving stores what was ticked.
++   */
++  public function testSubmitStoresTheTickedResources(): void {
++    $this->submit(['view--view', 'editor--editor']);
++
++    $this->assertContains('editor--editor', $this->stored());
++    $this->assertContains('view--view', $this->stored());
++    $this->assertNotContains('menu--menu', $this->stored());
++  }
++
++  /**
++   * Tests that saving keeps a resource the form could not offer.
++   */
++  public function testSubmitKeepsResourcesTheFormCannotOffer(): void {
++    $this->config('druxt.settings')
++      ->set('resources', array_merge(druxt_default_resources(), ['comment_type--comment_type']))
++      ->save();
++
++    // The comment module is absent, so the form has no checkbox for it.
++    $this->assertArrayNotHasKey('comment_type--comment_type', $this->resourcesElement()['#options']);
++
++    $this->submit(['view--view']);
++
++    $this->assertContains('comment_type--comment_type', $this->stored());
++  }
++
++  /**
++   * Tests that saving does not persist what the alter hook added.
++   */
++  public function testSubmitDoesNotPersistTheAlterHooksAddition(): void {
++    \Drupal::service('module_installer')->install(['druxt_resources_test']);
++
++    $this->submit(['view--view']);
++
++    $this->assertNotContains('user--user', $this->stored());
++  }
++
++  /**
++   * Tests that removing a shipped default warns about the consequence.
++   */
++  public function testSubmitWarnsWhenDefaultsAreRemoved(): void {
++    $this->submit(['editor--editor']);
++
++    $warnings = \Drupal::messenger()->messagesByType('warning');
++    $this->assertCount(1, $warnings);
++    $this->assertStringContainsString('view--view', (string) reset($warnings));
++  }
++
++  /**
++   * Tests that keeping every default warns about nothing.
++   */
++  public function testSubmitDoesNotWarnWhenNothingIsRemoved(): void {
++    $offered = array_keys($this->resourcesElement()['#options']);
++    $this->submit(array_intersect(druxt_default_resources(), $offered));
++
++    $this->assertSame([], \Drupal::messenger()->messagesByType('warning'));
++  }
++
++}
+diff --git a/tests/src/Unit/DruxtResourceConstraintValidatorTest.php b/tests/src/Unit/DruxtResourceConstraintValidatorTest.php
+new file mode 100644
+index 0000000000000000000000000000000000000000..266fa39a047579e453a2ef8e3351e2c9fcde4874
+--- /dev/null
++++ b/tests/src/Unit/DruxtResourceConstraintValidatorTest.php
+@@ -0,0 +1,38 @@
++<?php
++
++declare(strict_types=1);
++
++namespace Drupal\Tests\druxt\Unit;
++
++use Drupal\Core\Entity\EntityTypeManagerInterface;
++use Drupal\Tests\UnitTestCase;
++use Drupal\druxt\Plugin\Validation\Constraint\DruxtResourceConstraintValidator;
++use PHPUnit\Framework\Attributes\Group;
++use Symfony\Component\Validator\Constraints\NotBlank;
++use Symfony\Component\Validator\Exception\UnexpectedTypeException;
++
++/**
++ * Tests the resource constraint validator's contract.
++ *
++ * @group druxt
++ */
++#[Group('druxt')]
++class DruxtResourceConstraintValidatorTest extends UnitTestCase {
++
++  /**
++   * Tests that the validator refuses a constraint it does not implement.
++   *
++   * Symfony hands a validator whatever constraint names it, so a mistake in
++   * a plugin definition would otherwise be checked against the wrong rule
++   * and quietly pass.
++   */
++  public function testValidateRefusesAnotherConstraint(): void {
++    $validator = new DruxtResourceConstraintValidator(
++      $this->createMock(EntityTypeManagerInterface::class)
++    );
++
++    $this->expectException(UnexpectedTypeException::class);
++    $validator->validate('view--view', new NotBlank());
++  }
++
++}

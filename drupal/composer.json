@@ -23,7 +23,7 @@
         "drupal/core-recommended": "~11",
         "drupal/decoupled_router": "^2.0 <2.0.7",
         "drupal/decoupled_settings": "^1.0@beta",
-        "drupal/druxt": "^1.2",
+        "drupal/druxt": "1.2.x-dev",
         "drupal/simple_oauth": "^6.1",
         "drupal/tome": "^1.16",
         "drush/drush": "^13"
@@ -108,7 +108,7 @@
         },
         "patches": {
             "drupal/druxt": {
-                "Fix ViewsPathTranslatorSubscriber crash on views with no JSON:API route": "patches/druxt-views-path-translator-route-name.patch"
+                "Add ability to configure/extend exposed Druxt JSON:API resources (#3309969)": "patches/druxt-3309969-configurable-resources.patch"
             },
             "drupal/tome": {
                 "Fix subprocess commands built with a joined string, not an argv array": "patches/tome-process-array-not-string.patch",

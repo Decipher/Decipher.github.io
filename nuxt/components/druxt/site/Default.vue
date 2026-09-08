@@ -113,8 +113,18 @@ export default {
   },
 
   computed: {
+    /**
+     * The order the theme declares its regions in, from the build.
+     *
+     * Empty when nothing served it, which `layoutFor` treats as "order them
+     * the way they arrived" rather than guessing.
+     */
+    declaredRegions() {
+      return ((this.$config || {}).authoring || {}).regions || []
+    },
+
     band() {
-      return layoutFor(this.regions)
+      return layoutFor(this.regions, this.declaredRegions)
     },
 
     twoColumn() {

@@ -211,6 +211,44 @@ const configuredFilters = function () {
   return filters
 }
 
+/**
+ * The order a theme declares its regions in, read at build time.
+ *
+ * Druxt derives the region list from the blocks that are placed, so it arrives
+ * in whatever order that query returned: the account menu before the branding,
+ * and a header rendered backwards. This used to be corrected by a list of
+ * regexes in `lib/regions.mjs` guessing the order from region names, which was
+ * a guess at Olivero's naming made because there was no way to ask.
+ *
+ * `decoupled_settings` can serve the theme's declared order now, behind its
+ * `expose_theme_manifest` setting. Read directly rather than through the
+ * vendored Nuxt module, because the vendored build predates the manifest; when
+ * that build is refreshed this should go and the module should supply it.
+ *
+ * An empty list is the honest answer when nothing served it, and
+ * `layoutFor` then falls back to arrival order rather than to a guess.
+ */
+const declaredRegions = async function (baseUrl) {
+  // `axios`, not `fetch`. This build runs on Node 16, which has no global
+  // fetch, so a fetch here throws and the catch below turns that into "no
+  // manifest" - a silent wrong answer rather than an error. It cost an
+  // afternoon of wondering why the payload was empty when curl could see it.
+  const axios = require('axios')
+  const endpoint = `${String(baseUrl).replace(/\/+$/, '')}/jsonapi/decoupled/settings`
+  try {
+    const { data: body } = await axios.get(endpoint, {
+      headers: { Accept: 'application/vnd.api+json' },
+      timeout: 15000,
+    })
+    const data = Array.isArray(body.data) ? body.data[0] : body.data
+    const regions = (((data || {}).attributes || {}).theme || {}).regions || {}
+    return Object.keys(regions)
+  } catch {
+    // A build with no backend still builds; it just cannot order its regions.
+    return []
+  }
+}
+
 const localhostListenURL = function () {
   this.nuxt.hook('listen', (server, listener) => {
     listener.host = 'localhost'
@@ -305,6 +343,10 @@ export default async () => ({
     authoring: {
       // The buttons each text format is configured for, from the committed
       // config. See `configuredToolbars` for why this is not left to runtime.
+      // The theme's own region order, so the header is not assembled in
+      // whatever order the block query happened to return.
+      regions: await declaredRegions(baseUrl),
+
       toolbars: configuredToolbars(),
 
       // The display modes each bundle has, so the editor can offer a choice of
