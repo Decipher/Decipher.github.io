@@ -151,9 +151,26 @@ a {
 .prose-body p,
 .prose-body li {
   @apply text-body;
+}
 
-  /* A measure, so a line is a length the eye can track back from. */
-  max-width: 68ch;
+/*
+ * The measure, applied to the column rather than to paragraphs.
+ *
+ * It used to sit on `p` and `li` alone, so a paragraph stopped at 68 characters
+ * while the heading above it and the figure below it ran the full width of the
+ * container. The article read as a narrow column of text with headings and
+ * pictures sticking out to the right of it, which looks like a layout that has
+ * come apart rather than a deliberate measure.
+ *
+ * A figure is the exception, and deliberately: a screenshot of a page is
+ * unreadable at text width, so it is allowed the whole column.
+ *
+ * In rem rather than ch. `ch` is the width of a zero in the element's own font,
+ * so the same 68ch gave a heading 816px and a paragraph 612px, and the column
+ * still had a step in its right edge at every heading.
+ */
+.prose-body > *:not(figure) {
+  max-width: 38rem;
 }
 
 .prose-body ul,
