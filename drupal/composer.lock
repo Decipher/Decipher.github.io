@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "0a58d7eb541c90c2e2e49164c548f5d5",
+    "content-hash": "70084b4b32bd156abc2c422b3c260004",
     "packages": [
         {
             "name": "asm89/stack-cors",
@@ -1682,17 +1682,11 @@
         },
         {
             "name": "drupal/druxt",
-            "version": "1.2.2",
+            "version": "dev-1.2.x",
             "source": {
                 "type": "git",
                 "url": "https://git.drupalcode.org/project/druxt.git",
-                "reference": "1.2.2"
-            },
-            "dist": {
-                "type": "zip",
-                "url": "https://ftp.drupal.org/files/projects/druxt-1.2.2.zip",
-                "reference": "1.2.2",
-                "shasum": "44a98ebb2e3d2471446ea609e0dfbc0c648ab99b"
+                "reference": "f71640a7d92d4f02f824380cef06170194161f56"
             },
             "require": {
                 "drupal/core": "^10 || ^11 || ^12",
@@ -1702,12 +1696,15 @@
             },
             "type": "drupal-module",
             "extra": {
+                "branch-alias": {
+                    "dev-1.2.x": "1.2.x-dev"
+                },
                 "drupal": {
-                    "version": "1.2.2",
-                    "datestamp": "1788585538",
+                    "version": "1.2.2+0-dev",
+                    "datestamp": "1788584817",
                     "security-coverage": {
-                        "status": "covered",
-                        "message": "Covered by Drupal's security advisory policy"
+                        "status": "not-covered",
+                        "message": "Dev releases are not covered by Drupal security advisories."
                     }
                 }
             },
@@ -8176,7 +8173,8 @@
     "minimum-stability": "dev",
     "stability-flags": {
         "cweagans/composer-patches": 10,
-        "drupal/decoupled_settings": 10
+        "drupal/decoupled_settings": 10,
+        "drupal/druxt": 20
     },
     "prefer-stable": true,
     "prefer-lowest": false,

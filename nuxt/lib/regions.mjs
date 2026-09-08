@@ -63,24 +63,57 @@ export function bandFor(region) {
  * Everything unmatched sorts last, keeping the order it arrived in, so a region
  * this does not recognise is put after the ones it does rather than in front.
  */
-const RANK = [/branding/, /^header/, /^pre_?header/, /primary/, /secondary/, /^footer_top/, /^footer/]
+/**
+ * The order to fall back on when the theme will not say.
+ *
+ * A guess, and named as one. It matches on region names, which is to say it
+ * guesses at Olivero's naming and hopes other themes agree. It exists because
+ * Druxt derives the region list from the blocks that are placed, so regions
+ * arrive in whatever order that query returned: the account menu before the
+ * branding, and a header rendered backwards.
+ *
+ * Kept because most sites cannot answer the question yet. Reading the theme's
+ * declared order needs `decoupled_settings` with its theme manifest exposed,
+ * and a build with no backend cannot ask at all. Removing this and falling
+ * back to arrival order put the account menu ahead of the branding on every
+ * build but the one machine that had the manifest.
+ */
+const FALLBACK_ORDER = [
+  /branding/,
+  /^header/,
+  /^pre_?header/,
+  /primary/,
+  /secondary/,
+  /^footer_top/,
+  /^footer/,
+]
 
-export function rankOf(region) {
-  const index = RANK.findIndex((pattern) => pattern.test(String(region || '')))
-  return index === -1 ? RANK.length : index
+/**
+ * Where a region sits.
+ *
+ * The theme's declared order when it was served, which is a fact Drupal
+ * records. The guess above when it was not.
+ */
+export function rankOf(region, declared = []) {
+  const index = declared.indexOf(region)
+  if (index !== -1) return index
+  if (declared.length) return declared.length
+
+  const guessed = FALLBACK_ORDER.findIndex((pattern) => pattern.test(String(region || '')))
+  return guessed === -1 ? FALLBACK_ORDER.length : guessed
 }
 
 /**
  * A theme's regions, grouped into bands and ordered within them.
  */
-export function layoutFor(regions = []) {
+export function layoutFor(regions = [], declared = []) {
   const layout = Object.fromEntries(BANDS.map((band) => [band, []]))
   regions.forEach((region, arrived) => layout[bandFor(region)].push({ region, arrived }))
   return Object.fromEntries(
     Object.entries(layout).map(([band, entries]) => [
       band,
       entries
-        .sort((a, b) => rankOf(a.region) - rankOf(b.region) || a.arrived - b.arrived)
+        .sort((a, b) => rankOf(a.region, declared) - rankOf(b.region, declared) || a.arrived - b.arrived)
         .map((entry) => entry.region),
     ])
   )
