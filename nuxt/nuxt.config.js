@@ -31,10 +31,6 @@ const CONTENT_REPOSITORY = contentRepository()
 
 const baseUrl = process.env.BASE_URL || 'http://quickstart-druxt-serverless.ddev.site'
 
-
-// Bound to 0.0.0.0, Nuxt reports the container-internal interface IP as
-// its listen URL - unreachable from the host. Rewrite the reported URL
-// only: the bind stays 0.0.0.0 so container port forwarding keeps working.
 const localhostListenURL = function () {
   this.nuxt.hook('listen', (server, listener) => {
     listener.host = 'localhost'
@@ -42,7 +38,10 @@ const localhostListenURL = function () {
   })
 }
 
-export default {
+// An async factory rather than a plain object, because the site's identity is
+// read from Drupal and `publicRuntimeConfig` is serialised the moment this is
+// loaded. Nuxt 2 accepts a function returning a promise here.
+export default async () => ({
   // Target full static build.
   target: 'static',
 
@@ -185,6 +184,13 @@ export default {
   // but `npm start` locally should behave like dev does. Matches the
   // druxt.js monorepo's own example placement.
   modules: [
+    // Before druxt-site, because it reads `druxt.baseUrl` and writes the
+    // settings into the runtime config the rest of the build then uses.
+    //
+    // Vendored, not installed: the package is not published yet, and a
+    // dependency on the branch it lives on would be a private host in a public
+    // repository. See nuxt/vendor/decoupled-settings/README.md.
+    '~/vendor/decoupled-settings',
     'druxt-site',
     localhostListenURL,
   ],
@@ -210,4 +216,4 @@ export default {
   // Build Configuration: https://go.nuxtjs.dev/config-build
   build: {
   }
-}
+})
