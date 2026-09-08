@@ -113,6 +113,9 @@
             "drupal/tome": {
                 "Fix subprocess commands built with a joined string, not an argv array": "patches/tome-process-array-not-string.patch",
                 "Declare normalizer supported types so entity-specific normalizers are used": "patches/tome-normalizer-supported-types.patch"
+            },
+            "drupal/decoupled_settings": {
+                "Expose the active theme's regions, labels and breakpoints (#15)": "patches/decoupled-settings-15-theme-manifest.patch"
             }
         }
     }
