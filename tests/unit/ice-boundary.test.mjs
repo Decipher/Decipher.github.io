@@ -57,3 +57,22 @@ test('everything in src is re-exported from the package root', () => {
   const missing = files.filter((name) => !index.includes(`./src/${name}`))
   assert.deepEqual(missing, [])
 })
+
+test('no two modules export the same name', () => {
+  // `export *` from two modules that both define a name resolves it to
+  // undefined rather than raising: `CAPTION_FILTER` lived in two files and
+  // reading it through the package root silently gave nothing.
+  const seen = new Map()
+  const clashes = []
+  for (const name of files) {
+    const source = readFileSync(path.join(SRC, name), 'utf8')
+    for (const match of source.matchAll(
+      /^export (?:const|function|class|async function) (\w+)/gm
+    )) {
+      const exported = match[1]
+      if (seen.has(exported)) clashes.push(`${exported}: ${seen.get(exported)} and ${name}`)
+      else seen.set(exported, name)
+    }
+  }
+  assert.deepEqual(clashes, [])
+})

@@ -21,6 +21,8 @@
  */
 
 /** Images and media that carry a caption, with the attribute in either quote. */
+import { CAPTION_FILTER } from './formats.mjs'
+
 const CAPTIONED = /<(img|drupal-media)\b[^>]*\bdata-caption\s*=\s*("([^"]*)"|'([^']*)')[^>]*>/gi
 
 /** The attribute itself, so it can be taken back out of the tag. */
@@ -145,9 +147,6 @@ export function encodeAttribute(value) {
     .split('"')
     .join('&quot;')
 }
-
-/** The filter that turns `data-caption` into a figure when the field renders. */
-export const CAPTION_FILTER = 'filter_caption'
 
 /**
  * Whether captions belong in an attribute for this format.

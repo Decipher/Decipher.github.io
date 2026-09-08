@@ -33,6 +33,7 @@
  */
 import { DrupalImageCompatibility, imageUploadAdapter } from '../ice/src/ckeditor-upload.mjs'
 import { captionsAreAttributes, fromEditorCaptions, toEditorCaptions } from '../ice/src/captions.mjs'
+import { filtersFromResources } from '../ice/src/formats.mjs'
 import { editorFileUrls, storedFileUrls } from '../ice/src/files.mjs'
 import { stickyOffset } from '../lib/sticky.mjs'
 import { editorPlugins, loadCkeditor } from '../ice/src/ckeditor.mjs'
@@ -40,6 +41,7 @@ import { editorForFormat, FALLBACK_TOOLBAR, usableToolbar } from '../ice/src/edi
 
 // Shared across every field on the page: one request, however many editors.
 let editorConfigPromise = null
+let formatCollectionPromise = null
 
 export default {
   name: 'AuthoringWysiwyg',
@@ -58,7 +60,17 @@ export default {
   },
 
   data() {
-    return { model: this.value, editor: null }
+    return {
+      model: this.value,
+      editor: null,
+      /**
+       * The filters Drupal says this format runs, once it has said.
+       *
+       * Null until asked and if it will not answer. An empty array is a real
+       * answer, so the two cannot be collapsed: see `formats.mjs`.
+       */
+      liveFilters: null,
+    }
   },
 
   computed: {
@@ -72,6 +84,11 @@ export default {
      * into an attribute nothing reads and lost without a word.
      */
     captionsAsAttributes() {
+      // Drupal's own answer when this session can read it, which needs
+      // `filter_format--filter_format` exposed, and the build's copy when not.
+      if (Array.isArray(this.liveFilters)) {
+        return captionsAreAttributes({ [this.format]: this.liveFilters }, this.format)
+      }
       const filters = ((this.$config || {}).authoring || {}).filters || {}
       return captionsAreAttributes(filters, this.format)
     },
@@ -134,6 +151,10 @@ export default {
   },
 
   async mounted() {
+    // Alongside the editor, not before it: a format that cannot be read should
+    // not hold up an editor that has a perfectly good build-time answer.
+    this.loadFilters()
+
     const [namespace, configured] = await Promise.all([loadCkeditor(), this.loadToolbar()])
     if (!namespace) return
     await this.create(namespace, configured)
@@ -272,6 +293,26 @@ export default {
 
       const baked = usableToolbar((this.bakedToolbars || {})[this.format])
       return baked.length ? baked : [...FALLBACK_TOOLBAR]
+    },
+
+    /**
+     * Ask Drupal which filters this format runs.
+     *
+     * Needs `filter_format--filter_format` exposed, which stock Druxt does not
+     * do. Where it is not, this stays null and the build's copy answers.
+     */
+    async loadFilters() {
+      if (!this.backendUrl || !this.format || !this.$druxt) return
+      // The collection is shared, the answer is not: two fields on one form can
+      // use different formats, and memoising the answer gave the second field
+      // the first one's filters.
+      if (!formatCollectionPromise) {
+        formatCollectionPromise = this.$druxt
+          .getCollection('filter_format--filter_format')
+          .then((collection) => (collection || {}).data || null)
+          .catch(() => null)
+      }
+      this.liveFilters = filtersFromResources(await formatCollectionPromise, this.format)
     },
 
     /** Drupal's own answer, for a session allowed to ask. */
