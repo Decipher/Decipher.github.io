@@ -23,7 +23,7 @@
     "templates"
   ],
   "peerDependencies": {
-    "druxt": "^0.21.0"
+    "druxt": ">=0.21.0"
   },
   "engines": {
     "node": ">=16.20.1"
