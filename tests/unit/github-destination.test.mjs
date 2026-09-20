@@ -7,8 +7,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import destination from '../../nuxt/plugins/authoring-github-destination.js'
-import { contentsApiUrl } from '../../nuxt/lib/github.mjs'
+import { contentsApiUrl, sessionRecordRequest } from '../../nuxt/lib/github.mjs'
 
 const RAW = 'https://raw.githubusercontent.com/o/r/session/session.json'
 
@@ -16,11 +15,8 @@ test('a signed-in author reads the record from the API, not the CDN', () => {
   // As close to the job telling the page as a static site gets: the contents
   // API is current the moment the job pushes the branch, where the raw URL is
   // behind a CDN that can repeat a five minute old answer.
-  const { url, headers } = destination.recordRequest(RAW, { token: 'a-token' })
-  assert.equal(
-    url,
-    'https://api.github.com/repos/o/r/contents/session.json?ref=session'
-  )
+  const { url, headers } = sessionRecordRequest(RAW, 'a-token')
+  assert.equal(url, 'https://api.github.com/repos/o/r/contents/session.json?ref=session')
   assert.equal(headers.authorization, 'Bearer a-token')
   // The file, not the metadata envelope, so the module parses one shape
   // whichever address answered.
@@ -31,24 +27,10 @@ test('a record published somewhere other than GitHub still reads', () => {
   // Nothing usable means the module falls back to the plain URL rather than
   // treating the record as unreadable.
   assert.equal(contentsApiUrl('https://example.test/session.json'), null)
-  assert.equal(
-    destination.recordRequest('https://example.test/session.json', {
-      token: 'a-token',
-    }),
-    null
-  )
+  assert.equal(sessionRecordRequest('https://example.test/session.json', 'a-token'), null)
 })
 
-test('an anonymous visitor gets the plain URL, because there is no token', () => {
-  assert.equal(destination.recordRequest(RAW, {}), null)
-  assert.equal(destination.recordRequest(RAW, { token: undefined }), null)
-})
-
-test('the destination supplies only the reading path', () => {
-  // The token comes from the default destination, which reads the
-  // sessionRecord.tokenKey this site already sets.
-  assert.equal(destination.id, 'github')
-  assert.equal(typeof destination.recordRequest, 'function')
-  assert.equal(destination.token, undefined)
-  assert.equal(destination.export, undefined)
+test('an anonymous visitor gets nothing, so the plain URL is used', () => {
+  assert.equal(sessionRecordRequest(RAW, undefined), null)
+  assert.equal(sessionRecordRequest(RAW, ''), null)
 })

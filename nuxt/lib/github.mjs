@@ -199,3 +199,30 @@ export function contentsApiUrl(recordUrl) {
   const [, owner, repo, ref, path] = match
   return `${API}/repos/${owner}/${repo}/contents/${path}?ref=${encodeURIComponent(ref)}`
 }
+
+/**
+ * How to ask for the session record, given what we are allowed to use.
+ *
+ * The raw URL is served through a CDN with `max-age=300`, and `cache:
+ * 'no-store'` speaks to the browser's cache and not to that one, so a backend
+ * that came up a minute ago can stay invisible for five, and a 404 fetched
+ * before the session started is cached as happily as a hit.
+ *
+ * A signed-in author has a better address. The contents API is not the CDN and
+ * is current the moment the job pushes the branch. Without a token, or for a
+ * record published anywhere else, this returns nothing and the caller falls
+ * back to the plain URL.
+ */
+export function sessionRecordRequest(recordUrl, token) {
+  const api = token && contentsApiUrl(recordUrl)
+  if (!api) return null
+  return {
+    url: api,
+    headers: {
+      // The file itself rather than the metadata envelope, so the caller
+      // parses one shape whichever address answered.
+      accept: 'application/vnd.github.raw',
+      authorization: `Bearer ${token}`,
+    },
+  }
+}
