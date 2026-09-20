@@ -138,9 +138,9 @@ async function checkConformance(url, { fetch: fetchImpl, origin } = {}) {
   }
   return { ok: true, version: body.jsonapi.version };
 }
-async function readSessionRecord(recordUrl, { fetch: fetchImpl, now = Date.now(), token } = {}) {
+async function readSessionRecord(recordUrl, { fetch: fetchImpl, now = Date.now(), token, destination } = {}) {
   if (!recordUrl) return null;
-  const { url, headers } = sessionRecordRequest(recordUrl, token);
+  const { url, headers } = destinationRequest(destination, recordUrl, token);
   let record;
   try {
     const response = await fetchImpl(url, { cache: "no-store", headers });
@@ -153,26 +153,10 @@ async function readSessionRecord(recordUrl, { fetch: fetchImpl, now = Date.now()
   if (isExpired(record.expiresAt, now)) return null;
   return { ...record, url: normaliseUrl(record.url) };
 }
-function contentsApiUrl(recordUrl) {
-  const match = String(recordUrl || "").match(
-    /^https:\/\/raw\.githubusercontent\.com\/([^/]+)\/([^/]+)\/([^/]+)\/(.+)$/
-  );
-  if (!match) return null;
-  const [, owner, repo, ref, path] = match;
-  return `https://api.github.com/repos/${owner}/${repo}/contents/${path}?ref=${encodeURIComponent(ref)}`;
-}
-function sessionRecordRequest(recordUrl, token) {
-  const api = token && contentsApiUrl(recordUrl);
-  if (api) {
-    return {
-      url: api,
-      headers: {
-        // The file itself rather than the metadata envelope, so the caller
-        // parses one shape whichever address answered.
-        accept: "application/vnd.github.raw",
-        authorization: `Bearer ${token}`
-      }
-    };
+function destinationRequest(destination, recordUrl, token) {
+  if (destination && typeof destination.recordRequest === "function") {
+    const request = destination.recordRequest(recordUrl, { token });
+    if (request && request.url) return request;
   }
   const separator = String(recordUrl).includes("?") ? "&" : "?";
   return { url: `${recordUrl}${separator}t=${Date.now()}`, headers: void 0 };
@@ -458,6 +442,62 @@ function fromDateInput(local) {
   return date.toISOString();
 }
 
+const DESTINATION_METHODS = ["token", "recordRequest", "export"];
+function bustCache(recordUrl, now = Date.now()) {
+  const separator = String(recordUrl).includes("?") ? "&" : "?";
+  return `${recordUrl}${separator}t=${now}`;
+}
+function defaultDestination(options = {}) {
+  return {
+    id: "default",
+    token(storage) {
+      const key = (options.sessionRecord || {}).tokenKey;
+      if (!key || !storage) return void 0;
+      try {
+        const stored = JSON.parse(storage.getItem(key));
+        return stored && stored.token || void 0;
+      } catch (e) {
+        return void 0;
+      }
+    },
+    recordRequest(recordUrl) {
+      return { url: bustCache(recordUrl), headers: void 0 };
+    }
+  };
+}
+function defineDestination(destination = {}) {
+  const { id } = destination;
+  if (!id || typeof id !== "string") {
+    throw new TypeError("A destination needs an id.");
+  }
+  for (const key of Object.keys(destination)) {
+    if (key === "id") continue;
+    if (!DESTINATION_METHODS.includes(key)) {
+      throw new TypeError(
+        `Destination "${id}" has no method "${key}". Known methods: ${DESTINATION_METHODS.join(", ")}.`
+      );
+    }
+    if (typeof destination[key] !== "function") {
+      throw new TypeError(
+        `Destination "${id}" method "${key}" is not a function.`
+      );
+    }
+  }
+  return Object.freeze({ ...destination });
+}
+function destinationSupports(destination, method) {
+  return Boolean(destination && typeof destination[method] === "function");
+}
+function resolveDestination(destination, options = {}) {
+  const fallback = defaultDestination(options);
+  if (!destination) return fallback;
+  return {
+    ...fallback,
+    ...destination,
+    id: destination.id || fallback.id
+  };
+}
+
 function words(value) {
   return String(value == null ? "" : value).split(/(\s+)/).filter((part) => part !== "");
 }
@@ -725,10 +765,8 @@ function writeJson(storage, key, value) {
   }
 }
 function sessionRecordToken(options, storage) {
-  const key = (options.sessionRecord || {}).tokenKey;
-  if (!key) return void 0;
-  const stored = readJson(storage, key);
-  return stored && stored.token || void 0;
+  const destination = resolveDestination(options.destination, options);
+  return destination.token ? destination.token(storage) : void 0;
 }
 function druxtClients(context) {
   const app = context.app || context || {};
@@ -1000,7 +1038,8 @@ function createIce(options, context) {
       if (!recordUrl) return null;
       const published = await readSessionRecord(recordUrl, {
         fetch: fetchImpl,
-        token: sessionRecordToken(options, window.sessionStorage)
+        token: sessionRecordToken(options, window.sessionStorage),
+        destination: resolveDestination(options.destination, options)
       });
       if (!published || !published.url) return null;
       if (state.status === "connected" && state.url === normaliseUrl(published.url)) {
@@ -1052,7 +1091,8 @@ function createIce(options, context) {
         stored: readJson(window.localStorage, BACKEND_KEY),
         published: await readSessionRecord((options.sessionRecord || {}).url, {
           fetch: fetchImpl,
-          token: sessionRecordToken(options, window.sessionStorage)
+          token: sessionRecordToken(options, window.sessionStorage),
+          destination: resolveDestination(options.destination, options)
         })
       });
       if (!chosen) return null;
@@ -1841,7 +1881,13 @@ function registerIceStore(store) {
 
 const DEFAULTS = {
   clientId: null,
-  sessionRecord: { url: "", tokenKey: null }
+  sessionRecord: { url: "", tokenKey: null },
+  // The module path of a destination: where the session record is read from
+  // and where an export goes. A path rather than an object, because these
+  // options reach the plugin through JSON.stringify and functions do not
+  // survive it. Null means the default destination: the record's plain URL,
+  // and a token wherever `sessionRecord.tokenKey` says one is.
+  destination: null
 };
 function resolveOptions(moduleOptions = {}, nuxtOptions = {}) {
   const configured = {
@@ -1877,6 +1923,7 @@ exports.CAPTION_FILTER = CAPTION_FILTER;
 exports.CONFORMANCE_UNREACHABLE = CONFORMANCE_UNREACHABLE;
 exports.DEFAULTS = DEFAULTS;
 exports.DELTA_ATTRIBUTE = DELTA_ATTRIBUTE;
+exports.DESTINATION_METHODS = DESTINATION_METHODS;
 exports.DRUPAL_FILES = DRUPAL_FILES;
 exports.ENTITY_ATTRIBUTE = ENTITY_ATTRIBUTE;
 exports.FIELD_ATTRIBUTE = FIELD_ATTRIBUTE;
@@ -1892,6 +1939,7 @@ exports.asResource = asResource;
 exports.autoCreateTarget = autoCreateTarget;
 exports.autocompleteUrl = autocompleteUrl;
 exports.base64Url = base64Url;
+exports.bustCache = bustCache;
 exports.callbackUrl = callbackUrl;
 exports.cartKey = cartKey;
 exports.changedFields = changedFields;
@@ -1899,15 +1947,18 @@ exports.changedRegion = changedRegion;
 exports.checkConformance = checkConformance;
 exports.collectionUrl = collectionUrl$1;
 exports.commitOrder = commitOrder;
-exports.contentsApiUrl = contentsApiUrl;
 exports.createAuth = createAuth;
 exports.createIce = createIce;
 exports.createPlainFieldsAdapter = createPlainFieldsAdapter;
 exports.decodeAttribute = decodeAttribute;
 exports.deepEqual = deepEqual;
 exports["default"] = NuxtModule;
+exports.defaultDestination = defaultDestination;
+exports.defineDestination = defineDestination;
 exports.defineFeature = defineFeature;
 exports.dependencyMap = dependencyMap;
+exports.destinationRequest = destinationRequest;
+exports.destinationSupports = destinationSupports;
 exports.diffLines = diffLines;
 exports.druxtClients = druxtClients;
 exports.editModeFeature = editModeFeature;
@@ -1961,12 +2012,12 @@ exports.replaceHeldImage = replaceHeldImage;
 exports.requestMethod = requestMethod;
 exports.requestUrl = requestUrl;
 exports.requiredBy = requiredBy;
+exports.resolveDestination = resolveDestination;
 exports.resolveFeatures = resolveFeatures;
 exports.resolveOptions = resolveOptions;
 exports.resolveSource = resolveSource;
 exports.rewriteFileUrls = rewriteFileUrls;
 exports.safeFilename = safeFilename;
-exports.sessionRecordRequest = sessionRecordRequest;
 exports.sessionRecordToken = sessionRecordToken;
 exports.storedFileUrls = storedFileUrls;
 exports.targetResourceTypes = targetResourceTypes;

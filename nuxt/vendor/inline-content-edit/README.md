@@ -1,7 +1,7 @@
 # Vendored: @druxt-contrib/inline-content-edit
 
 Built from `druxt/druxt-inline-content-edit`, branch `feature/2-components`,
-commit `c7dc5899f122`.
+commit `6b2063f2cafd`.
 
 Vendored rather than installed because the package is not published yet. A
 dependency on the branch it lives on would be a private host in a public

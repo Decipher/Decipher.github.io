@@ -182,3 +182,20 @@ export function writeStoredToken(storage, value) {
     // Not fatal: the sign-in simply does not survive a reload.
   }
 }
+
+/**
+ * The API address of a record published as a raw file, if it is one.
+ *
+ * `raw.githubusercontent.com/<owner>/<repo>/<ref>/<path>` and the contents API
+ * serve the same bytes, and only one of them is current. This moved here from
+ * the editing module when that module stopped knowing any host by name: which
+ * addresses serve this site's session record is this site's knowledge.
+ */
+export function contentsApiUrl(recordUrl) {
+  const match = String(recordUrl || '').match(
+    /^https:\/\/raw\.githubusercontent\.com\/([^/]+)\/([^/]+)\/([^/]+)\/(.+)$/
+  )
+  if (!match) return null
+  const [, owner, repo, ref, path] = match
+  return `${API}/repos/${owner}/${repo}/contents/${path}?ref=${encodeURIComponent(ref)}`
+}

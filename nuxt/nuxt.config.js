@@ -469,8 +469,14 @@ export default async () => ({
                 process.env.SESSION_BRANCH || 'session'
               }/session.json`
             : ''),
-        tokenKey: null,
+        // Where the GitHub sign-in keeps its token. The module reads it to
+        // ask the contents API for the record rather than the CDN, so a
+        // signed-in author sees a backend the moment its job pushes.
+        tokenKey: 'authoring.github',
       },
+      // This site's record is published to a raw URL behind a CDN, and the
+      // module does not know that host. The destination tells it.
+      destination: '~/plugins/authoring-github-destination.js',
     },
   },
 
