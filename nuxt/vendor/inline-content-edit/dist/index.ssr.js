@@ -768,6 +768,10 @@ function sessionRecordToken(options, storage) {
   const destination = resolveDestination(options.destination, options);
   return destination.token ? destination.token(storage) : void 0;
 }
+function defer(fn, win = typeof window === "undefined" ? null : window) {
+  if (win && typeof win.setTimeout === "function") win.setTimeout(fn, 0);
+  else fn();
+}
 function druxtClients(context) {
   const app = context.app || context || {};
   const found = [app.$druxt || context.$druxt];
@@ -1078,7 +1082,7 @@ function createIce(options, context) {
       holdClientUntilConnected(context, state);
       const store = context.store;
       if (store) {
-        whenReady(() => store.dispatch("druxtIce/restore"));
+        whenReady(() => defer(() => store.dispatch("druxtIce/restore")));
         store.subscribe((mutation) => {
           if (String(mutation.type).startsWith("druxtIce/")) {
             whenReady(() => previewStagedContent(store, window.$nuxt));
@@ -1954,6 +1958,7 @@ exports.decodeAttribute = decodeAttribute;
 exports.deepEqual = deepEqual;
 exports["default"] = NuxtModule;
 exports.defaultDestination = defaultDestination;
+exports.defer = defer;
 exports.defineDestination = defineDestination;
 exports.defineFeature = defineFeature;
 exports.dependencyMap = dependencyMap;

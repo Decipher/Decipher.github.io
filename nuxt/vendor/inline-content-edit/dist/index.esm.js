@@ -760,6 +760,10 @@ function sessionRecordToken(options, storage) {
   const destination = resolveDestination(options.destination, options);
   return destination.token ? destination.token(storage) : void 0;
 }
+function defer(fn, win = typeof window === "undefined" ? null : window) {
+  if (win && typeof win.setTimeout === "function") win.setTimeout(fn, 0);
+  else fn();
+}
 function druxtClients(context) {
   const app = context.app || context || {};
   const found = [app.$druxt || context.$druxt];
@@ -1070,7 +1074,7 @@ function createIce(options, context) {
       holdClientUntilConnected(context, state);
       const store = context.store;
       if (store) {
-        whenReady(() => store.dispatch("druxtIce/restore"));
+        whenReady(() => defer(() => store.dispatch("druxtIce/restore")));
         store.subscribe((mutation) => {
           if (String(mutation.type).startsWith("druxtIce/")) {
             whenReady(() => previewStagedContent(store, window.$nuxt));
@@ -1908,4 +1912,4 @@ const NuxtModule = function(moduleOptions = {}) {
   });
 };
 
-export { ADAPTER_METHODS, ADVANCED_FIELDS, BACKEND_KEY, CAPTION_FILTER, CONFORMANCE_UNREACHABLE, DEFAULTS, DELTA_ATTRIBUTE, DESTINATION_METHODS, DRUPAL_FILES, ENTITY_ATTRIBUTE, FIELD_ATTRIBUTE, RETURN_KEY, STATIC_FILES, TOKEN_KEY, TYPE_ATTRIBUTE, VERIFIER_KEY, absoluteFileUrls, adapterSupports, applyCaptionFilter, asResource, autoCreateTarget, autocompleteUrl, base64Url, bustCache, callbackUrl, cartKey, changedFields, changedRegion, checkConformance, collectionUrl$1 as collectionUrl, commitOrder, createAuth, createIce, createPlainFieldsAdapter, decodeAttribute, deepEqual, NuxtModule as default, defaultDestination, defineDestination, defineFeature, dependencyMap, destinationRequest, destinationSupports, diffLines, druxtClients, editModeFeature, editorFileUrls, entityAnchors, exportCart, exportSummary, failsFilters, fieldAnchors, fileIsAllowed, filterFieldFor, filtersFromResources, findAnchor, fromDateInput, groupFields, hasHeldImage, hasUnfilteredCaption, holdClientUntilConnected, iceStoreModule, imageRelationship, installIce, isAdapterMethod, isDeletion, isDrupalFile, isEmptyResource, isExpired, isLong, isNew, labelFieldFor, labelOf, labelsUrl, listingAccepts, listingTypes, mergeEntry, modesFromDisplays, newResourceId, normaliseUrl, parseSize, patchBody, patchUrl, pointClientAt, previewStagedContent, previewsFor, readJson, readSessionRecord, readyGate, refreshFromBackend, registerIceStore, relativeFileUrls, replaceHeldImage, requestMethod, requestUrl, requiredBy, resolveDestination, resolveFeatures, resolveOptions, resolveSource, rewriteFileUrls, safeFilename, sessionRecordToken, storedFileUrls, targetResourceTypes, tidyResource, toDateInput, toRelationship, toggleEditMode, uploadHeaders, uploadUrl, valuesBefore, viewModesFor, withDependencies, withoutComputed, words, writeJson };
+export { ADAPTER_METHODS, ADVANCED_FIELDS, BACKEND_KEY, CAPTION_FILTER, CONFORMANCE_UNREACHABLE, DEFAULTS, DELTA_ATTRIBUTE, DESTINATION_METHODS, DRUPAL_FILES, ENTITY_ATTRIBUTE, FIELD_ATTRIBUTE, RETURN_KEY, STATIC_FILES, TOKEN_KEY, TYPE_ATTRIBUTE, VERIFIER_KEY, absoluteFileUrls, adapterSupports, applyCaptionFilter, asResource, autoCreateTarget, autocompleteUrl, base64Url, bustCache, callbackUrl, cartKey, changedFields, changedRegion, checkConformance, collectionUrl$1 as collectionUrl, commitOrder, createAuth, createIce, createPlainFieldsAdapter, decodeAttribute, deepEqual, NuxtModule as default, defaultDestination, defer, defineDestination, defineFeature, dependencyMap, destinationRequest, destinationSupports, diffLines, druxtClients, editModeFeature, editorFileUrls, entityAnchors, exportCart, exportSummary, failsFilters, fieldAnchors, fileIsAllowed, filterFieldFor, filtersFromResources, findAnchor, fromDateInput, groupFields, hasHeldImage, hasUnfilteredCaption, holdClientUntilConnected, iceStoreModule, imageRelationship, installIce, isAdapterMethod, isDeletion, isDrupalFile, isEmptyResource, isExpired, isLong, isNew, labelFieldFor, labelOf, labelsUrl, listingAccepts, listingTypes, mergeEntry, modesFromDisplays, newResourceId, normaliseUrl, parseSize, patchBody, patchUrl, pointClientAt, previewStagedContent, previewsFor, readJson, readSessionRecord, readyGate, refreshFromBackend, registerIceStore, relativeFileUrls, replaceHeldImage, requestMethod, requestUrl, requiredBy, resolveDestination, resolveFeatures, resolveOptions, resolveSource, rewriteFileUrls, safeFilename, sessionRecordToken, storedFileUrls, targetResourceTypes, tidyResource, toDateInput, toRelationship, toggleEditMode, uploadHeaders, uploadUrl, valuesBefore, viewModesFor, withDependencies, withoutComputed, words, writeJson };
