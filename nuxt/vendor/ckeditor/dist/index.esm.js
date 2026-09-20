@@ -148,7 +148,47 @@ function editorPlugins(namespace) {
   return resolvePlugins(namespace, PLUGINS);
 }
 
+const SCRIPTS_PATH = "/core/assets/vendor/ckeditor5";
 const COPY_PATH = "/ckeditor5";
+function createCkeditor(options, context = {}) {
+  const client = () => context.app && context.app.$druxt || context.$druxt || null;
+  const base = () => {
+    const druxt = client();
+    const url = druxt && druxt.options ? druxt.options.baseUrl : null;
+    return url ? String(url).replace(/\/+$/, "") : null;
+  };
+  const plugin = {
+    options,
+    /** The backend's origin, or null with no client. */
+    backendUrl: () => base(),
+    /**
+     * Where the scripts come from.
+     *
+     * The option wins. Then this site's own copy, if the module was asked to
+     * make one: a site that copies the builds wants to serve them, and
+     * pointing at the backend instead would be a second setting that has to
+     * agree with the first. It also means the editor still loads with no
+     * backend connected, which is the whole point of staging edits offline.
+     *
+     * The backend's copy last, which is right when nothing was copied: the
+     * builds match the Drupal that will render the result.
+     */
+    scripts: () => options.scripts || (options.copy ? COPY_PATH : null) || (base() ? `${base()}${SCRIPTS_PATH}` : null),
+    /** Where the files are shown from: the option, or the backend's copy. */
+    files: () => {
+      const { from, to } = options.files;
+      return { from, to: to || (base() ? `${base()}${from}` : null) };
+    },
+    /** The `CKEditor5` namespace, or null when it could not be loaded. */
+    load: () => loadCkeditor({
+      base: plugin.scripts(),
+      packages: options.packages,
+      timeout: options.timeout
+    }).catch(() => null)
+  };
+  return plugin;
+}
+
 function packageFile(name) {
   if (name === CORE) return `ckeditor5/build/${CORE}.js`;
   return `@ckeditor/ckeditor5-${name}/build/${name}.js`;
@@ -406,35 +446,6 @@ function readAsDataUrl(file) {
   });
 }
 
-const SCRIPTS_PATH = "/core/assets/vendor/ckeditor5";
-function createCkeditor(options, context = {}) {
-  const client = () => context.app && context.app.$druxt || context.$druxt || null;
-  const base = () => {
-    const druxt = client();
-    const url = druxt && druxt.options ? druxt.options.baseUrl : null;
-    return url ? String(url).replace(/\/+$/, "") : null;
-  };
-  const plugin = {
-    options,
-    /** The backend's origin, or null with no client. */
-    backendUrl: () => base(),
-    /** Where the scripts come from: the option, or the backend's copy. */
-    scripts: () => options.scripts || (base() ? `${base()}${SCRIPTS_PATH}` : null),
-    /** Where the files are shown from: the option, or the backend's copy. */
-    files: () => {
-      const { from, to } = options.files;
-      return { from, to: to || (base() ? `${base()}${from}` : null) };
-    },
-    /** The `CKEditor5` namespace, or null when it could not be loaded. */
-    load: () => loadCkeditor({
-      base: plugin.scripts(),
-      packages: options.packages,
-      timeout: options.timeout
-    }).catch(() => null)
-  };
-  return plugin;
-}
-
 const SUPPORTED = /* @__PURE__ */ new Set([...SUPPORTED_BUTTONS, "|"]);
 const ALIASES = {
   drupalInsertImage: "uploadImage"
@@ -558,4 +569,4 @@ const NuxtModule = function(moduleOptions = {}) {
   });
 };
 
-export { ALIASES, BUTTON_PLUGINS, CAPTION_FILTER, CORE, DEFAULTS, DEFAULT_PACKAGES, DRUPAL_FILES, DrupalImageCompatibility, FALLBACK_TOOLBAR, SCRIPTS_PATH, SUPPORTED, SUPPORTED_BUTTONS, absolute, captionsAreAttributes, configuredToolbar, createCkeditor, decodeAttribute, NuxtModule as default, editorFileUrls, editorForFormat, editorPlugins, encodeAttribute, filtersFor, filtersFromResources, fromEditorCaptions, imageUploadAdapter, isDrupalFile, loadCkeditor, loadScript, readAsDataUrl, resetLoader, resolveOptions, resolvePlugins, rewriteFileUrls, safeFilename, scriptUrl, storedFileUrls, toEditorCaptions, toolbarFor, uploadHeaders, uploadImage, uploadUrl, usableToolbar };
+export { ALIASES, BUTTON_PLUGINS, CAPTION_FILTER, COPY_PATH, CORE, DEFAULTS, DEFAULT_PACKAGES, DRUPAL_FILES, DrupalImageCompatibility, FALLBACK_TOOLBAR, SCRIPTS_PATH, SUPPORTED, SUPPORTED_BUTTONS, absolute, captionsAreAttributes, configuredToolbar, createCkeditor, decodeAttribute, NuxtModule as default, editorFileUrls, editorForFormat, editorPlugins, encodeAttribute, filtersFor, filtersFromResources, fromEditorCaptions, imageUploadAdapter, isDrupalFile, loadCkeditor, loadScript, readAsDataUrl, resetLoader, resolveOptions, resolvePlugins, rewriteFileUrls, safeFilename, scriptUrl, storedFileUrls, toEditorCaptions, toolbarFor, uploadHeaders, uploadImage, uploadUrl, usableToolbar };

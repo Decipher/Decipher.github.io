@@ -61,40 +61,6 @@ const copyDrupalFiles = function () {
   })
 }
 
-/**
- * Put CKEditor's DLL builds where the deployed site can fetch them.
- *
- * The editor is assembled at runtime from one script per plugin package rather
- * than from a prebuilt bundle, so that the toolbar Drupal is configured for is
- * the toolbar that renders. See `ice/src/ckeditor.mjs` for why it has to be done
- * this way rather than with an import.
- *
- * Copied out of `node_modules` at build time, and gitignored for that reason.
- */
-const copyCkeditor = function () {
-  const { copyFileSync, existsSync, mkdirSync, rmSync } = require('fs')
-  const { dirname, join } = require('path')
-  const to = join(__dirname, 'static', 'ckeditor5')
-  const resolve = (request) => {
-    try {
-      return dirname(require.resolve(`${request}/package.json`))
-    } catch {
-      return null
-    }
-  }
-
-  const core = resolve('ckeditor5')
-  if (!core) return
-  rmSync(to, { recursive: true, force: true })
-  mkdirSync(to, { recursive: true })
-  copyFileSync(join(core, 'build', 'ckeditor5-dll.js'), join(to, 'ckeditor5-dll.js'))
-
-  for (const name of CKEDITOR_PACKAGES) {
-    const from = resolve(`@ckeditor/ckeditor5-${name}`)
-    const file = from && join(from, 'build', `${name}.js`)
-    if (file && existsSync(file)) copyFileSync(file, join(to, `${name}.js`))
-  }
-}
 
 /**
  * The toolbar each text format is configured for, read at build time.
@@ -419,7 +385,6 @@ export default async () => ({
   // druxt.js monorepo's own example placement.
   modules: [
     copyDrupalFiles,
-    copyCkeditor,
     // Before druxt-site, because it reads `druxt.baseUrl` and writes the
     // settings into the runtime config the rest of the build then uses.
     //
@@ -453,6 +418,15 @@ export default async () => ({
     router: { middleware: false },
     // Set the default theme to render Site regions.
     site: { theme: 'olivero' },
+
+    // Copy the editor builds into this site and load them from here. Needed
+    // because the site is served with no backend attached: an author stages
+    // edits offline, and resolving the scripts against a backend URL would
+    // mean no editor at all.
+    ckeditor: {
+      copy: true,
+      packages: CKEDITOR_PACKAGES,
+    },
 
     // The authoring engine. The same two values the deleted plugins read out
     // of publicRuntimeConfig, moved to where the module looks for them. The
