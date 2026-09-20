@@ -31,10 +31,22 @@
  * so it throws before it subscribes to the editor's change events: the editor
  * appears, and every keystroke in it is silently dropped.
  */
-import { DrupalImageCompatibility, imageUploadAdapter } from '@druxt-contrib/ckeditor'
-import { captionsAreAttributes, fromEditorCaptions, toEditorCaptions } from '@druxt-contrib/inline-content-edit'
-import { filtersFromResources } from '@druxt-contrib/inline-content-edit'
-import { editorFileUrls, storedFileUrls } from '@druxt-contrib/inline-content-edit'
+// The caption transforms come from the editor module, not the engine. The
+// split is deliberate: the engine turns a stored caption into the figure
+// Drupal renders, for preview, and the editor module carries the round trip
+// in and out of CKEditor.
+import {
+  DrupalImageCompatibility,
+  captionsAreAttributes,
+  fromEditorCaptions,
+  imageUploadAdapter,
+  toEditorCaptions,
+} from '@druxt-contrib/ckeditor'
+import {
+  editorFileUrls,
+  filtersFromResources,
+  storedFileUrls,
+} from '@druxt-contrib/inline-content-edit'
 import { stickyOffset } from '../lib/sticky.mjs'
 import { editorPlugins, loadCkeditor } from '@druxt-contrib/ckeditor'
 import { editorForFormat, FALLBACK_TOOLBAR, usableToolbar } from '@druxt-contrib/ckeditor'

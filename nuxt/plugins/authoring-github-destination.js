@@ -16,7 +16,7 @@
  */
 import { defineDestination } from '@druxt-contrib/inline-content-edit'
 
-import { contentsApiUrl } from '~/lib/github.mjs'
+import { contentsApiUrl } from '../lib/github.mjs'
 
 export default defineDestination({
   id: 'github',
