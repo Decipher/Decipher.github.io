@@ -1,0 +1,33 @@
+{
+  "name": "@druxt-contrib/inline-content-edit",
+  "version": "0.0.0",
+  "description": "Stages edits in the browser, previews them in place and sends them on when a backend exists.",
+  "keywords": [
+    "druxt",
+    "nuxt",
+    "drupal",
+    "jsonapi",
+    "authoring",
+    "decoupled"
+  ],
+  "license": "MIT",
+  "exports": {
+    ".": {
+      "require": "./dist/index.ssr.js",
+      "import": "./dist/index.esm.js"
+    },
+    "./components/*": "./dist/components/*"
+  },
+  "main": "dist/index.ssr.js",
+  "module": "dist/index.esm.js",
+  "files": [
+    "dist",
+    "templates"
+  ],
+  "peerDependencies": {
+    "vue": "^2.7.0"
+  },
+  "engines": {
+    "node": ">=16.20.1"
+  }
+}
