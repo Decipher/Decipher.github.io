@@ -48,7 +48,7 @@ import {
   storedFileUrls,
 } from '@druxt-contrib/inline-content-edit'
 import { stickyOffset } from '../lib/sticky.mjs'
-import { editorPlugins, loadCkeditor } from '@druxt-contrib/ckeditor'
+import { editorPlugins } from '@druxt-contrib/ckeditor'
 import { editorForFormat, FALLBACK_TOOLBAR, usableToolbar } from '@druxt-contrib/ckeditor'
 
 // Shared across every field on the page: one request, however many editors.
@@ -167,7 +167,13 @@ export default {
     // not hold up an editor that has a perfectly good build-time answer.
     this.loadFilters()
 
-    const [namespace, configured] = await Promise.all([loadCkeditor(), this.loadToolbar()])
+    // Through the plugin, not the bare loader: the plugin is what knows where
+    // the scripts are. It prefers this site's own copy and falls back to the
+    // backend's, so the editor still loads with nothing connected.
+    const [namespace, configured] = await Promise.all([
+      this.$druxtCkeditor.load(),
+      this.loadToolbar(),
+    ])
     if (!namespace) return
     await this.create(namespace, configured)
   },

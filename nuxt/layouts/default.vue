@@ -38,7 +38,6 @@
         <DruxtSite />
       </div>
 
-
       <footer class="rule mt-16">
         <div
           class="mx-auto flex w-full max-w-5xl flex-wrap items-baseline gap-x-3 gap-y-1 px-6 py-8"
@@ -54,13 +53,23 @@
     </div>
 
     <!--
-      Its own column. `shrink-0` so it keeps its width and the content gives way,
-      which is what makes this a drawer rather than something floating over the
-      page.
+      Its own column from `sm` up. `shrink-0` so it keeps its width and the
+      content gives way, which is what makes this a drawer rather than
+      something floating over the page.
+
+      A phone has no room for two columns. `w-full` beside a `flex-1` sibling
+      took the whole viewport and left the content column zero pixels wide, so
+      turning on edit mode made the page disappear and replaced it with a cart
+      saying nothing had been edited yet. The header inside that collapsed
+      column kept drawing, overflowing across the drawer, and every tap landed
+      on whichever overlapping control happened to be on top.
+
+      So below `sm` it is an overlay with a way out, and the page is still
+      behind it.
     -->
     <aside
       v-if="cartOpen"
-      class="sticky top-0 h-screen w-full shrink-0 overflow-y-auto border-l border-hairline bg-surface sm:w-96"
+      class="fixed inset-0 z-50 overflow-y-auto bg-surface sm:sticky sm:inset-auto sm:top-0 sm:z-auto sm:h-screen sm:w-96 sm:shrink-0 sm:border-l sm:border-hairline"
       data-testid="authoring-drawer"
       aria-label="Staged changes"
     >
@@ -95,9 +104,34 @@ export default {
     window.removeEventListener('resize', this.measureSticky)
   },
 
+  watch: {
+    /**
+     * On a phone, turning on edit mode must not hide the page being edited.
+     *
+     * Edit mode opens the drawer, which is right where the drawer is a second
+     * column: the author sees their changes beside the thing they changed. On
+     * a narrow screen there is no second column, so the drawer is an overlay,
+     * and opening it the instant edit mode starts covers the page with a cart
+     * that correctly reports nothing has been edited yet. The way to the edit
+     * controls is underneath it.
+     *
+     * So the drawer stays shut here and the cart toggle opens it. Presentation
+     * is the site's to decide; the engine has no business knowing how wide the
+     * window is.
+     */
+    editing(on) {
+      if (on && this.narrow()) this.$store.dispatch('druxtIce/setDrawerOpen', false)
+    },
+  },
+
   methods: {
     measureSticky() {
       publishStickyOffset(document, window)
+    },
+
+    /** Below Tailwind's `sm`, where the drawer stops being a column. */
+    narrow() {
+      return typeof window !== 'undefined' && window.innerWidth < 640
     },
   },
 
