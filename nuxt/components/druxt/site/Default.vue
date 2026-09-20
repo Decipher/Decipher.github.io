@@ -29,7 +29,9 @@
         v-if="band.top.length"
         class="druxt-region-top sticky top-0 z-40 h-16 border-b border-hairline bg-paper/90 backdrop-blur"
       >
-        <div class="mx-auto flex h-full w-full max-w-5xl flex-wrap items-center gap-x-6 gap-y-2 px-6">
+        <div
+          class="mx-auto flex h-full w-full max-w-5xl flex-wrap items-center gap-x-6 gap-y-2 px-6"
+        >
           <slot :name="band.top[0]" />
           <div class="ml-auto flex flex-wrap items-center gap-x-6 gap-y-2">
             <slot v-for="region of band.top.slice(1)" :name="region" />
@@ -78,9 +80,37 @@
         </div>
       </div>
 
-      <footer v-if="band.bottom.length" class="druxt-region-bottom rule">
+      <!--
+        One footer, and it is Drupal's.
+
+        `footer_top` and `footer_bottom` land in this band, and the site used
+        to draw a second footer of its own underneath, so every page ended with
+        two stacked bands: Drupal's, holding whatever blocks are placed there,
+        and the site's, holding its name and build date. Two footers is one
+        more than any page needs, and it made the "Powered by" block look like
+        a stray rather than part of the footer it is placed in.
+
+        So the identity line lives here now, under the blocks. It renders even
+        with no footer blocks placed, because the build date belongs on every
+        page and is not Drupal's to withhold.
+      -->
+      <footer class="druxt-region-bottom rule">
         <div class="mx-auto w-full max-w-5xl px-6 py-8">
           <slot v-for="region of band.bottom" :name="region" />
+
+          <div
+            class="flex w-full flex-wrap items-baseline gap-x-3 gap-y-1"
+            :class="{ 'mt-4': band.bottom.length }"
+          >
+            <span class="eyebrow">{{ identity.name }}</span>
+            <template v-if="identity.slogan">
+              <span class="text-dimmed" aria-hidden="true">·</span>
+              <span class="eyebrow">{{ identity.slogan }}</span>
+            </template>
+            <span class="ml-auto font-mono text-xs text-dimmed" data-testid="built-at">{{
+              built
+            }}</span>
+          </div>
         </div>
       </footer>
     </template>
@@ -89,6 +119,7 @@
 
 <script>
 import { hasAside, layoutFor } from '../../../lib/regions.mjs'
+import { siteIdentity } from '../../../lib/settings.mjs'
 
 /**
  * The site, arranged.
@@ -125,6 +156,32 @@ export default {
 
     band() {
       return layoutFor(this.regions, this.declaredRegions)
+    },
+
+    /**
+     * What Drupal calls this site, and what it says about itself.
+     *
+     * Baked in by `@druxt-contrib/decoupled-settings` from `system.site`, so
+     * the footer's wording is edited in Drupal rather than here. The slogan
+     * had no home on the page before this and the footer carried a sentence
+     * written into the template instead, which no editor could reach.
+     */
+    identity() {
+      return siteIdentity((this.$config || {}).decoupledSettings, {
+        name: 'Deciphered',
+        slogan: 'Serverless Drupal',
+      })
+    },
+
+    /**
+     * When the site was built, as YYYY.MM.DD per the design system.
+     *
+     * From the build, not from the browser: reading `new Date()` here showed
+     * the visitor's today rather than the build's.
+     */
+    built() {
+      const iso = (this.$config && this.$config.builtAt) || ''
+      return iso.slice(0, 10).replace(/-/g, '.')
     },
 
     twoColumn() {

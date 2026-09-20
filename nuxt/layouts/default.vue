@@ -37,19 +37,6 @@
       <div class="flex-1">
         <DruxtSite />
       </div>
-
-      <footer class="rule mt-16">
-        <div
-          class="mx-auto flex w-full max-w-5xl flex-wrap items-baseline gap-x-3 gap-y-1 px-6 py-8"
-        >
-          <span class="eyebrow">{{ siteName }}</span>
-          <span class="text-dimmed" aria-hidden="true">·</span>
-          <span class="eyebrow">Static build, backend on demand</span>
-          <span class="ml-auto font-mono text-xs text-dimmed" data-testid="built-at">{{
-            built
-          }}</span>
-        </div>
-      </footer>
     </div>
 
     <!--
