@@ -76,7 +76,7 @@
  * is the shape rather than a single collapsed row. Deeper levels stay shut,
  * because a body field with its format and summary is noise until wanted.
  */
-import { diffLines, isLong } from '../ice/src/diff.mjs'
+import { diffLines, isLong } from '@druxt-contrib/inline-content-edit'
 
 export default {
   name: 'AuthoringJsonTree',

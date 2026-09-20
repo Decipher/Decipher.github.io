@@ -12,7 +12,7 @@
 </template>
 
 <script>
-import { changedFields, newResourceId } from '../ice/src/cart.mjs'
+import { changedFields, newResourceId } from '@druxt-contrib/inline-content-edit'
 
 export default {
   name: 'AuthoringEntityForm',
@@ -68,7 +68,7 @@ export default {
     staged() {
       const id = (this.original || {}).id
       if (!id) return false
-      return Boolean(this.$store.getters['authoringCart/entryFor'](this.type, id))
+      return Boolean(this.$store.getters['druxtIce/entryFor'](this.type, id))
     },
 
     /** A field bytes can be posted through, if this bundle has one. */
@@ -81,8 +81,8 @@ export default {
       const id = (this.original || {}).id
       if (!id) return false
       return Boolean(
-        this.$store.getters['authoringCart/entryFor'](this.type, id) ||
-          this.$store.getters['authoringCart/draftFor'](this.type, id)
+        this.$store.getters['druxtIce/entryFor'](this.type, id) ||
+          this.$store.getters['druxtIce/draftFor'](this.type, id)
       )
     },
 
@@ -97,7 +97,7 @@ export default {
     drafted() {
       const id = (this.original || {}).id
       if (!id) return false
-      return Boolean(this.$store.getters['authoringCart/draftFor'](this.type, id))
+      return Boolean(this.$store.getters['druxtIce/draftFor'](this.type, id))
     },
   },
 
@@ -146,7 +146,7 @@ export default {
       const form = this.$refs.form
       if (!form || !form.model || !this.original) return
 
-      const held = this.$store.getters['authoringCart/entryFor'](
+      const held = this.$store.getters['druxtIce/entryFor'](
         this.type,
         (this.original || {}).id
       )
@@ -196,7 +196,7 @@ export default {
     unstage() {
       const id = (this.original || {}).id
       if (!id) return
-      this.$store.dispatch('authoringCart/discardOne', { type: this.type, id })
+      this.$store.dispatch('druxtIce/discardOne', { type: this.type, id })
       this.message = 'Unstaged. The change is still here, it is just not going anywhere.'
     },
 
@@ -246,7 +246,7 @@ export default {
       this.original = JSON.parse(JSON.stringify(entity || {}))
       // Bytes already staged for this entity, so reopening its form shows the
       // picture rather than a field pointing at an id nothing can resolve.
-      const staged = this.$store.getters['authoringCart/entryFor'](
+      const staged = this.$store.getters['druxtIce/entryFor'](
         this.type,
         (this.original || {}).id
       )
@@ -269,8 +269,8 @@ export default {
       if (!form || !form.model) return
 
       const id = (this.original || {}).id
-      const staged = this.$store.getters['authoringCart/entryFor'](this.type, id)
-      const draft = this.$store.getters['authoringCart/draftFor'](this.type, id)
+      const staged = this.$store.getters['druxtIce/entryFor'](this.type, id)
+      const draft = this.$store.getters['druxtIce/draftFor'](this.type, id)
 
       for (const layer of [staged, draft]) {
         if (!layer) continue
@@ -295,7 +295,7 @@ export default {
       const form = this.$refs.form
       if (!form || !form.model || !this.original) return null
 
-      const staged = this.$store.getters['authoringCart/entryFor'](
+      const staged = this.$store.getters['druxtIce/entryFor'](
         this.type,
         (form.model || {}).id
       )
@@ -325,7 +325,7 @@ export default {
     saveDraft() {
       const delta = this.unstagedDelta()
       if (!delta) return
-      this.$store.dispatch('authoringCart/saveDraft', {
+      this.$store.dispatch('druxtIce/saveDraft', {
         type: this.type,
         id: (this.$refs.form.model || {}).id,
         ...delta,
@@ -348,7 +348,7 @@ export default {
         return
       }
 
-      const staged = await this.$store.dispatch('authoringCart/stage', {
+      const staged = await this.$store.dispatch('druxtIce/stage', {
         type: this.type,
         id: form.model.id,
         original: (this.original || {}).attributes || {},
@@ -410,7 +410,7 @@ export default {
       // before the store had settled and once after, while the drawer reverted
       // once. Two routes to one operation is two things to keep in agreement,
       // and they will not stay in agreement.
-      this.$store.dispatch('authoringCart/clearDraft', { type: this.type, id })
+      this.$store.dispatch('druxtIce/clearDraft', { type: this.type, id })
       this.message = this.staged
         ? 'Discarded. What was staged is still staged.'
         : 'Discarded.'

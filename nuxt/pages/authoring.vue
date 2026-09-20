@@ -92,13 +92,13 @@ export default {
   computed: {
     /** New content held in the cart, which no backend can list. */
     stagedNew() {
-      return this.$store.getters['authoringCart/stagedNew'].filter(
+      return this.$store.getters['druxtIce/stagedNew'].filter(
         (resource) => !resource.deleted && resource.type === 'node--article'
       )
     },
 
     backendUrl() {
-      return this.$authoring && this.$authoring.state.url
+      return this.$druxtIce && this.$druxtIce.state.url
     },
     connected() {
       return Boolean(this.backendUrl)

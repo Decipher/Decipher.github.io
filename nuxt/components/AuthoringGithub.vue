@@ -211,14 +211,14 @@ export default {
     },
 
     connected() {
-      return this.$authoring && this.$authoring.connected
+      return this.$druxtIce && this.$druxtIce.connected
     },
 
     /** Connected to the backend this started, rather than to some backend. */
     onStartedBackend() {
       const started = this.state.started
       if (!started || !this.connected) return false
-      const here = String(this.$authoring.state.url || '').replace(/\/+$/, '')
+      const here = String(this.$druxtIce.state.url || '').replace(/\/+$/, '')
       return here === String(started.url || '').replace(/\/+$/, '')
     },
 
@@ -261,7 +261,7 @@ export default {
 
     /** Move to the backend this started, because the author asked. */
     async switchToStarted() {
-      await this.$authoring.connectPublished(this.state.started)
+      await this.$druxtIce.connectPublished(this.state.started)
     },
 
     signOut() {

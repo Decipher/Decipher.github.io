@@ -54,13 +54,13 @@ export default {
     },
 
     editing() {
-      return this.$store.getters['authoringCart/editing']
+      return this.$store.getters['druxtIce/editing']
     },
   },
 
   methods: {
     toggle() {
-      this.$store.dispatch('authoringCart/setEditing', !this.editing)
+      this.$store.dispatch('druxtIce/setEditing', !this.editing)
     },
   },
 }

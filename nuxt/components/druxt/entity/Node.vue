@@ -187,8 +187,8 @@
  * referenced entity, which arrives back here. Without the `editing` guard the
  * result is an Edit control on the inside of a form that is already editing.
  */
-import { labelFieldFor } from '../../../ice/src/reference.mjs'
-import { viewModesFor } from '../../../ice/src/view-modes.mjs'
+import { labelFieldFor } from '@druxt-contrib/inline-content-edit'
+import { viewModesFor } from '@druxt-contrib/inline-content-edit'
 
 export default {
   name: 'DruxtEntityNode',
@@ -243,7 +243,7 @@ export default {
    */
   computed: {
     editing() {
-      return this.$store.getters['authoringCart/editing']
+      return this.$store.getters['druxtIce/editing']
     },
 
     /**
@@ -265,12 +265,12 @@ export default {
 
     entry() {
       if (!this.entity.type || !this.entity.id) return null
-      return this.$store.getters['authoringCart/entryFor'](this.entity.type, this.entity.id)
+      return this.$store.getters['druxtIce/entryFor'](this.entity.type, this.entity.id)
     },
 
     draft() {
       if (!this.entity.type || !this.entity.id) return null
-      return this.$store.getters['authoringCart/draftFor'](this.entity.type, this.entity.id)
+      return this.$store.getters['druxtIce/draftFor'](this.entity.type, this.entity.id)
     },
 
     /**
@@ -404,14 +404,14 @@ export default {
      */
     remove() {
       this.open = false
-      this.$store.dispatch('authoringCart/stageDeletion', {
+      this.$store.dispatch('druxtIce/stageDeletion', {
         type: this.entity.type,
         id: this.entity.id,
       })
     },
 
     keep() {
-      this.$store.dispatch('authoringCart/discardOne', {
+      this.$store.dispatch('druxtIce/discardOne', {
         type: this.entity.type,
         id: this.entity.id,
       })

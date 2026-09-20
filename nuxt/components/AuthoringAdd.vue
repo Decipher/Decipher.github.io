@@ -109,7 +109,7 @@ export default {
   computed: {
 
     editing() {
-      return this.$store.getters['authoringCart/editing']
+      return this.$store.getters['druxtIce/editing']
     },
     /**
      * The content being written, staged or not.
@@ -119,13 +119,13 @@ export default {
      */
     staged() {
       if (!this.stagedId) return null
-      return this.$store.getters['authoringCart/stagedNew'].find((r) => r.id === this.stagedId)
+      return this.$store.getters['druxtIce/stagedNew'].find((r) => r.id === this.stagedId)
     },
   },
 
   methods: {
     async add() {
-      this.stagedId = await this.$store.dispatch('authoringCart/draftNew', {
+      this.stagedId = await this.$store.dispatch('druxtIce/draftNew', {
         type: this.chosen,
         // Empty rather than invented: the form is where it gets filled in, and
         // a placeholder title would be indistinguishable from one somebody meant.
@@ -172,11 +172,11 @@ export default {
      * staged resources was the one they had already decided against.
      */
     cancel() {
-      this.$store.dispatch('authoringCart/clearDraft', {
+      this.$store.dispatch('druxtIce/clearDraft', {
         type: this.staged.type,
         id: this.staged.id,
       })
-      this.$store.dispatch('authoringCart/discardOne', {
+      this.$store.dispatch('druxtIce/discardOne', {
         type: this.staged.type,
         id: this.staged.id,
       })

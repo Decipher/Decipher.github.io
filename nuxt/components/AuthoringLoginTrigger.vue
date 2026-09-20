@@ -11,7 +11,7 @@
     type="button"
     class="font-mono text-xs uppercase tracking-eyebrow text-muted underline transition-colors hover:text-accent"
     data-testid="authoring-login-trigger"
-    @click="$authoring.openLogin()"
+    @click="$druxtIce.openLogin()"
   >
     {{ label }}
   </button>
@@ -24,7 +24,7 @@ export default {
   computed: {
     /** What the control says depends on how far in the reader already is. */
     label() {
-      const authoring = this.$authoring || {}
+      const authoring = this.$druxtIce || {}
       if (!authoring.connected) return 'Log in'
       return authoring.authenticated ? 'Account' : 'Log in'
     },

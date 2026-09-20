@@ -158,7 +158,7 @@ export default function (context, inject) {
       const deadline = Date.now() + 20 * 60 * 1000
       const look = async () => {
         if (mine !== generation || Date.now() > deadline) return
-        const found = app && app.$authoring && (await app.$authoring.discover())
+        const found = app && app.$druxtIce && (await app.$druxtIce.discover())
         if (mine !== generation) return
         if (found) {
           state.started = found

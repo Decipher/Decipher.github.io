@@ -103,16 +103,16 @@ export default {
 
   computed: {
     cartOpen() {
-      return this.$store.getters['authoringCart/drawerOpen']
+      return this.$store.getters['druxtIce/drawerOpen']
     },
 
     editing() {
-      return this.$store.getters['authoringCart/editing']
+      return this.$store.getters['druxtIce/editing']
     },
 
     /** Anything staged or typed, so held work is never off screen. */
     changes() {
-      return this.$store.getters['authoringCart/count']
+      return this.$store.getters['druxtIce/count']
     },
 
     /**

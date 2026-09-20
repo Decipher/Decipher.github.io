@@ -47,14 +47,14 @@ export default {
      * is no way to look at an empty cart, and no way to reach the Add tab.
      */
     editing() {
-      return this.$store.getters['authoringCart/editing']
+      return this.$store.getters['druxtIce/editing']
     },
 
     /** Anything staged or typed, so held work is never without a way back. */
     changes() {
       return (
-        this.$store.getters['authoringCart/count'] +
-        Object.keys(this.$store.state.authoringCart.drafts || {}).length
+        this.$store.getters['druxtIce/count'] +
+        Object.keys(this.$store.state.druxtIce.drafts || {}).length
       )
     },
   },

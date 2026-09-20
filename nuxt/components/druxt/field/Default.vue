@@ -199,10 +199,10 @@
 import { DruxtEntity, DruxtFieldMixin } from 'druxt-entity'
 import Draggable from 'vuedraggable'
 
-import { fromDateInput, toDateInput } from '../../../ice/src/datetime.mjs'
-import { rewriteFileUrls } from '../../../ice/src/files.mjs'
+import { fromDateInput, toDateInput } from '@druxt-contrib/inline-content-edit'
+import { rewriteFileUrls } from '@druxt-contrib/inline-content-edit'
 import { addCopyButtons, markZoomable } from '../../../lib/prose.mjs'
-import { applyCaptionFilter } from '../../../ice/src/captions.mjs'
+import { applyCaptionFilter } from '@druxt-contrib/inline-content-edit'
 import { isTrimmed, teaserHtml } from '../../../lib/teaser.mjs'
 
 export default {

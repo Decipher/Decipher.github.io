@@ -1,4 +1,4 @@
-import { CKEDITOR_PACKAGES } from './ice/src/ckeditor.mjs'
+import { DEFAULT_PACKAGES as CKEDITOR_PACKAGES } from '@druxt-contrib/ckeditor'
 import { repositoryFromRemotes } from './lib/github.mjs'
 
 require('dotenv').config({ path: '../.env' })
@@ -323,10 +323,10 @@ export default async () => ({
 
   // Plugins to run before rendering page: https://go.nuxtjs.dev/config-plugins
   plugins: [
-    // Client only: the backend this site is edited against is resolved in the
-    // browser at runtime, and must not be baked into the generated HTML.
-    '~/plugins/authoring.client.js',
-    { src: '~/plugins/authoring-auth.js', mode: 'client' },
+    // The connection and the OAuth half of authoring now come from
+    // @druxt-contrib/inline-content-edit, which registers its own plugin. The
+    // GitHub destination stays here: the module has no destinations interface
+    // yet, and that is tracked as its own issue.
     '~/plugins/authoring-github.client.js',
   ],
 
@@ -428,6 +428,12 @@ export default async () => ({
     // repository. See nuxt/vendor/decoupled-settings/README.md.
     '~/vendor/decoupled-settings',
     'druxt-site',
+    // The authoring engine and the editor, extracted from this site's own
+    // ice/ directory into contrib modules. In `modules` for the same reason
+    // druxt-site is: they register runtime plugins, and Nuxt 2 does not load
+    // buildModules on `nuxt start`.
+    '@druxt-contrib/inline-content-edit',
+    '@druxt-contrib/ckeditor',
     localhostListenURL,
   ],
 
@@ -447,6 +453,25 @@ export default async () => ({
     router: { middleware: false },
     // Set the default theme to render Site regions.
     site: { theme: 'olivero' },
+
+    // The authoring engine. The same two values the deleted plugins read out
+    // of publicRuntimeConfig, moved to where the module looks for them. The
+    // rest of `publicRuntimeConfig.authoring` stays: the components and the
+    // GitHub destination still read it, and the module knows nothing of it.
+    ice: {
+      clientId:
+        process.env.OAUTH_CLIENT_ID || 'dfdd3969-6fe2-4a6f-92bb-82b6f59013ed',
+      sessionRecord: {
+        url:
+          process.env.SESSION_RECORD_URL ||
+          (CONTENT_REPOSITORY
+            ? `https://raw.githubusercontent.com/${CONTENT_REPOSITORY}/${
+                process.env.SESSION_BRANCH || 'session'
+              }/session.json`
+            : ''),
+        tokenKey: null,
+      },
+    },
   },
 
   // Build Configuration: https://go.nuxtjs.dev/config-build

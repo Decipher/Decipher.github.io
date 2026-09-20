@@ -97,7 +97,7 @@ import {
   labelsUrl,
   targetResourceTypes,
   toRelationship,
-} from '../ice/src/reference.mjs'
+} from '@druxt-contrib/inline-content-edit'
 
 export default {
   name: 'AuthoringReference',
@@ -117,7 +117,7 @@ export default {
       return 'w-full rounded border border-hairline bg-paper px-3 py-2 font-sans text-sm text-ink focus:border-accent focus:outline-none'
     },
     backendUrl() {
-      return this.$authoring && this.$authoring.state.url
+      return this.$druxtIce && this.$druxtIce.state.url
     },
     placeholder() {
       return this.multiple ? 'Search to add another' : 'Search'
@@ -257,7 +257,7 @@ export default {
     /** One JSON:API GET. Returns nothing rather than throwing, so one failed
      * bundle does not lose the results from the others. */
     async request(url) {
-      const token = this.$authoringAuth && this.$authoringAuth.token
+      const token = this.$druxtIce.auth && this.$druxtIce.auth.token
       try {
         const response = await fetch(url, {
           headers: {
@@ -286,7 +286,7 @@ export default {
       this.emit()
       // A term invented here and now taken out has nothing left to be for. The
       // cart decides, because another entity may still point at it.
-      this.$store.dispatch('authoringCart/discardIfUnreferenced', {
+      this.$store.dispatch('druxtIce/discardIfUnreferenced', {
         type: item.type,
         id: item.id,
       })
@@ -314,7 +314,7 @@ export default {
       const existing = this.stagedWithLabel(label)
       if (existing) return this.choose({ type: existing.type, id: existing.id, label })
 
-      const id = await this.$store.dispatch('authoringCart/stageNew', {
+      const id = await this.$store.dispatch('druxtIce/stageNew', {
         type: this.createAs,
         attributes: { [this.labelField]: label },
         // Nothing references it yet; taking the chip off again should leave
@@ -328,7 +328,7 @@ export default {
     /** A term already staged under this name, if the author made one before. */
     stagedWithLabel(label) {
       const wanted = label.toLowerCase()
-      return this.$store.getters['authoringCart/stagedNew'].find(
+      return this.$store.getters['druxtIce/stagedNew'].find(
         (resource) =>
           resource.type === this.createAs &&
           String((resource.attributes || {})[this.labelField] || '').toLowerCase() === wanted

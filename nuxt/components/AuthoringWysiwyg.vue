@@ -31,13 +31,13 @@
  * so it throws before it subscribes to the editor's change events: the editor
  * appears, and every keystroke in it is silently dropped.
  */
-import { DrupalImageCompatibility, imageUploadAdapter } from '../ice/src/ckeditor-upload.mjs'
-import { captionsAreAttributes, fromEditorCaptions, toEditorCaptions } from '../ice/src/captions.mjs'
-import { filtersFromResources } from '../ice/src/formats.mjs'
-import { editorFileUrls, storedFileUrls } from '../ice/src/files.mjs'
+import { DrupalImageCompatibility, imageUploadAdapter } from '@druxt-contrib/ckeditor'
+import { captionsAreAttributes, fromEditorCaptions, toEditorCaptions } from '@druxt-contrib/inline-content-edit'
+import { filtersFromResources } from '@druxt-contrib/inline-content-edit'
+import { editorFileUrls, storedFileUrls } from '@druxt-contrib/inline-content-edit'
 import { stickyOffset } from '../lib/sticky.mjs'
-import { editorPlugins, loadCkeditor } from '../ice/src/ckeditor.mjs'
-import { editorForFormat, FALLBACK_TOOLBAR, usableToolbar } from '../ice/src/editor.mjs'
+import { editorPlugins, loadCkeditor } from '@druxt-contrib/ckeditor'
+import { editorForFormat, FALLBACK_TOOLBAR, usableToolbar } from '@druxt-contrib/ckeditor'
 
 // Shared across every field on the page: one request, however many editors.
 let editorConfigPromise = null
@@ -100,7 +100,7 @@ export default {
 
     /** The backend this session is connected to, if any. */
     backendUrl() {
-      return (this.$authoring && this.$authoring.state.url) || null
+      return (this.$druxtIce && this.$druxtIce.state.url) || null
     },
 
     /**
@@ -122,7 +122,7 @@ export default {
     uploadOptions() {
       return {
         backendUrl: this.backendUrl,
-        token: (this.$authoringAuth && this.$authoringAuth.token) || null,
+        token: (this.$druxtIce.auth && this.$druxtIce.auth.token) || null,
         resourceType: (this.upload || {}).resourceType,
         field: (this.upload || {}).field,
         // Where the bytes go when they cannot go to Drupal yet.
@@ -321,7 +321,7 @@ export default {
       if (!backend || !this.format) return []
 
       if (!editorConfigPromise) {
-        const token = this.$authoringAuth && this.$authoringAuth.token
+        const token = this.$druxtIce.auth && this.$druxtIce.auth.token
         editorConfigPromise = fetch(`${backend}/jsonapi/editor/editor`, {
           headers: {
             Accept: 'application/vnd.api+json',

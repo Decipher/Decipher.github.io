@@ -29,13 +29,13 @@ export default {
 
   computed: {
     count() {
-      return this.$store.getters['authoringCart/count']
+      return this.$store.getters['druxtIce/count']
     },
     editing() {
-      return this.$store.getters['authoringCart/editing']
+      return this.$store.getters['druxtIce/editing']
     },
     unstagedCount() {
-      return Object.keys(this.$store.state.authoringCart.drafts || {}).length
+      return Object.keys(this.$store.state.druxtIce.drafts || {}).length
     },
     /** Staged, and a mark for anything edited and not staged. */
     tally() {
@@ -45,13 +45,13 @@ export default {
       return parts.length ? ` ${parts.join(' ')}` : ''
     },
     open() {
-      return this.$store.getters['authoringCart/drawerOpen']
+      return this.$store.getters['druxtIce/drawerOpen']
     },
   },
 
   methods: {
     toggle() {
-      this.$store.dispatch('authoringCart/setDrawerOpen', !this.open)
+      this.$store.dispatch('druxtIce/setDrawerOpen', !this.open)
     },
   },
 }

@@ -104,7 +104,7 @@
  * The staging itself stays in `AuthoringEntityForm`, reached through inject
  * because Druxt gives the wrapper no way to emit back to the parent.
  */
-import { groupFields } from '../../../ice/src/form-groups.mjs'
+import { groupFields } from '@druxt-contrib/inline-content-edit'
 
 export default {
   name: 'DruxtEntityFormDefault',

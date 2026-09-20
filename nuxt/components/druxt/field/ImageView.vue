@@ -72,7 +72,7 @@ export default {
      * rendered by Druxt from a slot and has no parent to take a prop from.
      */
     pendingFiles() {
-      const cart = this.$store.state.authoringCart
+      const cart = this.$store.state.druxtIce
       const found = {}
       // Staged and unstaged alike: an image chosen and not staged still shows
       // on the page, the same as an unstaged word does.
@@ -110,7 +110,7 @@ export default {
     /** Drupal returns a site-relative URL, which is not this origin. */
     absolute(url) {
       if (/^https?:\/\//.test(url)) return url
-      const backend = (this.$authoring && this.$authoring.state.url) || ''
+      const backend = (this.$druxtIce && this.$druxtIce.state.url) || ''
       return `${String(backend).replace(/\/+$/, '')}${url}`
     },
   },

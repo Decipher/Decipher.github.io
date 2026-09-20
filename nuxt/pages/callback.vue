@@ -28,8 +28,8 @@ export default {
     }
 
     try {
-      await this.$authoringAuth.completeLogin(code)
-      const back = this.$authoringAuth.consumeReturnPath()
+      await this.$druxtIce.auth.completeLogin(code)
+      const back = this.$druxtIce.auth.consumeReturnPath()
       this.$router.replace(back)
       // The route being returned to still holds the payload baked at build
       // time, so without this the author lands back on stale content holding a

@@ -84,7 +84,7 @@
  * 200, so the only thing standing between an author and a silently
  * inaccessible image is this field.
  */
-import { fileIsAllowed, imageRelationship } from '../ice/src/upload.mjs'
+import { fileIsAllowed, imageRelationship } from '@druxt-contrib/inline-content-edit'
 
 export default {
   name: 'AuthoringImage',
@@ -223,7 +223,7 @@ export default {
     /** Drupal returns a site-relative URL, which is not this origin. */
     absolute(url) {
       if (/^https?:\/\//.test(url)) return url
-      const backend = (this.$authoring && this.$authoring.state.url) || ''
+      const backend = (this.$druxtIce && this.$druxtIce.state.url) || ''
       return `${String(backend).replace(/\/+$/, '')}${url}`
     },
   },

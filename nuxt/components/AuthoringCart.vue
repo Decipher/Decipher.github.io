@@ -350,7 +350,7 @@ import {
   requestMethod,
   requiredBy,
   tidyResource,
-} from '../ice/src/cart.mjs'
+} from '@druxt-contrib/inline-content-edit'
 import { openChangeRequest } from '../lib/github-client.mjs'
 
 export default {
@@ -371,29 +371,29 @@ export default {
 
   computed: {
     count() {
-      return this.$store.getters['authoringCart/count']
+      return this.$store.getters['druxtIce/count']
     },
     resources() {
-      return this.$store.getters['authoringCart/staged']
+      return this.$store.getters['druxtIce/staged']
     },
     persistent() {
-      return this.$store.state.authoringCart.persistent
+      return this.$store.state.druxtIce.persistent
     },
     committing() {
-      return this.$store.state.authoringCart.committing
+      return this.$store.state.druxtIce.committing
     },
     backendUrl() {
-      return this.$authoring && this.$authoring.state.url
+      return this.$druxtIce && this.$druxtIce.state.url
     },
     token() {
-      return this.$authoringAuth && this.$authoringAuth.token
+      return this.$druxtIce.auth && this.$druxtIce.auth.token
     },
     canCommit() {
       return Boolean(this.backendUrl && this.token)
     },
     /** Edits kept but not staged, listed apart from what is going to be sent. */
     unstaged() {
-      const drafts = this.$store.state.authoringCart.drafts || {}
+      const drafts = this.$store.state.druxtIce.drafts || {}
       return Object.entries(drafts).map(([key, draft]) => {
         const [type, id] = key.split(':')
         const attributes = draft.attributes || {}
@@ -494,7 +494,7 @@ export default {
       const result = await openChangeRequest({
         repository: state.repository,
         token: state.token,
-        exported: exportCart(this.$store.state.authoringCart.entries),
+        exported: exportCart(this.$store.state.druxtIce.entries),
         base: state.defaultBranch,
         fetch: window.fetch.bind(window),
       })
@@ -535,7 +535,7 @@ export default {
         if (event && event.target) event.target.checked = true
         return
       }
-      this.$store.dispatch('authoringCart/unstage', {
+      this.$store.dispatch('druxtIce/unstage', {
         type: resource.type,
         id: resource.id,
       })
@@ -543,7 +543,7 @@ export default {
 
     stageDraft(item) {
       this.refusal = null
-      this.$store.dispatch('authoringCart/stageDraft', { type: item.type, id: item.id })
+      this.$store.dispatch('druxtIce/stageDraft', { type: item.type, id: item.id })
     },
 
     /**
@@ -565,14 +565,14 @@ export default {
         this.refusal = `${this.labelFor(needed[0])} references this, so it cannot be discarded.`
         return
       }
-      this.$store.dispatch('authoringCart/discardOne', {
+      this.$store.dispatch('druxtIce/discardOne', {
         type: resource.type,
         id: resource.id,
       })
     },
 
     discardDraft(item) {
-      this.$store.dispatch('authoringCart/clearDraft', { type: item.type, id: item.id })
+      this.$store.dispatch('druxtIce/clearDraft', { type: item.type, id: item.id })
     },
 
     /** As the site will render it, in whichever display is asked for. */
@@ -664,7 +664,7 @@ export default {
     },
 
     close() {
-      this.$store.dispatch('authoringCart/setDrawerOpen', false)
+      this.$store.dispatch('druxtIce/setDrawerOpen', false)
     },
 
     /** The verb the commit will use, and a word for it. */
@@ -689,12 +689,12 @@ export default {
     },
 
     errorFor(resource) {
-      return this.$store.getters['authoringCart/errorFor'](resource.type, resource.id)
+      return this.$store.getters['druxtIce/errorFor'](resource.type, resource.id)
     },
 
     async commit() {
       this.result = null
-      const outcome = await this.$store.dispatch('authoringCart/commit', {
+      const outcome = await this.$store.dispatch('druxtIce/commit', {
         backendUrl: this.backendUrl,
         token: this.token,
       })
@@ -711,7 +711,7 @@ export default {
      * nothing to send it to.
      */
     download() {
-      const entries = this.$store.state.authoringCart.entries
+      const entries = this.$store.state.druxtIce.entries
       const blob = new Blob([JSON.stringify(exportCart(entries), null, 2)], {
         type: 'application/json',
       })
@@ -725,7 +725,7 @@ export default {
     },
 
     discard() {
-      this.$store.dispatch('authoringCart/discardAll')
+      this.$store.dispatch('druxtIce/discardAll')
       this.result = null
     },
   },

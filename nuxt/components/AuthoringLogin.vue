@@ -143,14 +143,14 @@ export default {
 
   computed: {
     dialog() {
-      return Boolean(this.$authoring && this.$authoring.state.loginDialog)
+      return Boolean(this.$druxtIce && this.$druxtIce.state.loginDialog)
     },
 
     // Both plugins are client-only, so neither exists while `nuxt generate`
     // renders these pages. Without the guards the static build fails on every
     // route.
     state() {
-      return (this.$authoring && this.$authoring.state) || null
+      return (this.$druxtIce && this.$druxtIce.state) || null
     },
 
     connected() {
@@ -158,7 +158,7 @@ export default {
     },
 
     authenticated() {
-      return Boolean(this.$authoringAuth && this.$authoringAuth.authenticated)
+      return Boolean(this.$druxtIce.auth && this.$druxtIce.auth.authenticated)
     },
 
     host() {
@@ -166,7 +166,7 @@ export default {
     },
 
     accountName() {
-      const account = this.$authoringAuth && this.$authoringAuth.account
+      const account = this.$druxtIce.auth && this.$druxtIce.auth.account
       return (account && (account.name || account.preferred_username)) || 'this account'
     },
 
@@ -204,17 +204,17 @@ export default {
     open() {
       this.error = null
       this.url = (this.state && this.state.url) || ''
-      this.$authoring.openLogin()
+      this.$druxtIce.openLogin()
     },
 
     close() {
-      this.$authoring.closeLogin()
+      this.$druxtIce.closeLogin()
     },
 
     async verify() {
       this.checking = true
       this.error = null
-      const ok = await this.$authoring.connect(this.url)
+      const ok = await this.$druxtIce.connect(this.url)
       this.checking = false
       if (!ok) this.error = this.state.error
       // Connecting does not change what is on screen. The page was rendered
@@ -225,7 +225,7 @@ export default {
     async login() {
       this.error = null
       try {
-        await this.$authoringAuth.login()
+        await this.$druxtIce.auth.login()
       } catch (e) {
         this.error = e.message
       }
@@ -241,8 +241,8 @@ export default {
      * away and its stored URL would otherwise be retried on every load.
      */
     disconnect() {
-      this.$authoring.disconnect()
-      this.$authoringAuth.logout()
+      this.$druxtIce.disconnect()
+      this.$druxtIce.auth.logout()
       this.url = ''
       this.error = null
       // Reload, or the page keeps showing what it fetched from the backend.
@@ -280,7 +280,7 @@ export default {
     },
 
     async logout() {
-      this.$authoringAuth.logout()
+      this.$druxtIce.auth.logout()
       this.close()
       // Back to what an anonymous visitor would see, rather than leaving
       // authenticated content on screen after signing out.
