@@ -9,7 +9,7 @@
   -->
   <button
     type="button"
-    class="font-mono text-xs uppercase tracking-eyebrow text-muted underline transition-colors hover:text-accent"
+    class="py-3 -my-3 px-1 -mx-1 font-mono text-xs uppercase tracking-eyebrow text-muted underline transition-colors hover:text-accent"
     data-testid="authoring-login-trigger"
     @click="$druxtIce.openLogin()"
   >

@@ -2,7 +2,7 @@
   <button
     v-if="shown"
     type="button"
-    class="font-mono text-xs uppercase tracking-eyebrow underline transition-colors"
+    class="py-3 -my-3 px-1 -mx-1 font-mono text-xs uppercase tracking-eyebrow underline transition-colors"
     :class="editing ? 'text-accent' : 'text-muted hover:text-accent'"
     data-testid="authoring-edit-toggle"
     :aria-pressed="String(editing)"

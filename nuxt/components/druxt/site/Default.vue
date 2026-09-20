@@ -27,7 +27,7 @@
       -->
       <header
         v-if="band.top.length"
-        class="druxt-region-top sticky top-0 z-40 h-16 border-b border-hairline bg-paper/90 backdrop-blur"
+        class="druxt-region-top sticky top-0 z-40 h-16 border-b border-hairline bg-paper sm:bg-paper/90 sm:backdrop-blur"
       >
         <div
           class="mx-auto flex h-full w-full max-w-5xl flex-wrap items-center gap-x-6 gap-y-2 px-6"
