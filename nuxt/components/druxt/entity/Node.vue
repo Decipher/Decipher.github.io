@@ -258,7 +258,11 @@ export default {
         if (!entry || !field) return null
         const staged = (entry.attributes || {})[field]
         if (staged === undefined) return null
-        const left = asText(((this.model || {}).attributes || {})[field])
+        // `before`, not the model. Staging previews itself: the model already
+        // holds the new value by the time this renders, so comparing against
+        // it says nothing changed. The cart keeps what the field held when it
+        // was first edited, which is the only copy of the original left.
+        const left = asText((entry.before || {})[field])
         const right = asText(staged)
         return left === right ? null : { left, right }
       },

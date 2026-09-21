@@ -206,10 +206,15 @@ export default {
   // Optional on purpose: a field rendered outside an entity that provides this
   // simply has no change to show.
   inject: {
+    /**
+     * This field's staged change, looked up by the entity that owns it.
+     *
+     * Optional: a field rendered outside an entity that provides it simply has
+     * no change to show. The default has to be a factory returning a function,
+     * because Vue calls a function default to build the value.
+     */
     stagedDiffFor: { default: () => () => null },
-  },
 
-  inject: {
     /**
      * The form this field is on, or nothing when it is rendered outside one.
      *
