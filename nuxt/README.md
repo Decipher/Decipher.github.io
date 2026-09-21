@@ -15,5 +15,6 @@ npm run generate   # the static site, written to nuxt/dist/
 [README](../README.md) for setup.
 
 `vendor/` holds built copies of Druxt modules that are not on npm yet. They are
-installed with `file:` paths, and each one's README records where it was built
+installed with `file:` paths and refreshed with `npm run vendor:sync` from the
+repository root, which records in each one's README the commit it was built
 from.

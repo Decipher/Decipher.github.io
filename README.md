@@ -15,16 +15,16 @@ The site can still be edited in place, with no backend running. See
 
 ## How it is laid out
 
-| Path              | What is in it                                                                        |
-| ----------------- | ------------------------------------------------------------------------------------ |
-| `drupal/`         | A Composer project on `drupal/recommended-project` lines, with `web/` as the docroot |
-| `drupal/config/`  | The configuration, exported. `config_sync_directory` points here                     |
-| `drupal/content/` | The content, as Tome writes it                                                       |
-| `drupal/files/`   | Uploaded files, as Tome writes them                                                  |
-| `nuxt/`           | The Nuxt 2 application. `npm run generate` writes the site to `nuxt/dist/`           |
-| `nuxt/vendor/`    | Built copies of Druxt modules that are not on npm yet, installed with `file:` paths  |
-| `scripts/`        | The npm scripts that run both halves together                                        |
-| `docs/`           | How editing without a backend works                                                  |
+| Path              | What is in it                                                                               |
+| ----------------- | ------------------------------------------------------------------------------------------- |
+| `drupal/`         | A Composer project on `drupal/recommended-project` lines, with `web/` as the docroot        |
+| `drupal/config/`  | The configuration, exported. `config_sync_directory` points here                            |
+| `drupal/content/` | The content, as Tome writes it                                                              |
+| `drupal/files/`   | Uploaded files, as Tome writes them                                                         |
+| `nuxt/`           | The Nuxt 2 application. `npm run generate` writes the site to `nuxt/dist/`                  |
+| `nuxt/vendor/`    | Built copies of Druxt modules that are not on npm yet. `npm run vendor:sync` refreshes them |
+| `scripts/`        | The npm scripts that run both halves together                                               |
+| `docs/`           | How editing without a backend works                                                         |
 
 Both halves follow their own ecosystem's conventions, because Druxt is the
 bridge between them rather than a third way of doing either.
@@ -200,6 +200,38 @@ no backend running: changes are held in the browser and leave either to a live
 Drupal or to the repository as a pull request.
 
 See [docs/authoring.md](docs/authoring.md).
+
+## Drupal's administration
+
+`/admin` and the rest of Drupal's own paths belong to the backend. By default
+the site links out to them, and the generated site has no admin routes, so on
+GitHub Pages none of this renders.
+
+With a server running, the site can serve Drupal's administration from its own
+origin instead:
+
+```bash
+DRUXT_ADMIN_MODE=proxy npm run dev
+```
+
+Then `http://localhost:3000/user/login` is Drupal's login form, and the session
+it starts is first party. It runs under `npm run dev` only: this site builds
+with `target: 'static'`, and neither the generated files nor `nuxt start` on
+them run server middleware.
+
+## Vendored modules
+
+`nuxt/vendor/` holds Druxt modules that are not on npm yet, built from their own
+repositories. Refresh one from a local clone of its repository:
+
+```bash
+npm run vendor:sync -- <name> <path to its checkout> [ref]
+npm --prefix nuxt install
+```
+
+The build runs in a throwaway worktree of that exact commit, so uncommitted work
+in the checkout never reaches the site, and the README it writes records the
+commit. Run it under the Node version the module pins.
 
 ## Services
 

@@ -74,6 +74,7 @@ repository
 serialised
 setuptools
 shivammathur
+siroc
 Stanislav
 starterkit
 startswith
@@ -95,5 +96,6 @@ unticking
 valeryan
 vfox
 viewports
+worktree
 xauth
 zoomable

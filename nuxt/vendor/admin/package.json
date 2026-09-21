@@ -1,0 +1,37 @@
+{
+  "name": "@druxt-contrib/admin",
+  "version": "0.0.0",
+  "description": "The admin slot inside DruxtSite: links out to Drupal by default, and gets out of the way where a richer frontend admin replaces it.",
+  "keywords": [
+    "druxt",
+    "nuxt",
+    "drupal",
+    "admin",
+    "decoupled"
+  ],
+  "license": "MIT",
+  "exports": {
+    ".": {
+      "require": "./dist/index.ssr.js",
+      "import": "./dist/index.esm.js"
+    },
+    "./lib/*": "./dist/lib/*",
+    "./components/*": "./dist/components/*"
+  },
+  "main": "dist/index.ssr.js",
+  "module": "dist/index.esm.js",
+  "files": [
+    "dist",
+    "templates"
+  ],
+  "peerDependencies": {
+    "vue": "^2.7.0"
+  },
+  "engines": {
+    "node": ">=16.20.1"
+  },
+  "jest-junit": {
+    "outputDirectory": "reports/junit",
+    "outputName": "junit.xml"
+  }
+}
