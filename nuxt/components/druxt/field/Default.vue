@@ -3,14 +3,11 @@
     <!-- ===== View displays ===== -->
     <template v-if="isSchemaView">
       <div v-if="relationship">
-        <DruxtEntity
-          v-for="{ type, id } of relationships"
-          :key="id"
-          v-bind="{ type, uuid: id }"
-        />
+        <DruxtEntity v-for="{ type, id } of relationships" :key="id" v-bind="{ type, uuid: id }" />
       </div>
       <!-- eslint-disable-next-line vue/no-v-html -->
-      <div v-else ref="prose" class="prose-body" v-html="rewritten" />
+      <!-- eslint-disable-next-line vue/no-v-html -->
+      <div v-else ref="prose" v-diff="fieldDiff" class="prose-body" v-html="rewritten" />
     </template>
 
     <!-- ===== Form displays ===== -->
@@ -70,11 +67,7 @@
       />
 
       <!-- URL alias -->
-      <AuthoringPath
-        v-else-if="isTypePath"
-        :value="model || {}"
-        @input="model = $event"
-      />
+      <AuthoringPath v-else-if="isTypePath" :value="model || {}" @input="model = $event" />
 
       <!-- Boolean -->
       <label v-else-if="isTypeCheckbox" class="flex items-center gap-2">
@@ -210,6 +203,12 @@ export default {
 
   mixins: [DruxtFieldMixin],
 
+  // Optional on purpose: a field rendered outside an entity that provides this
+  // simply has no change to show.
+  inject: {
+    stagedDiffFor: { default: () => () => null },
+  },
+
   inject: {
     /**
      * The form this field is on, or nothing when it is rendered outside one.
@@ -276,6 +275,16 @@ export default {
   },
 
   computed: {
+    /**
+     * This field's staged change, marked into the markup it already rendered.
+     *
+     * Null when nothing is staged, which the directive treats as a no-op, so
+     * one binding covers "not comparing" and "this field did not change".
+     */
+    fieldDiff() {
+      return this.stagedDiffFor((this.schema || {}).id)
+    },
+
     /**
      * The rendered field, pointing at images the deployed site actually has.
      *
@@ -447,7 +456,12 @@ export default {
      */
     errorText() {
       return (this.errors || [])
-        .map((error) => String(error.detail || '').split(': ').slice(1).join(': '))
+        .map((error) =>
+          String(error.detail || '')
+            .split(': ')
+            .slice(1)
+            .join(': ')
+        )
         .filter(Boolean)
         .join('\n')
     },

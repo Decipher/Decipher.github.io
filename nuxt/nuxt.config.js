@@ -399,6 +399,9 @@ export default async () => ({
     // buildModules on `nuxt start`.
     '@druxt-contrib/inline-content-edit',
     '@druxt-contrib/ckeditor',
+    // Registers `v-diff`, which marks a field's staged change into the markup
+    // that field already rendered.
+    '@druxt-contrib/diff',
     localhostListenURL,
   ],
 

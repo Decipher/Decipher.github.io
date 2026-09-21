@@ -14,10 +14,7 @@
         Only in edit mode, so a visitor's page is not reshaped by controls they
         will never see.
       -->
-      <div
-        v-if="editable"
-        class="mb-2 flex items-baseline justify-between gap-3"
-      >
+      <div v-if="editable" class="mb-2 flex items-baseline justify-between gap-3">
         <!--
           Two states worth telling apart. Staged is going to be sent; unstaged
           is an edit the author has made and not committed to, which the page
@@ -29,7 +26,9 @@
           :class="drafted ? 'border border-accent text-accent' : 'bg-accent text-accent-contrast'"
           :data-testid="drafted ? 'unstaged-badge' : 'staged-badge'"
         >
-          {{ deleted ? (drafted ? 'Delete, unstaged' : 'Deleting') : drafted ? 'Unstaged' : 'Staged' }}
+          {{
+            deleted ? (drafted ? 'Delete, unstaged' : 'Deleting') : drafted ? 'Unstaged' : 'Staged'
+          }}
         </span>
         <span v-else aria-hidden="true"></span>
 
@@ -164,6 +163,7 @@
 </template>
 
 <script>
+import { asText } from '@druxt-contrib/inline-content-edit'
 /**
  * The theme component for every entity the site renders.
  *
@@ -241,6 +241,30 @@ export default {
    * mode Drupal has: a listing of them is a settings screen, and this is a
    * toggle above a field you are typing in.
    */
+  /**
+   * What each field's staged change is, for anything that renders the field.
+   *
+   * A field component is handed a schema and a value and nothing that says
+   * which entity it belongs to, so it cannot look its own change up. This
+   * entity can: it knows its type and id and it already reads the cart. The
+   * lookup is provided rather than passed, because the field is several
+   * components down and every one between them would otherwise carry a prop
+   * that means nothing to it.
+   */
+  provide() {
+    return {
+      stagedDiffFor: (field) => {
+        const entry = this.entry
+        if (!entry || !field) return null
+        const staged = (entry.attributes || {})[field]
+        if (staged === undefined) return null
+        const left = asText(((this.model || {}).attributes || {})[field])
+        const right = asText(staged)
+        return left === right ? null : { left, right }
+      },
+    }
+  },
+
   computed: {
     editing() {
       return this.$store.getters['druxtIce/editing']
