@@ -1,8 +1,8 @@
 {
-  "name": "druxt-quickstart-serverless",
+  "name": "deciphered",
   "version": "0.3.0",
   "private": true,
-  "description": "Druxt quickstart (serverless): full static, no live Drupal backend at runtime - Drupal/Tome only matter at build time.",
+  "description": "The source of decipher.github.io: a Drupal site with no Drupal running behind it. Drupal and Tome run only while the site builds.",
   "packageManager": "npm@8.15.0",
   "scripts": {
     "setup": "node scripts/setup.mjs",

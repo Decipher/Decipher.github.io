@@ -1,43 +1,33 @@
-# DruxtSite quickstart - Serverless Druxt
+# Deciphered
 
-> One click, Fully Decoupled, Full Static, Serverless Drupal Site starter-kit with Druxt.
+The source of [decipher.github.io](https://decipher.github.io): a Drupal site
+with no Drupal running behind it.
 
-DruxtSite connects Drupal to Nuxt via JSON:API to provide a framework for building a Fully Decoupled site.
+Drupal is the content model, the editorial workflow and the store, and it only
+runs while the site builds. [Tome](https://www.drupal.org/project/tome) keeps
+the content and configuration in this repository as files, a build stands
+Drupal up from them, and [Druxt](https://druxtjs.org) renders every page with
+Nuxt 2 into static files that GitHub Pages serves. What a reader gets has no
+backend at all.
 
-This template builds to full static output, deployable to any CDN - Drupal and Tome only matter at build time. There's no live backend to run in production.
+The site can still be edited in place, with no backend running. See
+[Editing the site](#editing-the-site).
 
-This repository includes:
+## How it is laid out
 
-- Drupal 11 with Tome sync
-- Nuxt 2
-- DruxtSite
+| Path              | What is in it                                                                        |
+| ----------------- | ------------------------------------------------------------------------------------ |
+| `drupal/`         | A Composer project on `drupal/recommended-project` lines, with `web/` as the docroot |
+| `drupal/config/`  | The configuration, exported. `config_sync_directory` points here                     |
+| `drupal/content/` | The content, as Tome writes it                                                       |
+| `drupal/files/`   | Uploaded files, as Tome writes them                                                  |
+| `nuxt/`           | The Nuxt 2 application. `npm run generate` writes the site to `nuxt/dist/`           |
+| `nuxt/vendor/`    | Built copies of Druxt modules that are not on npm yet, installed with `file:` paths  |
+| `scripts/`        | The npm scripts that run both halves together                                        |
+| `docs/`           | How editing without a backend works                                                  |
 
-## Quickstart
-
-```bash
-npx giget@1 gh:druxt/quickstart-druxt-serverless#develop my-druxt-site --install
-cd my-druxt-site
-npm run generate
-```
-
-`--install` runs the full setup automatically: frontend, Composer, and a
-local Drupal 11 + SQLite backend, installed straight from the committed
-Tome config and content. It needs PHP 8.3 or newer and Composer on
-`PATH`. Without them it installs the frontend only, prints the next steps
-and still exits cleanly, so the install never fails on a machine that
-cannot run the backend.
-
-The `@1` is deliberate. giget 2 and newer call `fetch`, which needs Node
-18, and this site runs on [Node 16](.nvmrc) - an unpinned `giget@latest`
-fails there with `fetch is not defined`. giget 1 bundles a fetch
-polyfill, so one Node version covers both the download and the site.
-
-Prefer to start from your own repository? Use the GitHub
-[Use this template](https://github.com/druxt/quickstart-druxt-serverless/generate)
-button, then clone the repository it creates.
-
-`npm run generate` builds the full static site to `nuxt/dist/` - deploy
-that directory anywhere that serves static files.
+Both halves follow their own ecosystem's conventions, because Druxt is the
+bridge between them rather than a third way of doing either.
 
 ## Getting started
 
@@ -56,8 +46,7 @@ On Windows, use the dev container, WSL2, or a container backend - see
 
 ### One-command setup (local PHP + SQLite, no Docker)
 
-1. Create your repository from this template (or clone it), then from
-   the repository root:
+1. From the repository root:
 
    ```bash
    npm run setup
@@ -126,7 +115,7 @@ Using DDEV? Keep `BASE_URL` as the `*.ddev.site` URL in `.env`
 ### Local development with [Lando](https://lando.dev)
 
 Set `BASE_URL` in `.env` to your Lando URL
-(`https://druxt-quickstart-serverless.lndo.site` for the bundled `drupal/.lando.yml`).
+(`https://deciphered.lndo.site` for the bundled `drupal/.lando.yml`).
 Then:
 
 1. Frontend (from repository root):
@@ -181,19 +170,16 @@ Any of these work instead, with no changes to the repository:
 through `drupal/.devtools` (PHP built-in server + SQLite) - no
 Docker-in-Docker needed.
 
-[![Open in DevPod!](https://devpod.sh/assets/open-in-devpod.svg)](https://devpod.sh/open#https://github.com/druxt/quickstart-druxt-serverless)
-
-| Tool                        | How                                                                                                                                                                                                                                         |
-| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| VS Code                     | Clone, open the folder, run **Dev Containers: Reopen in Container**                                                                                                                                                                         |
-| GitHub Codespaces           | On the repository page: **Code → Open with Codespaces**                                                                                                                                                                                     |
-| [DevPod](https://devpod.sh) | Click the badge above, run `devpod up https://github.com/druxt/quickstart-druxt-serverless` (CLI), or add the same URL as a workspace source in DevPod's desktop app - all three read this same `devcontainer.json`, no extra config needed |
+| Tool                        | How                                                                                                                           |
+| --------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| VS Code                     | Clone, open the folder, run **Dev Containers: Reopen in Container**                                                           |
+| GitHub Codespaces           | On the repository page: **Code**, then **Open with Codespaces**                                                               |
+| [DevPod](https://devpod.sh) | `devpod up https://github.com/Decipher/Decipher.github.io`, or add the same URL as a workspace source in DevPod's desktop app |
 
 First open runs `npm install` at the repository root, which triggers
-the same full setup pipeline as [Quickstart](#quickstart) above:
-frontend dependencies, Composer, Drupal installed straight from the
-committed Tome config and content, and the backend started and ready.
-Then:
+the same full setup as `npm run setup`: frontend dependencies, Composer,
+Drupal installed straight from the committed Tome config and content, and
+the backend started and ready. Then:
 
 ```bash
 npm run dev
@@ -203,11 +189,9 @@ npm run dev
 - Nuxt frontend: http://localhost:3000 (or the next free port up to
   3009, which it prints)
 
-## How to use it
-
-Your environment contains a pre-installed, pre-configured and running instance of Drupal with Tome, and Nuxt with the DruxtSite module enabled.
-
-In a Development Container (VS Code, Codespaces, DevPod), forwarded ports are accessible via your editor's **Ports** panel, or Codespaces' own URL pattern for forwarded ports.
+In a Development Container, forwarded ports are accessible via your
+editor's **Ports** panel, or Codespaces' own URL pattern for forwarded
+ports.
 
 ## Editing the site
 
@@ -221,7 +205,7 @@ See [docs/authoring.md](docs/authoring.md).
 
 | Port   | Service                                                                               |
 | ------ | ------------------------------------------------------------------------------------- |
-| `3000` | Nuxt.js                                                                               |
+| `3000` | Nuxt                                                                                  |
 | `3003` | Storybook                                                                             |
 | `8888` | Drupal (local `.devtools` backend - DDEV serves at its own `*.ddev.site` URL instead) |
 
@@ -229,37 +213,36 @@ See [docs/authoring.md](docs/authoring.md).
 
 ### DDEV
 
-> DDEV is an open-source tool that makes it dead simple to get local PHP development environments up and running within minutes.
+DDEV manages the Drupal instance and provides a CLI for common Drupal tasks,
+including `ddev drush`. Run its commands from the `drupal/` directory.
 
-DDEV is used to manage the Drupal instance, and provides a CLI that can be used to run common drupal tasks, including `ddev drush`.
-
-These commands should be run from within the `/drupal` folder.
-
-Refer to the documentation for more details: https://ddev.readthedocs.io
+Documentation: https://ddev.readthedocs.io
 
 ### Lando
-
-> Lando is a free, open-source development tool that allows developers to
-> easily specify and construct the exact environment they need to build
-> their applications.
 
 - [lando.dev](https://lando.dev)
 - Config: [drupal/.lando.yml](drupal/.lando.yml)
 
 ### @nuxtjs/storybook
 
-> Storybook integration with NuxtJS .
+Druxt integrates with the Nuxt Storybook module to provide zero-configuration,
+auto-discovered stories with access to live data from your Drupal backend.
 
-Druxt integrates with the Nuxt Storybook module to provide zero-configuration, auto-discovery stories with access to live data from your Drupal backend.
-
-To start Storybook, navigate to the `nuxt` directory and run `npx nuxt storybook`.
+To start Storybook, run `npx nuxt storybook` from the `nuxt/` directory.
 
 ### Tome sync
 
-Tome sync is a static storage system for content, allowing you to keep your content up to date without the need of a database.
+Tome keeps content and configuration as files in the repository, so the site
+doesn't need a database outside a build.
 
-See the project page for more details: https://www.drupal.org/project/tome
+Project page: https://www.drupal.org/project/tome
 
-## License
+## Where it came from
 
-[MIT](https://github.com/druxt/druxt.js/blob/develop/LICENSE)
+The site started from the Druxt serverless starter kit,
+[druxt/quickstart-druxt-serverless](https://github.com/druxt/quickstart-druxt-serverless),
+and has grown its own editing and deployment since.
+
+## Licence
+
+[MIT](LICENSE)

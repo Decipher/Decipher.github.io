@@ -2,9 +2,9 @@
  * Shared helpers for the repository-root npm scripts (scripts/*.mjs).
  *
  * Runs on plain Node (>= 16, see .nvmrc / mise.toml) with zero npm
- * dependencies: the root package.json intentionally has none, so
- * `npx giget gh:druxt/quickstart my-site --install` stays fast and
- * nothing can hoist over or conflict with nuxt/'s dependency tree.
+ * dependencies: the root package.json intentionally has none, so a root
+ * install stays fast and nothing can hoist over or conflict with nuxt/'s
+ * dependency tree.
  */
 
 import { spawn, spawnSync } from 'node:child_process'

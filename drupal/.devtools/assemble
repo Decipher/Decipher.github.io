@@ -11,7 +11,7 @@
 
 declare(strict_types=1);
 
-namespace QuickstartServerlessDevTools;
+namespace DecipheredDevTools;
 
 require_once __DIR__ . '/helpers.php';
 

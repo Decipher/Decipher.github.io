@@ -1,5 +1,5 @@
 {
-  "name": "Druxt Quickstart (Serverless)",
+  "name": "Deciphered",
   "image": "mcr.microsoft.com/devcontainers/base:trixie",
   "features": {
     "ghcr.io/devcontainers/features/node:1": {

@@ -4,9 +4,9 @@
 # features/php) builds PHP from source with no "extensions" option -
 # gd isn't compiled in at all. Drupal core needs it regardless of what
 # any composer.json platform override was told (its own installer does
-# an independent runtime check). No sodium needed here - unlike
-# quickstart/quickstart-druxt-site-tome, this repo has no simple_oauth/
-# consumers (and so no lcobucci/jwt) at all.
+# an independent runtime check). sodium is checked below rather than built:
+# simple_oauth pulls in lcobucci/jwt, which requires it, and the GitHub
+# workflows install it for the same reason.
 set -euo pipefail
 
 echo "==> Installing system dependencies"
@@ -55,6 +55,11 @@ echo 'extension=gd' | sudo tee "$CONF_DIR/gd.ini" > /dev/null
 # Drupal's installer both hard-require it, and a broken build surfacing
 # here beats a confusing failure mid-provision.
 php -r "exit(extension_loaded('gd') ? 0 : 1);" || { echo "gd extension failed to load" >&2; exit 1; }
+
+# sodium is not built here. If the PHP feature left it out, say so now: the
+# alternative is Composer's platform check failing half-way through setup,
+# on lcobucci/jwt, with nothing pointing back to this script.
+php -r "exit(extension_loaded('sodium') ? 0 : 1);" || { echo "sodium extension is missing: simple_oauth needs it through lcobucci/jwt" >&2; exit 1; }
 
 
 echo "==> Trusting this repo's mise.toml"

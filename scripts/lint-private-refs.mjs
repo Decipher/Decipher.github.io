@@ -1,11 +1,11 @@
 /**
  * Fail if a tracked file points at a host only the author can reach.
  *
- * This repository is public and is what people copy to start a site, so
- * a private URL in it is not a buried comment: composer-patches prints
- * every patch description during `composer install`, which is how a
- * self-hosted merge request link ended up in front of everyone who
- * followed the quickstart.
+ * This repository is public, so a private URL in it is not a buried
+ * comment: composer-patches prints every patch description during
+ * `composer install`, which is how a self-hosted merge request link ended
+ * up in front of everyone who installed the starter kit this site came
+ * from.
  *
  * The rule is the shape of the host, not a list of known hostnames -
  * anything resolvable only inside a LAN. localhost, loopback, and the

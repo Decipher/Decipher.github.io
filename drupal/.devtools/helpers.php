@@ -2,7 +2,7 @@
 
 /**
  * @file
- * Shared helper functions for quickstart's DevTools scripts.
+ * Shared helper functions for the DevTools scripts.
  *
  * Adapted from the `.devtools/` pattern in `packages/druxtjs/docs/drupal/`
  * (branch `feature/docs-drupal-local-php`), itself modelled on
@@ -21,7 +21,7 @@
 
 declare(strict_types=1);
 
-namespace QuickstartServerlessDevTools;
+namespace DecipheredDevTools;
 
 /**
  * Get environment variable with fallback and default value.
@@ -524,7 +524,7 @@ function is_debug(): bool {
 
 // Never run the real quit() during tests.
 // @codeCoverageIgnoreStart
-if (!function_exists('QuickstartServerlessDevTools\quit') && !class_exists('PHPUnit\\Framework\\TestCase')) {
+if (!function_exists('DecipheredDevTools\quit') && !class_exists('PHPUnit\\Framework\\TestCase')) {
 
   /**
    * Exit script with given code.

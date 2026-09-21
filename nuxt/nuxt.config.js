@@ -30,7 +30,7 @@ function contentRepository() {
 
 const CONTENT_REPOSITORY = contentRepository()
 
-const baseUrl = process.env.BASE_URL || 'http://quickstart-druxt-serverless.ddev.site'
+const baseUrl = process.env.BASE_URL || 'http://deciphered.ddev.site'
 
 /**
  * Put Drupal's public files where the deployed site can serve them.
@@ -255,7 +255,7 @@ export default async () => ({
 
   // Global page headers: https://go.nuxtjs.dev/config-head
   head: {
-    title: 'quickstart-druxt-site',
+    title: 'Deciphered',
     htmlAttrs: {
       lang: 'en'
     },
