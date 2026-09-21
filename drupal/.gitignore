@@ -21,9 +21,35 @@ web/sites/simpletest
 
 # Ignore environment specific files.
 .env
-web/robots.txt
+
+# Drupal's scaffold files. drupal/core-composer-scaffold writes these on every
+# `composer install`, and its own documentation says to treat them the way the
+# vendor directory is treated: not committed unless it is necessary. It is not
+# necessary here, because nothing runs Drupal without a Composer install first.
+# settings.php is not one of them: it is this project's, and stays committed.
 .editorconfig
 .gitattributes
+web/.csslintrc
+web/.eslintignore
+web/.eslintrc.json
+web/.ht.router.php
+web/.htaccess
+web/INSTALL.txt
+web/README.md
+web/autoload.php
+web/example.gitignore
+web/index.php
+web/modules/README.txt
+web/profiles/README.txt
+web/robots.txt
+web/sites/README.txt
+web/sites/default/default.services.yml
+web/sites/default/default.settings.php
+web/sites/development.services.yml
+web/sites/example.settings.local.php
+web/sites/example.sites.php
+web/themes/README.txt
+web/update.php
 .ddev/docker-compose.host-docker-internal.yaml
 
 # Authoring session artefacts, written by .devtools/provision-authoring.
