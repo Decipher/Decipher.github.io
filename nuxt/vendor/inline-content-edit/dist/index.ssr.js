@@ -542,6 +542,92 @@ function isLong(value, limit = 120) {
   return String(value == null ? "" : value).length > limit;
 }
 
+const DIFF_TYPE = "jsonapi_diff--diff";
+const BUILT = "built";
+const STAGED = "staged";
+const COMPUTED = ["processed"];
+function asText(value) {
+  if (value === null || value === void 0) return "";
+  if (Array.isArray(value)) return value.map(asText).filter(Boolean).join("\n");
+  if (typeof value === "object") {
+    const inner = value.value !== void 0 ? value.value : value.target_id;
+    return inner === void 0 ? JSON.stringify(value) : asText(inner);
+  }
+  return String(value);
+}
+function stripComputed(value) {
+  if (Array.isArray(value)) return value.map(stripComputed);
+  if (value && typeof value === "object") {
+    const out = { ...value };
+    for (const key of COMPUTED) delete out[key];
+    return out;
+  }
+  return value;
+}
+function fieldChanged(left, right) {
+  return JSON.stringify(stripComputed(left)) !== JSON.stringify(stripComputed(right));
+}
+function fieldOps(left, right) {
+  const before = asText(left);
+  const after = asText(right);
+  if (before === after) return before ? [{ type: "=", lines: [before] }] : [];
+  const ops = [];
+  if (before) ops.push({ type: "-", lines: before.split("\n") });
+  if (after) ops.push({ type: "+", lines: after.split("\n") });
+  return ops;
+}
+function fieldStatus(left, right, touched = true) {
+  if (!touched) return "same";
+  const had = asText(left) !== "";
+  const has = asText(right) !== "";
+  if (!fieldChanged(left, right)) return "same";
+  if (!had && has) return "added";
+  if (had && !has) return "removed";
+  return "changed";
+}
+function stagedDiff(built, staged, { all = false } = {}) {
+  const left = (built || {}).attributes || {};
+  const right = (staged || {}).attributes || {};
+  const id = (staged || {}).id || (built || {}).id || "";
+  const type = (staged || {}).type || (built || {}).type || "";
+  const names = all ? [.../* @__PURE__ */ new Set([...Object.keys(left), ...Object.keys(right)])] : Object.keys(right);
+  const fields = {};
+  const summary = { added: 0, removed: 0, changed: 0, same: 0 };
+  for (const name of names.sort()) {
+    const touched = Object.prototype.hasOwnProperty.call(right, name);
+    const status = fieldStatus(left[name], right[name], touched);
+    summary[status] += 1;
+    if (status === "same" && !all) continue;
+    const after = touched ? right[name] : left[name];
+    fields[name] = {
+      label: name,
+      status,
+      left: asText(left[name]),
+      right: asText(after),
+      ops: fieldOps(left[name], after)
+    };
+  }
+  return {
+    data: {
+      type: DIFF_TYPE,
+      // The same three-part shape a revision diff uses, with names where it
+      // would have revision ids.
+      id: `${id}:${BUILT}:${STAGED}`,
+      attributes: { summary, tree_summary: { ...summary }, fields },
+      relationships: {
+        left: { data: id ? { type, id } : null },
+        right: { data: id ? { type, id } : null },
+        children: { data: [] }
+      },
+      meta: {
+        // So a renderer can say "not yet sent" rather than naming a revision,
+        // and so a caller can tell the two kinds of document apart.
+        staged: true
+      }
+    }
+  };
+}
+
 function defineFeature({
   id,
   label,
@@ -1923,15 +2009,18 @@ const NuxtModule = function(moduleOptions = {}) {
 exports.ADAPTER_METHODS = ADAPTER_METHODS;
 exports.ADVANCED_FIELDS = ADVANCED_FIELDS;
 exports.BACKEND_KEY = BACKEND_KEY;
+exports.BUILT = BUILT;
 exports.CAPTION_FILTER = CAPTION_FILTER;
 exports.CONFORMANCE_UNREACHABLE = CONFORMANCE_UNREACHABLE;
 exports.DEFAULTS = DEFAULTS;
 exports.DELTA_ATTRIBUTE = DELTA_ATTRIBUTE;
 exports.DESTINATION_METHODS = DESTINATION_METHODS;
+exports.DIFF_TYPE = DIFF_TYPE;
 exports.DRUPAL_FILES = DRUPAL_FILES;
 exports.ENTITY_ATTRIBUTE = ENTITY_ATTRIBUTE;
 exports.FIELD_ATTRIBUTE = FIELD_ATTRIBUTE;
 exports.RETURN_KEY = RETURN_KEY;
+exports.STAGED = STAGED;
 exports.STATIC_FILES = STATIC_FILES;
 exports.TOKEN_KEY = TOKEN_KEY;
 exports.TYPE_ATTRIBUTE = TYPE_ATTRIBUTE;
@@ -1940,6 +2029,7 @@ exports.absoluteFileUrls = absoluteFileUrls;
 exports.adapterSupports = adapterSupports;
 exports.applyCaptionFilter = applyCaptionFilter;
 exports.asResource = asResource;
+exports.asText = asText;
 exports.autoCreateTarget = autoCreateTarget;
 exports.autocompleteUrl = autocompleteUrl;
 exports.base64Url = base64Url;
@@ -1973,6 +2063,9 @@ exports.exportCart = exportCart;
 exports.exportSummary = exportSummary;
 exports.failsFilters = failsFilters;
 exports.fieldAnchors = fieldAnchors;
+exports.fieldChanged = fieldChanged;
+exports.fieldOps = fieldOps;
+exports.fieldStatus = fieldStatus;
 exports.fileIsAllowed = fileIsAllowed;
 exports.filterFieldFor = filterFieldFor;
 exports.filtersFromResources = filtersFromResources;
@@ -2024,6 +2117,7 @@ exports.resolveSource = resolveSource;
 exports.rewriteFileUrls = rewriteFileUrls;
 exports.safeFilename = safeFilename;
 exports.sessionRecordToken = sessionRecordToken;
+exports.stagedDiff = stagedDiff;
 exports.storedFileUrls = storedFileUrls;
 exports.targetResourceTypes = targetResourceTypes;
 exports.tidyResource = tidyResource;
