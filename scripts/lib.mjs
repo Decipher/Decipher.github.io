@@ -8,6 +8,7 @@
  */
 
 import { spawn, spawnSync } from 'node:child_process'
+import crypto from 'node:crypto'
 import fs from 'node:fs'
 import net from 'node:net'
 import path from 'node:path'
@@ -18,6 +19,33 @@ export const DRUPAL_DIR = path.join(ROOT, 'drupal')
 export const NUXT_DIR = path.join(ROOT, 'nuxt')
 export const ENV_FILE = path.join(ROOT, '.env')
 export const SETUP_LOCK_DIR = path.join(ROOT, '.setup.lock')
+
+/**
+ * A short key naming a checkout's files in /tmp.
+ *
+ * A fixed name is shared by every clone of this repository on the machine,
+ * so provisioning one checkout wiped the database another one was serving.
+ * drupal/.devtools/helpers.php and drupal/Makefile work out the same key,
+ * and test/checkout-paths.test.mjs checks the three agree.
+ */
+export function checkoutKey(drupalDir = DRUPAL_DIR) {
+  let resolved = drupalDir
+  try {
+    resolved = fs.realpathSync(drupalDir)
+  } catch {
+    // A path that does not exist still gets a stable key of its own.
+  }
+  return crypto.createHash('sha256').update(resolved).digest('hex').slice(0, 12)
+}
+
+/** The SQLite database, unless DB_FILE names another. */
+export const defaultDbFile = () => `/tmp/deciphered-${checkoutKey()}-site.sqlite`
+
+/** The dev webserver's log. */
+export const serverLogFile = () => `/tmp/deciphered-${checkoutKey()}-php-server.log`
+
+/** The PID file tracking the dev webserver. */
+export const serverPidFile = () => `/tmp/deciphered-${checkoutKey()}-php-server.pid`
 
 /**
  * What to tell a Windows user instead of failing midway: the local
@@ -424,7 +452,7 @@ export async function ensureBackend() {
   const up = await waitForPort(backend.host, backend.port, 30)
   if (!up) {
     console.error(`Backend did not come up at ${backend.url}`)
-    console.error('Log: /tmp/quickstart-serverless-drupal-php-server.log')
+    console.error(`Log: ${serverLogFile()}`)
     process.exit(1)
   }
 

@@ -38,7 +38,7 @@ require_once __DIR__ . '/helpers.php';
 // Variables.
 // -----------------------------------------------------------------------------
 
-$db_file = resolve_env_value('DB_FILE', '/tmp/quickstart-serverless-drupal-site.sqlite')[0];
+$db_file = resolve_env_value('DB_FILE', default_db_file())[0];
 
 // -----------------------------------------------------------------------------
 

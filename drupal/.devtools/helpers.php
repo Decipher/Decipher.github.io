@@ -297,14 +297,37 @@ function stop_webserver(string $port): void {
 }
 
 /**
+ * A short key naming this checkout's files in /tmp.
+ *
+ * A fixed name is shared by every clone of this repository on the machine.
+ * With the pidfile, one checkout's `stop` killed another checkout's server.
+ * With the database, provisioning one checkout wiped the database another
+ * one was serving. scripts/lib.mjs and drupal/Makefile work out the same key,
+ * and test/checkout-paths.test.mjs checks the three agree.
+ */
+function checkout_key(): string {
+  return substr(hash('sha256', (string) realpath(dirname(__DIR__))), 0, 12);
+}
+
+/**
+ * The SQLite database, unless DB_FILE names another.
+ */
+function default_db_file(): string {
+  return sprintf('/tmp/deciphered-%s-site.sqlite', checkout_key());
+}
+
+/**
+ * The dev webserver's log.
+ */
+function server_log_file(): string {
+  return sprintf('/tmp/deciphered-%s-php-server.log', checkout_key());
+}
+
+/**
  * Path of the pidfile tracking the dev webserver process.
  */
 function server_pid_file(): string {
-  // Unique per checkout: a fixed name is shared by every clone of this
-  // repo on the machine, letting one checkout's `stop` kill another
-  // checkout's server (the pidfile written last wins). cwd is stable
-  // here - every .devtools script runs from drupal/.
-  return sprintf('/tmp/quickstart-serverless-drupal-php-server-%s.pid', hash('sha256', (string) getcwd()));
+  return sprintf('/tmp/deciphered-%s-php-server.pid', checkout_key());
 }
 
 /**
