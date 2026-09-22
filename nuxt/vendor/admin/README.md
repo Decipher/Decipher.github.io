@@ -1,6 +1,6 @@
 # Vendored: @druxt-contrib/admin
 
-Built from `druxt/druxt-admin`, `feature/3-proxy-mode` at commit `7d3287d1d850`.
+Built from `druxt/druxt-admin`, `feature/3-proxy-mode` at commit `64fe922a0673`.
 
 Vendored rather than installed because the package is not published yet.
 Written by `npm run vendor:sync -- admin <checkout> <ref>`: run that again

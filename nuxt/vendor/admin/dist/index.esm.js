@@ -1,7 +1,5 @@
 import { join } from 'path';
-import http from 'http';
-import https from 'https';
-import { URL } from 'url';
+import { createProxyMiddleware } from 'http-proxy-middleware';
 
 const ADMIN_PATHS = [
   "/admin",
@@ -60,16 +58,6 @@ const BACKEND_PATHS = [
 ];
 const FILES_PATH = /^\/sites\/[^/]+\/files(\/|$)/;
 const EDIT_PATH = /^\/(node|media|taxonomy\/term|comment|user)\/[^/]+\/(edit|delete|revisions|translations|devel|layout)(\/|$)/;
-const HOP_BY_HOP = [
-  "connection",
-  "keep-alive",
-  "proxy-authenticate",
-  "proxy-authorization",
-  "te",
-  "trailer",
-  "transfer-encoding",
-  "upgrade"
-];
 function shouldProxy(path, options = {}) {
   const subject = String(path || "").split("?")[0];
   if (!subject) return false;
@@ -81,6 +69,17 @@ function shouldProxy(path, options = {}) {
     (prefix) => subject === prefix || subject.startsWith(`${prefix}/`)
   );
 }
+
+const HOP_BY_HOP = [
+  "connection",
+  "keep-alive",
+  "proxy-authenticate",
+  "proxy-authorization",
+  "te",
+  "trailer",
+  "transfer-encoding",
+  "upgrade"
+];
 function upstreamHeaders(headers = {}, { protocol = "http", remoteAddress = "" } = {}) {
   const out = {};
   for (const [name, value] of Object.entries(headers)) {
@@ -137,47 +136,56 @@ function downstreamHeaders(headers = {}, { baseUrl, secure, host } = {}) {
   }
   return out;
 }
-function createProxy(options = {}) {
-  const baseUrl = String(options.baseUrl || "").replace(/\/+$/, "");
-  const target = baseUrl ? new URL(baseUrl) : null;
-  const transport = target && target.protocol === "https:" ? https : http;
-  const onError = options.onError || ((error, req, res) => {
-    res.statusCode = 502;
-    res.setHeader("content-type", "text/plain; charset=utf-8");
-    res.end(`The backend could not be reached: ${error.message}
+function backendUnreachable(error, req, res) {
+  res.statusCode = 502;
+  res.setHeader("content-type", "text/plain; charset=utf-8");
+  res.end(`The backend could not be reached: ${error.message}
 `);
-  });
-  return function druxtAdminProxy(req, res, next) {
-    if (!target || !shouldProxy(req.url, options)) return next();
-    const protocol = readerProtocol(req);
-    const secure = typeof options.secure === "boolean" ? options.secure : protocol === "https";
-    const upstream = transport.request(
-      {
-        protocol: target.protocol,
-        hostname: target.hostname,
-        port: target.port || (target.protocol === "https:" ? 443 : 80),
-        method: req.method,
-        path: `${target.pathname.replace(/\/$/, "")}${req.url}`,
-        headers: upstreamHeaders(req.headers, {
-          protocol,
+}
+function proxyEntry(options = {}) {
+  const baseUrl = String(options.baseUrl || "").replace(/\/+$/, "");
+  if (!baseUrl) return null;
+  return [
+    (pathname) => shouldProxy(pathname, options),
+    {
+      target: baseUrl,
+      // The Host goes upstream as the reader sent it. @nuxtjs/proxy defaults
+      // this to true, which would make Drupal build its links for itself.
+      changeOrigin: false,
+      // Set by hand in onProxyReq. http-proxy's own appends this hop's scheme,
+      // turning a tunnel's `https` into `https,http`.
+      xfwd: false,
+      ws: false,
+      logLevel: "warn",
+      onProxyReq(proxyReq, req) {
+        const forwarded = upstreamHeaders(req.headers, {
+          protocol: readerProtocol(req),
           remoteAddress: req.socket.remoteAddress
-        })
+        });
+        for (const name of [
+          "x-forwarded-host",
+          "x-forwarded-proto",
+          "x-forwarded-for"
+        ]) {
+          if (forwarded[name]) proxyReq.setHeader(name, forwarded[name]);
+        }
       },
-      (response) => {
-        res.writeHead(
-          response.statusCode,
-          downstreamHeaders(response.headers, {
-            baseUrl,
-            secure,
-            host: req.headers.host
-          })
-        );
-        response.pipe(res);
-      }
-    );
-    upstream.on("error", (error) => onError(error, req, res));
-    req.pipe(upstream);
-  };
+      onProxyRes(proxyRes, req) {
+        const secure = typeof options.secure === "boolean" ? options.secure : readerProtocol(req) === "https";
+        proxyRes.headers = downstreamHeaders(proxyRes.headers, {
+          baseUrl,
+          secure,
+          host: req.headers.host
+        });
+      },
+      onError: options.onError || backendUnreachable
+    }
+  ];
+}
+function createProxy(options = {}) {
+  const entry = proxyEntry(options);
+  if (!entry) return (req, res, next) => next();
+  return createProxyMiddleware(...entry);
 }
 
 const DEFAULTS = {
@@ -230,4 +238,4 @@ const NuxtModule = function(moduleOptions = {}) {
   this.addServerMiddleware(createProxy(options));
 };
 
-export { ADMIN_PATHS, BACKEND_PATHS, DEFAULTS, EDIT_PATH, FILES_PATH, MODES, backendPath, createProxy, NuxtModule as default, downstreamHeaders, isAdminPath, readerProtocol, resolveMode, resolveOptions, rewriteCookie, rewriteLocation, shouldProxy, upstreamHeaders };
+export { ADMIN_PATHS, BACKEND_PATHS, DEFAULTS, EDIT_PATH, FILES_PATH, MODES, backendPath, createProxy, NuxtModule as default, downstreamHeaders, isAdminPath, proxyEntry, readerProtocol, resolveMode, resolveOptions, rewriteCookie, rewriteLocation, shouldProxy, upstreamHeaders };
