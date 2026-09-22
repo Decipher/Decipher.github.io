@@ -1,18 +1,6 @@
 {
-    "_hash": "e8fc533a467b277b79f68bee7de896f6139b1e649c0ae25b4d9caaefba2bcc0d",
+    "_hash": "26ffe17e4fc2c93a8d6801216822d8d025d2d6ed6047031f0b8476ac84a1e4a3",
     "patches": {
-        "drupal/druxt": [
-            {
-                "package": "drupal/druxt",
-                "description": "Add ability to configure/extend exposed Druxt JSON:API resources (#3309969)",
-                "url": "patches/druxt-3309969-configurable-resources.patch",
-                "sha256": "e53e977489d0cb3988de2508d7eaf061a817224c31024a821bf6ca038ac0037e",
-                "depth": 1,
-                "extra": {
-                    "provenance": "root"
-                }
-            }
-        ],
         "drupal/tome": [
             {
                 "package": "drupal/tome",
