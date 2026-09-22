@@ -233,6 +233,12 @@ The build runs in a throwaway worktree of that exact commit, so uncommitted work
 in the checkout never reaches the site, and the README it writes records the
 commit. Run it under the Node version the module pins.
 
+A vendored package is a build, and a Nuxt application's `.gitignore` ignores
+`dist`. This one un-ignores `vendor/*/dist/`, which is what lets the build be
+committed at all. Without those two lines a vendored package is committed with
+its build missing, and nothing says so until a deployment whose install may not
+reach outside the lock file fails.
+
 ## Services
 
 | Port   | Service                                                                               |
