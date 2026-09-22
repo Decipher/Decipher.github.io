@@ -92,7 +92,7 @@ test('the login step', async ({ page }) => {
   await isolateFromBackends(page)
   await stubConformingBackend(page)
   await page.goto(`/?backend=${encodeURIComponent(BACKEND)}`, { waitUntil: 'networkidle' })
-  await page.evaluate(() => window.$nuxt.$authoring.openLogin())
+  await page.evaluate(() => window.$nuxt.$druxtIce.openLogin())
   await expect(page.getByTestId('authoring-continue')).toBeVisible()
   await hideLoadingBar(page)
   await mockText(page)

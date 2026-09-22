@@ -191,7 +191,7 @@ test.describe('the edit form', () => {
     await expect(page.getByTestId('reference-create')).toContainText('Sourdough')
     await page.getByTestId('reference-create').click()
 
-    const staged = await page.evaluate(() => window.$nuxt.$store.getters['authoringCart/resources'])
+    const staged = await page.evaluate(() => window.$nuxt.$store.getters['druxtIce/resources'])
     const term = staged.find((r) => r.type === 'taxonomy_term--tags')
     // Staged, not created: nothing reaches the site until the cart is sent.
     expect(term.attributes.name).toBe('Sourdough')
@@ -230,9 +230,7 @@ test.describe('the edit form', () => {
     await page.getByTestId('authoring-stage').click()
     await expect(page.getByTestId('authoring-stage-message')).toContainText('Staged')
 
-    const staged = await page.evaluate(
-      () => window.$nuxt.$store.getters['authoringCart/resources'][0]
-    )
+    const staged = await page.evaluate(() => window.$nuxt.$store.getters['druxtIce/resources'][0])
     expect(staged.attributes.title).toBe('An edited title')
     // Only what changed: the rest of the entity is not the author's to send.
     expect(Object.keys(staged.attributes)).toEqual(['title'])
@@ -250,9 +248,7 @@ test.describe('the edit form', () => {
     await expect(page.getByTestId('field-path')).toHaveValue('/no-leading-slash')
 
     await page.getByTestId('authoring-stage').click()
-    const staged = await page.evaluate(
-      () => window.$nuxt.$store.getters['authoringCart/resources'][0]
-    )
+    const staged = await page.evaluate(() => window.$nuxt.$store.getters['druxtIce/resources'][0])
     expect(staged.attributes.path.alias).toBe('/no-leading-slash')
     // pid identifies the alias record; rebuilding the value would drop it.
     expect(staged.attributes.path).toHaveProperty('langcode', 'en')
@@ -270,9 +266,7 @@ test.describe('the edit form', () => {
     await expect(page.getByTestId('reference-selected').filter({ hasText: 'Bread' })).toHaveCount(1)
 
     await page.getByTestId('authoring-stage').click()
-    const staged = await page.evaluate(
-      () => window.$nuxt.$store.getters['authoringCart/resources'][0]
-    )
+    const staged = await page.evaluate(() => window.$nuxt.$store.getters['druxtIce/resources'][0])
     // A relationship, not an attribute, and carrying nothing but type and id.
     expect(staged.relationships.field_tags.data).toEqual([
       { type: 'taxonomy_term--tags', id: 'cf97bdbd-f6fa-4a2b-96b9-e8c1b3404c2f' },
@@ -309,7 +303,7 @@ test.describe('the edit form', () => {
     await appReady(page)
     await page.getByTestId('authoring-edit-toggle').click()
 
-    await page.evaluate(() => window.$nuxt.$store.dispatch('authoringCart/setDrawerOpen', true))
+    await page.evaluate(() => window.$nuxt.$store.dispatch('druxtIce/setDrawerOpen', true))
     await page.getByTestId('cart-tab-add').click()
     await page.getByTestId('authoring-add-type').selectOption('node--article')
     await page.getByTestId('authoring-add').click()
@@ -356,13 +350,12 @@ test.describe('the edit form', () => {
     // rendered entity, and the open form is standing where that was.
     await expect
       .poll(() =>
-        page.evaluate(() => Object.keys(window.$nuxt.$store.state.authoringCart.drafts).length)
+        page.evaluate(() => Object.keys(window.$nuxt.$store.state.druxtIce.drafts).length)
       )
       .toBe(1)
 
     await page.evaluate(
-      (id) =>
-        window.$nuxt.$store.dispatch('authoringCart/discardOne', { type: 'node--article', id }),
+      (id) => window.$nuxt.$store.dispatch('druxtIce/discardOne', { type: 'node--article', id }),
       ARTICLE
     )
 
@@ -383,7 +376,7 @@ test.describe('the edit form', () => {
     await expect
       .poll(() =>
         page.evaluate(() => {
-          const drafts = Object.values(window.$nuxt.$store.state.authoringCart.drafts)
+          const drafts = Object.values(window.$nuxt.$store.state.druxtIce.drafts)
           return (drafts[0] || {}).attributes?.title ?? null
         })
       )
@@ -401,7 +394,7 @@ test.describe('the edit form', () => {
 
     await expect(page.getByTestId('unstaged-badge')).toBeVisible()
     // Kept, but not counted: the drawer must not claim work it will not send.
-    expect(await page.evaluate(() => window.$nuxt.$store.getters['authoringCart/count'])).toBe(0)
+    expect(await page.evaluate(() => window.$nuxt.$store.getters['druxtIce/count'])).toBe(0)
 
     // And reopening puts it back in front of the author.
     await page.getByTestId(`edit-node--article-${ARTICLE}`).click()
@@ -442,7 +435,7 @@ test.describe('the edit form', () => {
       .filter({ hasText: 'Sourdough' })
       .getByTestId('reference-remove')
       .click()
-    const staged = await page.evaluate(() => window.$nuxt.$store.getters['authoringCart/resources'])
+    const staged = await page.evaluate(() => window.$nuxt.$store.getters['druxtIce/resources'])
     expect(staged.filter((r) => r.type === 'taxonomy_term--tags')).toHaveLength(0)
   })
 
@@ -463,7 +456,7 @@ test.describe('the edit form', () => {
     await tags.fill('Sourdough')
     await page.getByTestId('reference-create').click()
 
-    const staged = await page.evaluate(() => window.$nuxt.$store.getters['authoringCart/resources'])
+    const staged = await page.evaluate(() => window.$nuxt.$store.getters['druxtIce/resources'])
     // Added, removed and added again is one change, not three.
     expect(staged.filter((r) => r.type === 'taxonomy_term--tags')).toHaveLength(1)
   })
@@ -514,7 +507,7 @@ test.describe('the edit form', () => {
 
     await page.evaluate(
       ([token]) =>
-        window.$nuxt.$store.dispatch('authoringCart/commit', {
+        window.$nuxt.$store.dispatch('druxtIce/commit', {
           backendUrl: 'http://backend.test',
           token,
         }),

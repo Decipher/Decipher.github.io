@@ -39,8 +39,8 @@ async function stubConformingBackend(page) {
  * test. These are about what connecting remembers.
  */
 async function openLogin(page) {
-  await page.waitForFunction(() => window.$nuxt && window.$nuxt.$authoring)
-  await page.evaluate(() => window.$nuxt.$authoring.openLogin())
+  await page.waitForFunction(() => window.$nuxt && window.$nuxt.$druxtIce)
+  await page.evaluate(() => window.$nuxt.$druxtIce.openLogin())
 }
 
 test.beforeEach(({ page }) => isolateFromPublishedSessions(page))

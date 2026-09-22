@@ -17,7 +17,7 @@ import { appReady, isolateFromPublishedSessions } from './isolate.js'
 async function stage(page, { type, id, original, edited, relationships }) {
   return page.evaluate(
     ([type, id, original, edited, relationships]) =>
-      window.$nuxt.$store.dispatch('authoringCart/stage', {
+      window.$nuxt.$store.dispatch('druxtIce/stage', {
         type,
         id,
         original,
@@ -28,11 +28,11 @@ async function stage(page, { type, id, original, edited, relationships }) {
   )
 }
 
-const count = (page) => page.evaluate(() => window.$nuxt.$store.getters['authoringCart/count'])
+const count = (page) => page.evaluate(() => window.$nuxt.$store.getters['druxtIce/count'])
 
 /** Edits made and not staged, which is where new content starts. */
 const drafts = (page) =>
-  page.evaluate(() => Object.keys(window.$nuxt.$store.state.authoringCart.drafts).length)
+  page.evaluate(() => Object.keys(window.$nuxt.$store.state.druxtIce.drafts).length)
 
 // Every test in this file, not only the first describe: a build knows where
 // sessions publish themselves and looks there on load, so anything asserting
@@ -98,9 +98,7 @@ test.describe('authoring cart', () => {
     await stage(page, { type: 'node--article', id: 'abc', original: {}, edited: { body: 'B' } })
 
     expect(await count(page)).toBe(1)
-    const resource = await page.evaluate(
-      () => window.$nuxt.$store.getters['authoringCart/resources'][0]
-    )
+    const resource = await page.evaluate(() => window.$nuxt.$store.getters['druxtIce/resources'][0])
     expect(Object.keys(resource.attributes).sort()).toEqual(['body', 'title'])
   })
 
@@ -186,12 +184,12 @@ test.describe('adding content', () => {
     await page.goto('/', { waitUntil: 'networkidle' })
     await appReady(page)
     await page.evaluate(() =>
-      window.$nuxt.$store.dispatch('authoringCart/stageDeletion', {
+      window.$nuxt.$store.dispatch('druxtIce/stageDeletion', {
         type: 'node--article',
         id: 'gone',
       })
     )
-    await page.evaluate(() => window.$nuxt.$store.dispatch('authoringCart/setDrawerOpen', true))
+    await page.evaluate(() => window.$nuxt.$store.dispatch('druxtIce/setDrawerOpen', true))
 
     // Tidied for the wire, a deletion is indistinguishable from an edit that
     // changed nothing, so the drawer reads the cart's own copy.
@@ -202,12 +200,12 @@ test.describe('adding content', () => {
     await page.goto('/', { waitUntil: 'networkidle' })
     await appReady(page)
     await page.evaluate(() =>
-      window.$nuxt.$store.dispatch('authoringCart/stageDeletion', {
+      window.$nuxt.$store.dispatch('druxtIce/stageDeletion', {
         type: 'node--article',
         id: 'gone',
       })
     )
-    await page.evaluate(() => window.$nuxt.$store.dispatch('authoringCart/setDrawerOpen', true))
+    await page.evaluate(() => window.$nuxt.$store.dispatch('druxtIce/setDrawerOpen', true))
 
     await page.getByTestId('cart-select-gone').click()
 
@@ -231,7 +229,7 @@ test.describe('adding content', () => {
       original: { title: 'The old title' },
       edited: { title: 'The new title' },
     })
-    await page.evaluate(() => window.$nuxt.$store.dispatch('authoringCart/setDrawerOpen', true))
+    await page.evaluate(() => window.$nuxt.$store.dispatch('druxtIce/setDrawerOpen', true))
     await page.getByTestId('authoring-cart-expand').first().click()
 
     // A staged resource is a delta: on its own it says what a field will be
@@ -258,7 +256,7 @@ test.describe('adding content', () => {
       original: { title: 'Was' },
       edited: { title: 'Is' },
     })
-    await page.evaluate(() => window.$nuxt.$store.dispatch('authoringCart/setDrawerOpen', true))
+    await page.evaluate(() => window.$nuxt.$store.dispatch('druxtIce/setDrawerOpen', true))
 
     // A token rather than an OAuth button: GitHub's device flow endpoints send
     // no CORS headers, so a browser cannot reach them at all.
@@ -284,7 +282,7 @@ test.describe('adding content', () => {
       original: { title: 'Was' },
       edited: { title: 'Is' },
     })
-    await page.evaluate(() => window.$nuxt.$store.dispatch('authoringCart/setDrawerOpen', true))
+    await page.evaluate(() => window.$nuxt.$store.dispatch('druxtIce/setDrawerOpen', true))
 
     // Send, because that is where the GitHub controls are. They used to render
     // under every tab, and these two tests were the reason nobody noticed.
@@ -318,7 +316,7 @@ test.describe('adding content', () => {
       original: { title: 'Was' },
       edited: { title: 'Is' },
     })
-    await page.evaluate(() => window.$nuxt.$store.dispatch('authoringCart/setDrawerOpen', true))
+    await page.evaluate(() => window.$nuxt.$store.dispatch('druxtIce/setDrawerOpen', true))
 
     // Send, because that is where the GitHub controls are. They used to render
     // under every tab, and these two tests were the reason nobody noticed.
@@ -487,7 +485,7 @@ test.describe('adding content', () => {
       original: { title: 'Was' },
       edited: { title: 'Is' },
     })
-    await page.evaluate(() => window.$nuxt.$store.dispatch('authoringCart/setDrawerOpen', true))
+    await page.evaluate(() => window.$nuxt.$store.dispatch('druxtIce/setDrawerOpen', true))
     await page.getByTestId('cart-tab-send').click()
     await page.getByTestId('github-repository').fill('o/r')
     await page.getByTestId('github-token').fill('a-token')
@@ -536,7 +534,7 @@ test.describe('adding content', () => {
       original: { title: 'Was' },
       edited: { title: 'Is' },
     })
-    await page.evaluate(() => window.$nuxt.$store.dispatch('authoringCart/setDrawerOpen', true))
+    await page.evaluate(() => window.$nuxt.$store.dispatch('druxtIce/setDrawerOpen', true))
     await page.getByTestId('cart-tab-send').click()
     await page.getByTestId('github-repository').fill('o/r')
     await page.getByTestId('github-token').fill('a-token')
@@ -820,8 +818,8 @@ test.describe('adding content', () => {
     // menu, and connecting to a backend with no blocks takes the whole region
     // away with it. What is under test here is which backend the interface
     // thinks it is on, not how editing gets turned on.
-    await page.evaluate(() => window.$nuxt.$store.dispatch('authoringCart/setEditing', true))
-    await page.evaluate(() => window.$nuxt.$store.dispatch('authoringCart/setDrawerOpen', true))
+    await page.evaluate(() => window.$nuxt.$store.dispatch('druxtIce/setEditing', true))
+    await page.evaluate(() => window.$nuxt.$store.dispatch('druxtIce/setDrawerOpen', true))
     await page.getByTestId('cart-tab-send').click()
     await page.getByTestId('github-repository').fill('o/r')
     await page.getByTestId('github-token').fill('a-token')
@@ -842,7 +840,7 @@ test.describe('adding content', () => {
 
     await expect(page.getByTestId('github-started-elsewhere')).toBeVisible()
     // And moving is offered, not done for you.
-    expect(await page.evaluate(() => window.$nuxt.$authoring.state.url)).toBe(
+    expect(await page.evaluate(() => window.$nuxt.$druxtIce.state.url)).toBe(
       'http://elsewhere.test'
     )
   })
@@ -862,13 +860,13 @@ test.describe('adding content', () => {
       edited: { title: 'Is' },
     })
     const created = await page.evaluate(() =>
-      window.$nuxt.$store.dispatch('authoringCart/stageNew', {
+      window.$nuxt.$store.dispatch('druxtIce/stageNew', {
         type: 'node--article',
         attributes: { title: 'Brand new' },
       })
     )
     await page.evaluate(() =>
-      window.$nuxt.$store.dispatch('authoringCart/stageDeletion', {
+      window.$nuxt.$store.dispatch('druxtIce/stageDeletion', {
         type: 'node--article',
         id: 'removed',
       })
@@ -897,13 +895,13 @@ test.describe('the drawer as a review surface', () => {
       edited: { title: 'Is' },
     })
     await page.evaluate(() =>
-      window.$nuxt.$store.dispatch('authoringCart/saveDraft', {
+      window.$nuxt.$store.dispatch('druxtIce/saveDraft', {
         type: 'node--article',
         id: 'draft-one',
         attributes: { title: 'Typed, not staged' },
       })
     )
-    await page.evaluate(() => window.$nuxt.$store.dispatch('authoringCart/setDrawerOpen', true))
+    await page.evaluate(() => window.$nuxt.$store.dispatch('druxtIce/setDrawerOpen', true))
 
     // One list made an unstaged edit look like something about to be sent.
     await expect(page.getByTestId('authoring-cart-expand')).toHaveCount(1)
@@ -921,7 +919,7 @@ test.describe('the drawer as a review surface', () => {
       original: { title: 'Was' },
       edited: { title: 'Is' },
     })
-    await page.evaluate(() => window.$nuxt.$store.dispatch('authoringCart/setDrawerOpen', true))
+    await page.evaluate(() => window.$nuxt.$store.dispatch('druxtIce/setDrawerOpen', true))
 
     // One control for one idea. A checkbox that only scoped the commit was a
     // third state on top of the two the cart already had.
@@ -939,7 +937,7 @@ test.describe('the drawer as a review surface', () => {
     await page.goto('/', { waitUntil: 'networkidle' })
     await appReady(page)
     const tagId = await page.evaluate(() =>
-      window.$nuxt.$store.dispatch('authoringCart/stageNew', {
+      window.$nuxt.$store.dispatch('druxtIce/stageNew', {
         type: 'taxonomy_term--tags',
         attributes: { name: 'Rye' },
         onlyIfReferenced: true,
@@ -952,7 +950,7 @@ test.describe('the drawer as a review surface', () => {
       edited: { title: 'Tagged' },
       relationships: { field_tags: { data: [{ type: 'taxonomy_term--tags', id: tagId }] } },
     })
-    await page.evaluate(() => window.$nuxt.$store.dispatch('authoringCart/setDrawerOpen', true))
+    await page.evaluate(() => window.$nuxt.$store.dispatch('druxtIce/setDrawerOpen', true))
 
     // Said, not silently corrected: re-ticking what someone just unticked is
     // its own kind of wrong.
@@ -979,7 +977,7 @@ test.describe('the drawer as a review surface', () => {
     await expect(main).not.toContainText('Written in the browser')
 
     const id = await page.evaluate(() =>
-      window.$nuxt.$store.dispatch('authoringCart/stageNew', {
+      window.$nuxt.$store.dispatch('druxtIce/stageNew', {
         type: 'node--article',
         attributes: { title: 'Written in the browser' },
       })
@@ -990,8 +988,7 @@ test.describe('the drawer as a review surface', () => {
     // And taking it back off again, because a preview that cannot be undone is
     // a page an author cannot get back.
     await page.evaluate(
-      (id) =>
-        window.$nuxt.$store.dispatch('authoringCart/discardOne', { type: 'node--article', id }),
+      (id) => window.$nuxt.$store.dispatch('druxtIce/discardOne', { type: 'node--article', id }),
       id
     )
     await expect(main).not.toContainText('Written in the browser')
@@ -1005,7 +1002,7 @@ test.describe('the drawer as a review surface', () => {
     await page.goto('/', { waitUntil: 'networkidle' })
     await appReady(page)
     const tagId = await page.evaluate(() =>
-      window.$nuxt.$store.dispatch('authoringCart/stageNew', {
+      window.$nuxt.$store.dispatch('druxtIce/stageNew', {
         type: 'taxonomy_term--tags',
         attributes: { name: 'Rye' },
         onlyIfReferenced: true,
@@ -1018,7 +1015,7 @@ test.describe('the drawer as a review surface', () => {
       edited: { title: 'Tagged' },
       relationships: { field_tags: { data: [{ type: 'taxonomy_term--tags', id: tagId }] } },
     })
-    await page.evaluate(() => window.$nuxt.$store.dispatch('authoringCart/setDrawerOpen', true))
+    await page.evaluate(() => window.$nuxt.$store.dispatch('druxtIce/setDrawerOpen', true))
 
     await page.getByTestId(`cart-discard-${tagId}`).click()
     await expect(page.getByTestId('cart-refusal')).toContainText('cannot be discarded')

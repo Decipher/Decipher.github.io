@@ -24,7 +24,7 @@ export async function isolateFromPublishedSessions(page) {
  */
 export async function appReady(page) {
   await page.waitForFunction(
-    () => Boolean(window.$nuxt && window.$nuxt.$store && window.$nuxt.$store.state.authoringCart),
+    () => Boolean(window.$nuxt && window.$nuxt.$store && window.$nuxt.$store.state.druxtIce),
     { timeout: 30000 }
   )
   // One tick past mount, so a restore committed during it has landed.

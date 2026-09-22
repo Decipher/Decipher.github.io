@@ -93,12 +93,12 @@ test.describe('edit mode', () => {
     // The entry lands a tick after the form closes, and reading between the two
     // found an empty cart and failed on `undefined.isNew`.
     await page.waitForFunction(
-      () => Object.keys(window.$nuxt.$store.state.authoringCart.entries).length > 0
+      () => Object.keys(window.$nuxt.$store.state.druxtIce.entries).length > 0
     )
     const resource = await page.evaluate(
       () =>
-        window.$nuxt.$store.state.authoringCart.entries[
-          Object.keys(window.$nuxt.$store.state.authoringCart.entries)[0]
+        window.$nuxt.$store.state.druxtIce.entries[
+          Object.keys(window.$nuxt.$store.state.druxtIce.entries)[0]
         ]
     )
     // The flag is what decides POST over PATCH at commit time, and it has to
