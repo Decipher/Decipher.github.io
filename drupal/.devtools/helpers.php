@@ -399,6 +399,60 @@ function passthru_or_fail(string $cmd, string $format = '', string|int|float ...
 }
 
 /**
+ * The patches in patches.lock.json that are not applied to their package.
+ *
+ * Composer Patches 2 keeps no record of what it applied, and its own
+ * `patches-repatch` returns 0 even when a patch fails. So this checks the
+ * files: a reverse dry run succeeds only when the patch is already there.
+ *
+ * `patch` rather than `git apply`: this directory is inside the site's own
+ * repository, where `git apply` skips the patch and still exits 0.
+ *
+ * @return string[]
+ *   One line per patch that is not applied, naming the package and the file.
+ */
+function unapplied_patches(string $lock_file = 'patches.lock.json', string $installed_file = 'vendor/composer/installed.json'): array {
+  if (!is_file($lock_file)) {
+    return [];
+  }
+  $lock = json_decode((string) file_get_contents($lock_file), TRUE) ?: [];
+  $installed = json_decode((string) file_get_contents($installed_file), TRUE) ?: [];
+  $paths = [];
+  foreach ($installed['packages'] ?? $installed as $package) {
+    if (isset($package['name'], $package['install-path'])) {
+      $paths[$package['name']] = dirname($installed_file) . '/' . $package['install-path'];
+    }
+  }
+
+  $missing = [];
+  foreach ($lock['patches'] ?? [] as $name => $patches) {
+    foreach ($patches as $patch) {
+      $file = $patch['url'] ?? '';
+      // A patch fetched from a URL has no local file to check against.
+      if ($file === '' || preg_match('#^[a-z]+://#i', $file)) {
+        continue;
+      }
+      $path = $paths[$name] ?? NULL;
+      if ($path === NULL || !is_dir($path)) {
+        $missing[] = sprintf('%s is not installed, so %s cannot be applied', $name, $file);
+        continue;
+      }
+      $command = sprintf(
+        'patch --dry-run --reverse --force --silent -p%d -d %s -i %s > /dev/null 2>&1',
+        (int) ($patch['depth'] ?? 1),
+        escapeshellarg($path),
+        escapeshellarg(realpath($file) ?: $file)
+      );
+      exec($command, $output, $exit_code);
+      if ($exit_code !== 0) {
+        $missing[] = sprintf('%s: %s', $name, $file);
+      }
+    }
+  }
+  return $missing;
+}
+
+/**
  * Run a command via passthru, retrying on failure before giving up.
  *
  * For long network-bound steps (composer install): registries and GitHub

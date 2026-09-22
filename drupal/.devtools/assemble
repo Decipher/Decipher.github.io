@@ -29,6 +29,21 @@ putenv('COMPOSER_MEMORY_LIMIT=-1');
 passthru_with_retries('composer install --no-interaction --no-progress');
 PASS('Dependencies installed.');
 
+// Checked, not trusted. A patch that does not apply fails the first install;
+// the retry then finds every package already installed, so Composer Patches
+// never runs and the retry succeeds with packages unpatched. A stale
+// patches.lock.json surfaced that way as a tome:import failure much later,
+// with nothing pointing back here.
+TASK('Checking that every patch in patches.lock.json is applied.');
+$unapplied = unapplied_patches();
+if ($unapplied) {
+  foreach ($unapplied as $line) {
+    FAIL_NO_EXIT('Not applied: %s', $line);
+  }
+  FAIL('If composer.json and patches.lock.json list different patches, run `composer patches-relock`, then `composer install` again.');
+}
+PASS('Every patch is applied.');
+
 echo PHP_EOL;
 echo '===============================' . PHP_EOL;
 echo '    ASSEMBLE COMPLETE          ' . PHP_EOL;
