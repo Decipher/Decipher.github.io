@@ -390,3 +390,20 @@ test_visual:
   extends: .playwright
   script:
     - npm run test:visual
+
+# New baselines, made on the runner that compares against them. Manual, and
+# handed back as an artifact rather than committed: a changed baseline is a
+# changed design, and someone approves the design by looking at the PNGs
+# before they replace the committed ones. Never regenerate them on a laptop,
+# where fonts and Chromium differ from the runner's.
+test_visual_update:
+  extends: .playwright
+  when: manual
+  allow_failure: true
+  script:
+    - npm run test:visual:update
+  artifacts:
+    when: always
+    paths:
+      - tests/visual/__screenshots__/
+    expire_in: 1 week
