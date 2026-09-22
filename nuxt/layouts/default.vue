@@ -15,12 +15,31 @@
         above it. A toolbar used to, which put the tool above the site it is a
         tool for.
 
-        The sign-in dialog is hosted here and nowhere else. Drupal's account menu
-        carries the button that opens it, and that menu is inside a region Druxt
-        re-renders the moment a backend connects: a dialog rendered there would
-        be unmounted by the thing it was opened to do.
+        The sign-in dialog is hosted here and nowhere else. The site header
+        carries the button that opens it, and the header is inside DruxtSite,
+        which a connecting backend re-renders: a dialog rendered there would be
+        unmounted by the thing it was opened to do.
       -->
       <AuthoringLogin :trigger="false" />
+      <!--
+        A way to sign in when the site header is not there to carry one.
+        DruxtSite renders nothing at all while a connected backend fails to
+        answer, which took every control off the page, including the one that
+        connects a different backend. Client-only, so a generated page never
+        carries it alongside the real header; the header says when it is there.
+        The same height and rule as the real header.
+      -->
+      <client-only>
+        <header
+          v-if="!$store.state.chrome.header"
+          class="sticky top-0 z-40 h-16 border-b border-hairline bg-paper sm:bg-paper/90 sm:backdrop-blur"
+          data-testid="site-header-fallback"
+        >
+          <div class="mx-auto flex h-full w-full max-w-5xl items-center justify-end px-6">
+            <AuthoringLoginTrigger />
+          </div>
+        </header>
+      </client-only>
       <!--
         Drupal's own layout, not this frontend's. `DruxtSite` renders every
         region the theme declares, and the content region's Main page content

@@ -35,6 +35,13 @@
           <slot :name="band.top[0]" />
           <div class="ml-auto flex flex-wrap items-center gap-x-6 gap-y-2">
             <slot v-for="region of band.top.slice(1)" :name="region" />
+            <!--
+              Signing in is this site's control, not a Drupal block's, so it is
+              rendered here rather than in the account menu region. Connecting a
+              backend re-renders every region from that backend, and one without
+              an account menu would take the way to sign in away with it.
+            -->
+            <AuthoringLoginTrigger />
           </div>
         </div>
       </header>
@@ -186,6 +193,34 @@ export default {
 
     twoColumn() {
       return hasAside(this.band)
+    },
+
+    /** Whether the header, and the sign-in control in it, is on the page. */
+    hasHeader() {
+      return this.regions.length > 0 && this.band.top.length > 0
+    },
+  },
+
+  watch: {
+    hasHeader: 'reportHeader',
+  },
+
+  /**
+   * The layout draws a sign-in control of its own only when this header is
+   * not there to carry one. Reported on the client alone, which is also the
+   * only place the layout looks, so no page is ever generated with two.
+   */
+  mounted() {
+    this.reportHeader()
+  },
+
+  beforeDestroy() {
+    this.$store.commit('chrome/setHeader', false)
+  },
+
+  methods: {
+    reportHeader() {
+      this.$store.commit('chrome/setHeader', this.hasHeader)
     },
   },
 }

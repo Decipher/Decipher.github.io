@@ -28,10 +28,10 @@
     <AuthoringCartToggle v-if="editing || changes" />
     <AuthoringEditToggle />
     <!--
-      The trigger only. The dialog is hosted by the layout, outside every Drupal
-      region, because connecting a backend re-renders this one.
+      Signing in is not here. It is rendered by the site header, outside every
+      Drupal region, and so is its dialog, by the layout: connecting a backend
+      re-renders this region from that backend, which may have no account menu.
     -->
-    <AuthoringLoginTrigger />
   </div>
 </template>
 
