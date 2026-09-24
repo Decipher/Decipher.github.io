@@ -12,3 +12,8 @@ find the same element the site rendered.
 
 Declared as `file:vendor/anchors` so the package name resolves in
 `node_modules`.
+
+The package's own `package.json` declares `"type": "module"`, which makes Node
+treat `dist/index.ssr.js` as an ES module even though siroc writes it as
+CommonJS. `nuxt generate` renders on the server and `require()`s this package,
+so that declaration is left out here, as it is for every module beside it.
