@@ -25,6 +25,7 @@
     "@ckeditor/ckeditor5-remove-format": "35.4.0",
     "@ckeditor/ckeditor5-source-editing": "35.4.0",
     "@ckeditor/ckeditor5-table": "35.4.0",
+    "@druxt-contrib/anchors": "file:vendor/anchors",
     "@druxt-contrib/ckeditor": "file:vendor/ckeditor",
     "@druxt-contrib/diff": "file:vendor/diff",
     "@druxt-contrib/inline-content-edit": "file:vendor/inline-content-edit",

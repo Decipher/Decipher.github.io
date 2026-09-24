@@ -1,5 +1,5 @@
 <template>
-  <div class="authoring-field-image" :data-authoring-field="schema.id">
+  <div class="authoring-field-image" v-bind="anchors">
     <img
       v-for="image of images"
       :key="image.src"
@@ -30,6 +30,7 @@
  * A relationship carries the file's id and the alt text but not its path, so
  * the file entities have to be fetched before anything can be drawn.
  */
+import { fieldAnchors } from '@druxt-contrib/anchors'
 import { DruxtFieldMixin } from 'druxt-entity'
 
 export default {
@@ -40,6 +41,11 @@ export default {
   data: () => ({ files: {} }),
 
   computed: {
+    /** How this field names itself on the page: the shared contract. */
+    anchors() {
+      return fieldAnchors((this.schema || {}).id)
+    },
+
     items() {
       const data = (this.model || {}).data
       if (!data) return []
