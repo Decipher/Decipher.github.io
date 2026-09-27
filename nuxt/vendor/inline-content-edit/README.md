@@ -1,7 +1,7 @@
 # Vendored: @druxt-contrib/inline-content-edit
 
-Built from `druxt/druxt-inline-content-edit`, branch `feature/2-components`,
-commit `6f31661a37a0`.
+Built from `druxt/druxt-inline-content-edit`, branch `feature/4-druxt-auth`,
+commit `8a98de2`.
 
 Vendored rather than installed because the package is not published yet. A
 dependency on the branch it lives on would be a private host in a public
@@ -17,9 +17,11 @@ resolves for anybody who clones, and names no private host.
 
 Only the built output is here: `dist`, `templates` and a trimmed
 `package.json`. The manifest keeps the fields that make the package
-resolvable and drops the rest, because the scripts it used to carry point at
-files that were never copied, and npm runs `postinstall` for a `file:`
-dependency.
+resolvable, its peer dependencies among them, and drops the rest, because the
+scripts it used to carry point at files that were never copied, and npm runs
+`postinstall` for a `file:` dependency. The module requires `druxt-auth` by
+name at build time, and as an optional peer it is not installed on its own,
+so this site lists `druxt-auth` in its own `package.json`.
 
 Replace this directory with a normal dependency once the package is on npm:
 

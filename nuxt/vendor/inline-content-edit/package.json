@@ -25,7 +25,13 @@
     "templates"
   ],
   "peerDependencies": {
+    "druxt-auth": "^0.5.0",
     "vue": "^2.7.0"
+  },
+  "peerDependenciesMeta": {
+    "druxt-auth": {
+      "optional": true
+    }
   },
   "engines": {
     "node": ">=16.20.1"

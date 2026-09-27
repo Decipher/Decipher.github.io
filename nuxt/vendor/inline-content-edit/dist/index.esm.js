@@ -1,5 +1,133 @@
-import { join, resolve } from 'path';
+import { resolve, join } from 'path';
 import Vue from 'vue';
+
+function normaliseUrl(url) {
+  return (url || "").trim().replace(/\/+$/, "");
+}
+function isExpired(expiresAt, now = Date.now()) {
+  if (!expiresAt) return false;
+  const at = new Date(expiresAt).getTime();
+  return Number.isNaN(at) ? true : at <= now;
+}
+const CONFORMANCE_UNREACHABLE = "Could not reach it, or it does not allow a site's origin.";
+async function checkConformance(url, { fetch: fetchImpl, origin } = {}) {
+  const base = normaliseUrl(url);
+  if (!base) return { ok: false, reason: "Enter a backend URL." };
+  if (!/^https?:\/\//.test(base)) {
+    return { ok: false, reason: "That is not an http or https URL." };
+  }
+  let response;
+  try {
+    response = await fetchImpl(`${base}/jsonapi`, {
+      headers: { Accept: "application/vnd.api+json" }
+    });
+  } catch (e) {
+    const suffix = origin ? ` Check it is running, and that its CORS configuration lists ${origin}.` : "";
+    return { ok: false, reason: CONFORMANCE_UNREACHABLE + suffix };
+  }
+  if (!response.ok) {
+    return { ok: false, reason: `JSON:API answered ${response.status}.` };
+  }
+  let body;
+  try {
+    body = await response.json();
+  } catch (e) {
+    body = null;
+  }
+  if (!body || !body.jsonapi) {
+    return {
+      ok: false,
+      reason: "That URL answered, but it is not a JSON:API endpoint."
+    };
+  }
+  return { ok: true, version: body.jsonapi.version };
+}
+async function readSessionRecord(recordUrl, { fetch: fetchImpl, now = Date.now(), token, destination } = {}) {
+  if (!recordUrl) return null;
+  const { url, headers } = destinationRequest(destination, recordUrl, token);
+  let record;
+  try {
+    const response = await fetchImpl(url, { cache: "no-store", headers });
+    if (!response.ok) return null;
+    record = await response.json();
+  } catch (e) {
+    return null;
+  }
+  if (!record || typeof record.url !== "string" || !record.url) return null;
+  if (isExpired(record.expiresAt, now)) return null;
+  return { ...record, url: normaliseUrl(record.url) };
+}
+function destinationRequest(destination, recordUrl, token) {
+  if (destination && typeof destination.recordRequest === "function") {
+    const request = destination.recordRequest(recordUrl, { token });
+    if (request && request.url) return request;
+  }
+  const separator = String(recordUrl).includes("?") ? "&" : "?";
+  return { url: `${recordUrl}${separator}t=${Date.now()}`, headers: void 0 };
+}
+function base64Url(bytes) {
+  let binary = "";
+  for (const byte of new Uint8Array(bytes)) binary += String.fromCharCode(byte);
+  const base64 = typeof btoa === "function" ? btoa(binary) : Buffer.from(binary, "binary").toString("base64");
+  return base64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+function callbackUrl(origin, base = "/") {
+  const path = base.endsWith("/") ? base : `${base}/`;
+  return `${origin}${path}callback`;
+}
+function resolveSource({ query, stored, published }) {
+  if (query) return { url: normaliseUrl(query), source: "query" };
+  if (stored && stored.url)
+    return { ...stored, url: normaliseUrl(stored.url), source: "stored" };
+  if (published && published.url) return { ...published, source: "published" };
+  return null;
+}
+
+function readJson(storage, key) {
+  try {
+    return JSON.parse(storage.getItem(key)) || null;
+  } catch (e) {
+    return null;
+  }
+}
+function writeJson(storage, key, value) {
+  try {
+    if (value) storage.setItem(key, JSON.stringify(value));
+    else storage.removeItem(key);
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+const AUTH_STRATEGY = "drupal-authorization_code";
+const BACKEND_KEY = "authoring.backend";
+function backendFor(context, storage) {
+  const ice = context && (context.app && context.app.$druxtIce || context.$druxtIce) || null;
+  if (ice && ice.state && ice.state.url) {
+    return { url: ice.state.url, clientId: ice.state.clientId || null };
+  }
+  const stored = storage ? readJson(storage, BACKEND_KEY) : null;
+  if (stored && stored.url) {
+    return { url: stored.url, clientId: stored.clientId || null };
+  }
+  return null;
+}
+function pointStrategyAt(options, backend) {
+  if (!options || !backend || !backend.url) return false;
+  const url = normaliseUrl(backend.url);
+  const endpoints = options.endpoints || (options.endpoints = {});
+  endpoints.authorization = `${url}/oauth/authorize`;
+  endpoints.authorizationBackend = `${url}/oauth/authorize`;
+  endpoints.token = `${url}/oauth/token`;
+  endpoints.userInfo = `${url}/oauth/userinfo`;
+  if (backend.clientId) options.clientId = backend.clientId;
+  return true;
+}
+function bareToken(value) {
+  if (!value || typeof value !== "string") return null;
+  return value.replace(/^Bearer\s+/i, "") || null;
+}
 
 const ADAPTER_METHODS = [
   "editableFields",
@@ -87,88 +215,6 @@ function findAnchor(root, { entity, type, field, delta } = {}) {
   }
   if (!parts.length) return null;
   return root.querySelector(parts.join(""));
-}
-
-function normaliseUrl(url) {
-  return (url || "").trim().replace(/\/+$/, "");
-}
-function isExpired(expiresAt, now = Date.now()) {
-  if (!expiresAt) return false;
-  const at = new Date(expiresAt).getTime();
-  return Number.isNaN(at) ? true : at <= now;
-}
-const CONFORMANCE_UNREACHABLE = "Could not reach it, or it does not allow a site's origin.";
-async function checkConformance(url, { fetch: fetchImpl, origin } = {}) {
-  const base = normaliseUrl(url);
-  if (!base) return { ok: false, reason: "Enter a backend URL." };
-  if (!/^https?:\/\//.test(base)) {
-    return { ok: false, reason: "That is not an http or https URL." };
-  }
-  let response;
-  try {
-    response = await fetchImpl(`${base}/jsonapi`, {
-      headers: { Accept: "application/vnd.api+json" }
-    });
-  } catch (e) {
-    const suffix = origin ? ` Check it is running, and that its CORS configuration lists ${origin}.` : "";
-    return { ok: false, reason: CONFORMANCE_UNREACHABLE + suffix };
-  }
-  if (!response.ok) {
-    return { ok: false, reason: `JSON:API answered ${response.status}.` };
-  }
-  let body;
-  try {
-    body = await response.json();
-  } catch (e) {
-    body = null;
-  }
-  if (!body || !body.jsonapi) {
-    return {
-      ok: false,
-      reason: "That URL answered, but it is not a JSON:API endpoint."
-    };
-  }
-  return { ok: true, version: body.jsonapi.version };
-}
-async function readSessionRecord(recordUrl, { fetch: fetchImpl, now = Date.now(), token, destination } = {}) {
-  if (!recordUrl) return null;
-  const { url, headers } = destinationRequest(destination, recordUrl, token);
-  let record;
-  try {
-    const response = await fetchImpl(url, { cache: "no-store", headers });
-    if (!response.ok) return null;
-    record = await response.json();
-  } catch (e) {
-    return null;
-  }
-  if (!record || typeof record.url !== "string" || !record.url) return null;
-  if (isExpired(record.expiresAt, now)) return null;
-  return { ...record, url: normaliseUrl(record.url) };
-}
-function destinationRequest(destination, recordUrl, token) {
-  if (destination && typeof destination.recordRequest === "function") {
-    const request = destination.recordRequest(recordUrl, { token });
-    if (request && request.url) return request;
-  }
-  const separator = String(recordUrl).includes("?") ? "&" : "?";
-  return { url: `${recordUrl}${separator}t=${Date.now()}`, headers: void 0 };
-}
-function base64Url(bytes) {
-  let binary = "";
-  for (const byte of new Uint8Array(bytes)) binary += String.fromCharCode(byte);
-  const base64 = typeof btoa === "function" ? btoa(binary) : Buffer.from(binary, "binary").toString("base64");
-  return base64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-}
-function callbackUrl(origin, base = "/") {
-  const path = base.endsWith("/") ? base : `${base}/`;
-  return `${origin}${path}callback`;
-}
-function resolveSource({ query, stored, published }) {
-  if (query) return { url: normaliseUrl(query), source: "query" };
-  if (stored && stored.url)
-    return { ...stored, url: normaliseUrl(stored.url), source: "stored" };
-  if (published && published.url) return { ...published, source: "published" };
-  return null;
 }
 
 const CAPTIONED = /<(img|drupal-media)\b[^>]*\bdata-caption\s*=\s*("([^"]*)"|'([^']*)')[^>]*>/gi;
@@ -822,26 +868,6 @@ function readyGate(win) {
   };
 }
 
-const BACKEND_KEY = "authoring.backend";
-const TOKEN_KEY = "authoring.token";
-const VERIFIER_KEY = "authoring.verifier";
-const RETURN_KEY = "authoring.return";
-function readJson(storage, key) {
-  try {
-    return JSON.parse(storage.getItem(key)) || null;
-  } catch (e) {
-    return null;
-  }
-}
-function writeJson(storage, key, value) {
-  try {
-    if (value) storage.setItem(key, JSON.stringify(value));
-    else storage.removeItem(key);
-    return true;
-  } catch (e) {
-    return false;
-  }
-}
 function sessionRecordToken(options, storage) {
   const destination = resolveDestination(options.destination, options);
   return destination.token ? destination.token(storage) : void 0;
@@ -926,17 +952,22 @@ function previewStagedContent(store, app) {
 function refreshFromBackend(app) {
   if (!app) return;
   const store = app.$store;
-  const router = store && store.state && store.state.druxtRouter;
-  if (router) {
-    router.routes = {};
-    router.entities = {};
-    router.route = {};
-    router.redirect = null;
+  const state = store && store.state;
+  if (state && state.druxtRouter) {
+    store.replaceState({
+      ...state,
+      druxtRouter: {
+        ...state.druxtRouter,
+        routes: {},
+        entities: {},
+        route: {},
+        redirect: null
+      }
+    });
   }
-  const druxt = store && store.state && store.state.druxt;
-  if (druxt) {
-    druxt.collections = {};
-    druxt.resources = {};
+  if (store && store.state && store.state.druxt) {
+    store.commit("druxt/flushCollection", {});
+    store.commit("druxt/flushResource", {});
   }
   if (app.$druxt) app.$druxt.index = {};
   const pending = [];
@@ -949,117 +980,58 @@ function refreshFromBackend(app) {
   refetch(app);
   return Promise.all(pending).then(() => void 0);
 }
-function randomVerifier() {
-  const bytes = new Uint8Array(32);
-  window.crypto.getRandomValues(bytes);
-  return base64Url(bytes);
-}
-async function challengeFor(verifier) {
-  const digest = await window.crypto.subtle.digest(
-    "SHA-256",
-    new TextEncoder().encode(verifier)
-  );
-  return base64Url(digest);
-}
-function createAuth(ice, context) {
-  const routerBase = context.base || "/";
-  const restored = readJson(window.sessionStorage, TOKEN_KEY);
+function createAuth(ice, context, whenReady = (fn) => fn()) {
+  const $auth = () => context.app && context.app.$auth || context.$auth || null;
   const auth = Vue.observable({
-    token: restored && restored.token || null,
-    account: restored && restored.account || null,
+    get token() {
+      const a = $auth();
+      return a && a.strategy && a.strategy.token ? bareToken(a.strategy.token.get()) : null;
+    },
+    get account() {
+      const a = $auth();
+      return a && a.user || null;
+    },
     get authenticated() {
-      return Boolean(auth.token);
+      const a = $auth();
+      return Boolean(a && a.loggedIn);
     },
     async login() {
-      const backend = ice.state.url;
-      const clientId = ice.state.clientId;
-      if (!backend) throw new Error("No backend connected.");
-      if (!clientId) throw new Error("No OAuth client ID for this backend.");
-      const verifier = randomVerifier();
-      window.sessionStorage.setItem(VERIFIER_KEY, verifier);
-      window.sessionStorage.setItem(
-        RETURN_KEY,
+      if (!ice.state.url) throw new Error("No backend connected.");
+      if (!ice.state.clientId) {
+        throw new Error("No OAuth client ID for this backend.");
+      }
+      const a = $auth();
+      if (!a) throw new Error("No sign-in module: druxt-auth is not installed.");
+      a.$storage.setUniversal(
+        "redirect",
         window.location.pathname + window.location.search
       );
-      const params = new URLSearchParams({
-        response_type: "code",
-        client_id: clientId,
-        redirect_uri: callbackUrl(window.location.origin, routerBase),
-        code_challenge: await challengeFor(verifier),
-        code_challenge_method: "S256"
-      });
-      window.location.assign(`${backend}/oauth/authorize?${params}`);
+      return a.loginWith(AUTH_STRATEGY);
     },
-    async completeLogin(code) {
-      const backend = ice.state.url;
-      const verifier = window.sessionStorage.getItem(VERIFIER_KEY);
-      if (!backend) throw new Error("No backend connected.");
-      if (!verifier) throw new Error("No PKCE verifier: start the login again.");
-      const body = new URLSearchParams({
-        grant_type: "authorization_code",
-        client_id: ice.state.clientId,
-        redirect_uri: callbackUrl(window.location.origin, routerBase),
-        code_verifier: verifier,
-        code
-      });
-      const response = await window.fetch(`${backend}/oauth/token`, {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body
-      });
-      window.sessionStorage.removeItem(VERIFIER_KEY);
-      if (!response.ok) {
-        const detail = await response.json().catch(() => ({}));
-        throw new Error(
-          detail.error_description || detail.error || `Token request failed (${response.status}).`
-        );
-      }
-      const payload = await response.json();
-      auth.token = payload.access_token;
-      await auth.loadAccount();
-      persist();
-      applyToken();
-      return auth.token;
-    },
-    async loadAccount() {
-      try {
-        const response = await window.fetch(`${ice.state.url}/oauth/userinfo`, {
-          headers: { Authorization: `Bearer ${auth.token}` }
-        });
-        auth.account = response.ok ? await response.json() : null;
-      } catch (e) {
-        auth.account = null;
-      }
-    },
-    consumeReturnPath() {
-      const path = window.sessionStorage.getItem(RETURN_KEY);
-      window.sessionStorage.removeItem(RETURN_KEY);
-      return path || routerBase;
-    },
-    logout() {
-      auth.token = null;
-      auth.account = null;
-      writeJson(window.sessionStorage, TOKEN_KEY, null);
+    async logout() {
+      const a = $auth();
+      if (a) await a.logout();
       applyToken();
     }
   });
-  function persist() {
-    writeJson(window.sessionStorage, TOKEN_KEY, {
-      token: auth.token,
-      account: auth.account
-    });
-  }
   function applyToken() {
     const client = context.app && context.app.$druxt || context.$druxt;
     if (!client || !client.axios) return;
-    if (auth.token) {
-      client.axios.defaults.headers.common.Authorization = `Bearer ${auth.token}`;
+    const token = auth.token;
+    if (token) {
+      client.axios.defaults.headers.common.Authorization = `Bearer ${token}`;
     } else {
       delete client.axios.defaults.headers.common.Authorization;
     }
   }
   auth.applyToken = applyToken;
-  applyToken();
+  whenReady(() => {
+    applyToken();
+    const a = $auth();
+    if (a && a.$storage && typeof a.$storage.watchState === "function") {
+      a.$storage.watchState("loggedIn", applyToken);
+    }
+  });
   return auth;
 }
 function createIce(options, context) {
@@ -1183,7 +1155,7 @@ function createIce(options, context) {
       return ice.connect(chosen.url, chosen.source);
     }
   };
-  ice.auth = createAuth(ice, context);
+  ice.auth = createAuth(ice, context, whenReady);
   return ice;
 }
 async function installIce(options, context, inject) {
@@ -1969,7 +1941,10 @@ const DEFAULTS = {
   // options reach the plugin through JSON.stringify and functions do not
   // survive it. Null means the default destination: the record's plain URL,
   // and a token wherever `sessionRecord.tokenKey` says one is.
-  destination: null
+  destination: null,
+  // Passed on to druxt-auth, which signs the author in. `false` leaves
+  // druxt-auth out, for a site that brings its own sign-in.
+  auth: {}
 };
 function resolveOptions(moduleOptions = {}, nuxtOptions = {}) {
   const configured = {
@@ -1985,12 +1960,52 @@ function resolveOptions(moduleOptions = {}, nuxtOptions = {}) {
     }
   };
 }
-const NuxtModule = function(moduleOptions = {}) {
+async function requireAuth(container, options) {
+  if (options.auth === false) return false;
+  const required = Object.keys(container.requiredModules || {});
+  if (required.some((key) => key.includes("druxt-auth"))) {
+    console.warn(
+      "[druxt-ice] druxt-auth is already required; list it after this module, or leave it to this module, so signing in follows the connected backend."
+    );
+    return false;
+  }
+  const auth = container.options.auth || {};
+  const strategies = auth.strategies || {};
+  container.options.auth = {
+    ...auth,
+    strategies: {
+      ...strategies,
+      [AUTH_STRATEGY]: {
+        scheme: resolve(__dirname, "../templates/auth-scheme.js"),
+        ...strategies[AUTH_STRATEGY] || {}
+      }
+    }
+  };
+  const build = container.options.build || (container.options.build = {});
+  const transpile = build.transpile || (build.transpile = []);
+  if (!transpile.includes("druxt-auth/templates")) {
+    transpile.push("druxt-auth/templates");
+  }
+  const configured = ((container.options.druxt || {}).auth || {}).clientId;
+  await container.requireModule([
+    "druxt-auth",
+    {
+      // The site's dialog is the way in; druxt-auth's login page is not asked
+      // for unless the site asks for it.
+      login: false,
+      ...options.clientId || !configured ? { clientId: options.clientId || "druxt-ice" } : {},
+      ...options.auth || {}
+    }
+  ]);
+  return true;
+}
+const NuxtModule = async function(moduleOptions = {}) {
   const options = resolveOptions(moduleOptions, this.options);
   this.options.store = true;
   this.nuxt.hook("components:dirs", (dirs) => {
     dirs.push({ path: join(__dirname, "components") });
   });
+  await requireAuth(this, options);
   this.addPlugin({
     src: resolve(__dirname, "../templates/plugin.js"),
     fileName: "druxt-ice.js",
@@ -1998,4 +2013,4 @@ const NuxtModule = function(moduleOptions = {}) {
   });
 };
 
-export { ADAPTER_METHODS, ADVANCED_FIELDS, BACKEND_KEY, BUILT, CAPTION_FILTER, CONFORMANCE_UNREACHABLE, DEFAULTS, DELTA_ATTRIBUTE, DESTINATION_METHODS, DIFF_TYPE, DRUPAL_FILES, ENTITY_ATTRIBUTE, FIELD_ATTRIBUTE, RETURN_KEY, STAGED, STATIC_FILES, TOKEN_KEY, TYPE_ATTRIBUTE, VERIFIER_KEY, absoluteFileUrls, adapterSupports, applyCaptionFilter, asResource, asText, autoCreateTarget, autocompleteUrl, base64Url, bustCache, callbackUrl, cartKey, changedFields, changedRegion, checkConformance, collectionUrl$1 as collectionUrl, commitOrder, createAuth, createIce, createPlainFieldsAdapter, decodeAttribute, deepEqual, NuxtModule as default, defaultDestination, defer, defineDestination, defineFeature, dependencyMap, destinationRequest, destinationSupports, diffLines, druxtClients, editModeFeature, editorFileUrls, entityAnchors, exportCart, exportSummary, failsFilters, fieldAnchors, fieldChanged, fieldOps, fieldStatus, fileIsAllowed, filterFieldFor, filtersFromResources, findAnchor, fromDateInput, groupFields, hasHeldImage, hasUnfilteredCaption, holdClientUntilConnected, iceStoreModule, imageRelationship, installIce, isAdapterMethod, isDeletion, isDrupalFile, isEmptyResource, isExpired, isLong, isNew, labelFieldFor, labelOf, labelsUrl, listingAccepts, listingTypes, mergeEntry, modesFromDisplays, newResourceId, normaliseUrl, parseSize, patchBody, patchUrl, pointClientAt, previewStagedContent, previewsFor, readJson, readSessionRecord, readyGate, refreshFromBackend, registerIceStore, relativeFileUrls, replaceHeldImage, requestMethod, requestUrl, requiredBy, resolveDestination, resolveFeatures, resolveOptions, resolveSource, rewriteFileUrls, safeFilename, sessionRecordToken, stagedDiff, storedFileUrls, targetResourceTypes, tidyResource, toDateInput, toRelationship, toggleEditMode, uploadHeaders, uploadUrl, valuesBefore, viewModesFor, withDependencies, withoutComputed, words, writeJson };
+export { ADAPTER_METHODS, ADVANCED_FIELDS, AUTH_STRATEGY, BACKEND_KEY, BUILT, CAPTION_FILTER, CONFORMANCE_UNREACHABLE, DEFAULTS, DELTA_ATTRIBUTE, DESTINATION_METHODS, DIFF_TYPE, DRUPAL_FILES, ENTITY_ATTRIBUTE, FIELD_ATTRIBUTE, STAGED, STATIC_FILES, TYPE_ATTRIBUTE, absoluteFileUrls, adapterSupports, applyCaptionFilter, asResource, asText, autoCreateTarget, autocompleteUrl, backendFor, bareToken, base64Url, bustCache, callbackUrl, cartKey, changedFields, changedRegion, checkConformance, collectionUrl$1 as collectionUrl, commitOrder, createAuth, createIce, createPlainFieldsAdapter, decodeAttribute, deepEqual, NuxtModule as default, defaultDestination, defer, defineDestination, defineFeature, dependencyMap, destinationRequest, destinationSupports, diffLines, druxtClients, editModeFeature, editorFileUrls, entityAnchors, exportCart, exportSummary, failsFilters, fieldAnchors, fieldChanged, fieldOps, fieldStatus, fileIsAllowed, filterFieldFor, filtersFromResources, findAnchor, fromDateInput, groupFields, hasHeldImage, hasUnfilteredCaption, holdClientUntilConnected, iceStoreModule, imageRelationship, installIce, isAdapterMethod, isDeletion, isDrupalFile, isEmptyResource, isExpired, isLong, isNew, labelFieldFor, labelOf, labelsUrl, listingAccepts, listingTypes, mergeEntry, modesFromDisplays, newResourceId, normaliseUrl, parseSize, patchBody, patchUrl, pointClientAt, pointStrategyAt, previewStagedContent, previewsFor, readJson, readSessionRecord, readyGate, refreshFromBackend, registerIceStore, relativeFileUrls, replaceHeldImage, requestMethod, requestUrl, requireAuth, requiredBy, resolveDestination, resolveFeatures, resolveOptions, resolveSource, rewriteFileUrls, safeFilename, sessionRecordToken, stagedDiff, storedFileUrls, targetResourceTypes, tidyResource, toDateInput, toRelationship, toggleEditMode, uploadHeaders, uploadUrl, valuesBefore, viewModesFor, withDependencies, withoutComputed, words, writeJson };

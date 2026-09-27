@@ -34,6 +34,7 @@
     "ckeditor5": "35.4.0",
     "core-js": "3.25.1",
     "dotenv": "^16.0.3",
+    "druxt-auth": "^0.5.0",
     "druxt-site": "^0.14.4-dev.20260920074540",
     "nuxt": "2.15.8",
     "vue-server-renderer": "^2.7.14",

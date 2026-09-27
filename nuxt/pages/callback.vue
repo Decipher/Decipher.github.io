@@ -6,39 +6,24 @@
 </template>
 
 <script>
+/**
+ * Where the backend sends the browser back with a code.
+ *
+ * druxt-auth exchanges the code before this page renders, and on success it
+ * returns the author to the page they signed in from, so what is left to
+ * show here is a refusal: the backend reports its own in the query rather
+ * than by failing the redirect, and that message is the useful one, not a
+ * page that says "Completing" for ever.
+ */
 export default {
   name: 'AuthoringCallback',
-
   data: () => ({ error: null }),
-
-  async mounted() {
+  mounted() {
     const params = new URLSearchParams(window.location.search)
-
-    // The backend reports its own refusals here rather than by failing the
-    // redirect, so a returned error is the useful message, not a broken page.
     if (params.get('error')) {
       this.error = params.get('error_description') || params.get('error')
-      return
-    }
-
-    const code = params.get('code')
-    if (!code) {
+    } else if (!params.get('code')) {
       this.error = 'No authorisation code was returned.'
-      return
-    }
-
-    try {
-      await this.$druxtIce.auth.completeLogin(code)
-      const back = this.$druxtIce.auth.consumeReturnPath()
-      this.$router.replace(back)
-      // The route being returned to still holds the payload baked at build
-      // time, so without this the author lands back on stale content holding a
-      // perfectly good token.
-      if (this.$nuxt && typeof this.$nuxt.refresh === 'function') {
-        await this.$nuxt.refresh()
-      }
-    } catch (e) {
-      this.error = e.message
     }
   },
 }

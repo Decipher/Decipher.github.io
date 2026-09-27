@@ -67,6 +67,16 @@ async function stubBackend(page) {
 
     if (request.method() === 'OPTIONS') return route.fulfill({ status: 204, headers })
 
+    // Who the token belongs to. nuxt/auth asks on every page load, and a
+    // token with no account behind it is not a sign-in.
+    if (url.pathname === '/oauth/userinfo') {
+      return route.fulfill({
+        status: 200,
+        headers: { ...headers, 'content-type': 'application/json' },
+        body: JSON.stringify({ sub: '1', name: 'admin' }),
+      })
+    }
+
     // A file upload is not a JSON:API document: it is raw bytes at the field's
     // own route, with the filename in a header.
     if (request.method() === 'POST' && url.pathname.endsWith('/field_image')) {
@@ -135,10 +145,10 @@ async function openForm(page) {
   await appReady(page)
   await page.evaluate((backend) => {
     localStorage.setItem('authoring.backend', JSON.stringify({ url: backend, clientId: null }))
-    sessionStorage.setItem(
-      'authoring.token',
-      JSON.stringify({ token: 'stub-token', account: 'admin' })
-    )
+    // Signed in, the way nuxt/auth keeps it: the strategy and its token, under
+    // its own keys. The account comes from the stubbed userinfo route.
+    localStorage.setItem('auth.strategy', 'drupal-authorization_code')
+    localStorage.setItem('auth._token.drupal-authorization_code', 'Bearer stub-token')
   }, BACKEND)
 
   await page.goto('/authoring', { waitUntil: 'networkidle' })
@@ -294,10 +304,8 @@ test.describe('the edit form', () => {
     await appReady(page)
     await page.evaluate((backend) => {
       localStorage.setItem('authoring.backend', JSON.stringify({ url: backend, clientId: null }))
-      sessionStorage.setItem(
-        'authoring.token',
-        JSON.stringify({ token: 'stub-token', account: 'admin' })
-      )
+      localStorage.setItem('auth.strategy', 'drupal-authorization_code')
+      localStorage.setItem('auth._token.drupal-authorization_code', 'Bearer stub-token')
     }, BACKEND)
     await page.goto('/authoring', { waitUntil: 'networkidle' })
     await appReady(page)
