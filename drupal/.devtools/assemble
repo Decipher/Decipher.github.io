@@ -44,6 +44,13 @@ if ($unapplied) {
 }
 PASS('Every patch is applied.');
 
+// The binary the vale module runs. The script pins the version and checks the
+// digest, so every environment that assembles this site lints with the same
+// release, and `drush vale:install` is never asked for "latest".
+TASK('Installing Vale.');
+passthru_or_fail('../scripts/install-vale.sh', 'Vale could not be installed.');
+PASS('Vale installed.');
+
 echo PHP_EOL;
 echo '===============================' . PHP_EOL;
 echo '    ASSEMBLE COMPLETE          ' . PHP_EOL;

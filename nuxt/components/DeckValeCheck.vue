@@ -79,9 +79,10 @@ export default {
   },
   methods: {
     describe(alert) {
-      const where = alert.Line ? `line ${alert.Line}` : ''
-      const rule = alert.Check ? ` ${alert.Check}` : ''
-      return `${alert.Severity || 'alert'}${rule}${where ? `, ${where}` : ''}: ${alert.Message || ''}`.trim()
+      // The module's keys, not Vale's own: level, rule, line and message.
+      const where = alert.line ? `line ${alert.line}` : ''
+      const rule = alert.rule ? ` ${alert.rule}` : ''
+      return `${alert.level || 'alert'}${rule}${where ? `, ${where}` : ''}: ${alert.message || ''}`.trim()
     },
     exampleClass(i) {
       const result = this.results[i]

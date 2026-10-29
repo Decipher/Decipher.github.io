@@ -7,6 +7,11 @@
 [tools]
 node = "16.17.0"
 php = "8.4"
+# The two binaries a session needs, at the versions the install scripts pin
+# (scripts/install-cloudflared.sh and scripts/install-vale.sh), so a laptop
+# session and a runner session execute the same bytes.
+cloudflared = "2026.8.3"
+vale = "3.17.1"
 
 [tasks.setup]
 description = "Install frontend deps, provision Drupal (SQLite), start the backend."

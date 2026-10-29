@@ -7,6 +7,14 @@ dependencies:
     - node.type.article
   module:
     - text
+    - vale
+third_party_settings:
+  vale:
+    enabled: true
+    min_level: suggestion
+    disabled_rules: {  }
+    level_overrides: {  }
+    profile: ''
 _core:
   default_config_hash: 4Wxs1LseZ8JsNwD9uJVIbzZqG35yQXN8Eo1Hub6NMuI
 id: node.article.body
