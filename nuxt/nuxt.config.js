@@ -460,6 +460,11 @@ export default async () => ({
     // the site's own origin, where nothing answers. Absolute requests to the
     // connected backend are what CORS is configured for.
     proxy: { api: false },
+    // No server cache. Druxt 0.25 caches JSON:API responses on the server in
+    // production. A generated site has no server, so it changes nothing there,
+    // but a `nuxt start` session frontend would serve stale menus and settings
+    // while the backend is being edited live.
+    cache: false,
     // Disable deprecated Entity fields.
     entity: { components: { fields: false }},
     // Disable the router middleware (redirect support) in favour of serverless.
