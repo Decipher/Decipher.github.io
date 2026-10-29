@@ -7,10 +7,12 @@
  * the committed config (adopting its site UUID), import Tome-tracked
  * content and files.
  *
- * No OAuth/Consumer step here - unlike quickstart-druxt-site-tome, this
- * repo has no simple_oauth/consumers in its committed config. It builds
- * to full static output with no live Drupal backend at runtime (see
- * `nuxt generate`), so there's nothing to authenticate against.
+ * The sign-in pieces are committed: simple_oauth and consumers are in the
+ * config, the `authoring` scope is config, and the frontend's Consumer is
+ * Tome content. Only the OAuth key pair is made here, because a private key
+ * is never committed. `.devtools/provision-authoring` then adds what is per
+ * backend: the frontend origin's CORS rules, the trusted hosts and the
+ * session's own callback URL.
  *
  * `drush site-install --existing-config` installs straight from the
  * committed config, adopting its site UUID. A plain `tome:install` does
@@ -128,9 +130,52 @@ TASK('Running drush site-install --existing-config.');
 drush('site-install --existing-config');
 PASS('Site installed from committed config.');
 
+// The committed simple_oauth settings point at ../keys/*.key, relative to
+// web/. The files are not committed, so a fresh checkout makes its own pair.
+// An existing pair is kept: replacing it would log out every session that
+// holds a token signed with it.
+TASK('Making the OAuth key pair, if this checkout has none.');
+$keys_dir = getcwd() . '/keys';
+if (is_file($keys_dir . '/private.key') && is_file($keys_dir . '/public.key')) {
+  PASS('Keys already present at %s.', $keys_dir);
+}
+else {
+  if (!is_dir($keys_dir) && !mkdir($keys_dir, 0755, TRUE) && !is_dir($keys_dir)) {
+    FAIL('Unable to create %s.', $keys_dir);
+  }
+  // An absolute path: the command writes to disk at once, from its own cwd.
+  drush('simple-oauth:generate-keys %s', $keys_dir);
+  PASS('Keys generated at %s.', $keys_dir);
+}
+
 TASK('Importing Tome-tracked content and files.');
 drush('tome:import');
 PASS('Content and files imported.');
+
+// The frontend can only sign in if these three things came through the
+// install and the import. Each of them was missing once, and each failure
+// showed up only as a failed login on the frontend, so check here instead.
+TASK('Checking that the frontend can sign in against this backend.');
+drush('php-eval %s', <<<'PHP'
+$client_id = "dfdd3969-6fe2-4a6f-92bb-82b6f59013ed";
+$consumers = \Drupal::entityTypeManager()->getStorage("consumer")->loadByProperties(["client_id" => $client_id]);
+if (count($consumers) !== 1) {
+  throw new \RuntimeException(sprintf("Expected one Consumer with client_id %s, found %d. Is drupal/content/consumer.%s.json committed and in content/meta/index.json?", $client_id, count($consumers), $client_id));
+}
+$consumer = reset($consumers);
+$scopes = array_column($consumer->get("authorization_code_scopes")->getValue(), "scope_id");
+if (!\Drupal::entityTypeManager()->getStorage("oauth2_scope")->load("authoring") || !in_array("authoring", $scopes, TRUE)) {
+  throw new \RuntimeException("The Consumer has no default `authoring` scope, so every authorize request would be refused.");
+}
+$settings = \Drupal::config("simple_oauth.settings");
+foreach (["public_key", "private_key"] as $key) {
+  $path = DRUPAL_ROOT . "/" . $settings->get($key);
+  if (!is_file($path)) {
+    throw new \RuntimeException(sprintf("simple_oauth.settings %s points at %s, which does not exist.", $key, $path));
+  }
+}
+PHP);
+PASS('Consumer %s, the authoring scope and the key pair are all in place.', $client_id ?? 'dfdd3969-6fe2-4a6f-92bb-82b6f59013ed');
 
 echo PHP_EOL;
 echo '===============================' . PHP_EOL;

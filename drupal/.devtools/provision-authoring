@@ -110,28 +110,28 @@ TASK('Enabling and configuring simple_oauth.');
 drush('pm:enable consumers');
 drush('pm:enable simple_oauth');
 
+// The key paths are committed config and `.devtools/provision` makes the pair,
+// so an existing pair is kept here. Replacing it would log out every session
+// that holds a token signed with it.
 $keys_dir = getcwd() . '/keys';
-if (!is_dir($keys_dir) && !mkdir($keys_dir, 0755, TRUE) && !is_dir($keys_dir)) {
-  FAIL('Unable to create %s.', $keys_dir);
+if (!is_file($keys_dir . '/private.key') || !is_file($keys_dir . '/public.key')) {
+  if (!is_dir($keys_dir) && !mkdir($keys_dir, 0755, TRUE) && !is_dir($keys_dir)) {
+    FAIL('Unable to create %s.', $keys_dir);
+  }
+  // The generate-keys command writes to disk immediately, so it gets an
+  // absolute path rather than relying on this script's own cwd matching web/'s.
+  drush('simple-oauth:generate-keys %s', $keys_dir);
 }
-
-// Config values are relative to web/ (the docroot), matching the cwd
-// `.devtools/start` runs the webserver from - not this script's cwd.
-drush('config:set simple_oauth.settings public_key %s', '../keys/public.key');
-drush('config:set simple_oauth.settings private_key %s', '../keys/private.key');
-// The generate-keys command writes to disk immediately, so it gets an
-// absolute path rather than relying on this script's own cwd matching web/'s.
-drush('simple-oauth:generate-keys %s', $keys_dir);
-PASS('simple_oauth enabled; OAuth keys generated at %s.', $keys_dir);
+PASS('simple_oauth enabled; OAuth keys at %s.', $keys_dir);
 
 TASK('Creating the authoring OAuth Consumer.');
-// A stable client ID, not a fresh one per run. The consumer is a content
-// entity, so Tome exports it, and a random ID would mean a new committed file
-// every time anyone provisioned. It is also not a secret: it is a public
-// client (PKCE, no secret), the frontend sends it in every authorize request,
-// and a stable value means the frontend can hold it at build time instead of
-// being told at runtime.
-$client_id = resolve_env_value('OAUTH_CLIENT_ID', 'fbc6e835-b119-444d-9d67-3a5d0b120720')[0];
+// One client ID everywhere: the frontend's build-time default in
+// nuxt.config.js, the Consumer committed under drupal/content, and this. The
+// Consumer is a content entity, so Tome exports it, and a different ID here
+// would mean a second Consumer file on every provision. It is not a secret:
+// it is a public client (PKCE, no secret), and the frontend sends it in every
+// authorize request.
+$client_id = resolve_env_value('OAUTH_CLIENT_ID', 'dfdd3969-6fe2-4a6f-92bb-82b6f59013ed')[0];
 putenv('OAUTH_CLIENT_ID=' . $client_id);
 putenv('OAUTH_CALLBACK=' . $oauth_callback);
 drush('php-eval %s', <<<'PHP'
