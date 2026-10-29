@@ -341,7 +341,25 @@ export default {
      * only fields the author touched are staged. Sending the whole model would
      * overwrite anything changed elsewhere since.
      */
+    /**
+     * Resolve once the form has its model and its snapshot.
+     *
+     * Druxt's form fetches before it has anything to stage, and a click that
+     * lands first used to stage nothing and say so. Waiting a moment is what
+     * the author meant.
+     */
+    async ready(timeout = 3000) {
+      const started = Date.now()
+      while (Date.now() - started < timeout) {
+        const form = this.$refs.form
+        if (form && form.model && this.original) return true
+        await new Promise((resolve) => setTimeout(resolve, 50))
+      }
+      return false
+    },
+
     async stage() {
+      await this.ready()
       const form = this.$refs.form
       if (!form || !form.model || !this.original) {
         this.message = 'The form has not finished loading.'

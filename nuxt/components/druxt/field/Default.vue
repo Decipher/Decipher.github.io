@@ -168,6 +168,27 @@
       <p v-if="errorText" class="mt-1.5 text-sm text-accent" data-testid="field-error">
         {{ errorText }}
       </p>
+      <!--
+        What the backend said about this field when the last commit was
+        refused, and what it said when the last one was accepted. The first
+        is why the entry is still in the cart; the second did not block it.
+      -->
+      <p
+        v-for="(reason, i) in backendErrors"
+        :key="`refused-${i}`"
+        class="mt-1.5 text-sm text-accent"
+        data-testid="authoring-field-refused"
+      >
+        {{ reason }}
+      </p>
+      <p
+        v-for="(alert, i) in backendWarnings"
+        :key="`warning-${i}`"
+        class="mt-1.5 text-sm text-muted"
+        data-testid="authoring-field-warning"
+      >
+        {{ alert.level || 'warning' }}: {{ alert.message }}
+      </p>
     </div>
   </div>
 </template>
@@ -470,6 +491,24 @@ export default {
      * Drupal reports "field_x: The thing is wrong.", and repeating the field
      * name beneath the field's own label reads badly.
      */
+    /** The entity this field belongs to, when it is being edited in place. */
+    editedEntity() {
+      const form = this.authoringForm
+      return form && form.type && form.uuid ? { type: form.type, id: form.uuid } : null
+    },
+
+    backendErrors() {
+      if (!this.editedEntity) return []
+      const fields = this.$store.getters['druxtIce/fieldErrorsFor'](this.editedEntity.type, this.editedEntity.id)
+      return (fields || {})[(this.schema || {}).id] || []
+    },
+
+    backendWarnings() {
+      if (!this.editedEntity) return []
+      const alerts = this.$store.getters['druxtIce/warningsFor'](this.editedEntity.type, this.editedEntity.id)
+      return (alerts || []).filter((alert) => alert.field === (this.schema || {}).id)
+    },
+
     errorText() {
       return (this.errors || [])
         .map((error) =>

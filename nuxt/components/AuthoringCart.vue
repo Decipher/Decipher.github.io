@@ -339,6 +339,10 @@
     <p v-if="result" class="text-sm text-muted mt-3" data-testid="authoring-cart-result">
       {{ result }}
     </p>
+    <!-- Accepted, with something to say: alerts that did not block the save. -->
+    <ul v-if="warnings.length" class="mt-2 space-y-1 text-sm text-muted" data-testid="authoring-cart-warnings">
+      <li v-for="(line, i) in warnings" :key="i">{{ line }}</li>
+    </ul>
   </div>
 </template>
 
@@ -371,6 +375,16 @@ export default {
   },
 
   computed: {
+    /** One line per alert an accepted write came back with. */
+    warnings() {
+      return this.$store.getters['druxtIce/warnings'].flatMap(({ type, alerts }) =>
+        alerts.map(
+          (alert) =>
+            `${type.split('--')[1] || type} ${alert.field || ''}: ${alert.level || 'warning'}, ${alert.rule || ''}: ${alert.message || ''}`
+        )
+      )
+    },
+
     count() {
       return this.$store.getters['druxtIce/count']
     },
