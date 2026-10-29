@@ -1,3 +1,4 @@
+uuid: 8ec1a14f-a7b5-4545-82f7-bc14202e1886
 langcode: en
 status: true
 dependencies:
@@ -195,9 +196,9 @@ display:
           info: {  }
           override: true
           sticky: true
-          caption: 'Prose linting'
           summary: ''
           empty_table: false
+          caption: 'Prose linting'
       row:
         type: fields
       query:

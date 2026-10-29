@@ -59,6 +59,8 @@
             "value": true
         }
     ],
+    "preview_targets": [],
+    "preview_layouts": [],
     "decoupled_settings_overrides": [],
     "secret": [],
     "grant_types": [
