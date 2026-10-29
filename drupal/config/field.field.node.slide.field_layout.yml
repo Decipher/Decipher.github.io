@@ -1,0 +1,21 @@
+uuid: 6cb12532-3da5-4887-820d-d5e4034b92d6
+langcode: en
+status: true
+dependencies:
+  config:
+    - field.storage.node.field_layout
+    - node.type.slide
+  module:
+    - options
+id: node.slide.field_layout
+field_name: field_layout
+entity_type: node
+bundle: slide
+label: Layout
+description: 'How the deck reads the body.'
+required: true
+translatable: true
+default_value: {  }
+default_value_callback: ''
+settings: {  }
+field_type: list_string

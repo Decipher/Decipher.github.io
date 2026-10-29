@@ -1,0 +1,103 @@
+{
+    "uuid": [
+        {
+            "value": "f0c69267-47d2-456c-8180-fcff0c4e3483"
+        }
+    ],
+    "langcode": [
+        {
+            "value": "en"
+        }
+    ],
+    "type": [
+        {
+            "target_id": "slide",
+            "target_type": "node_type",
+            "target_uuid": "ef998fba-c0db-42b5-b8d8-148210b7c2bf"
+        }
+    ],
+    "revision_timestamp": [
+        {
+            "value": "2026-10-29T06:55:53+00:00"
+        }
+    ],
+    "revision_uid": [
+        {
+            "target_type": "user",
+            "target_uuid": "27a72419-c5b9-44d0-8b2d-6f9b0cca9354"
+        }
+    ],
+    "revision_log": [],
+    "status": [
+        {
+            "value": true
+        }
+    ],
+    "uid": [
+        {
+            "target_type": "user",
+            "target_uuid": "27a72419-c5b9-44d0-8b2d-6f9b0cca9354"
+        }
+    ],
+    "title": [
+        {
+            "value": "This site has no Drupal"
+        }
+    ],
+    "created": [
+        {
+            "value": "2026-10-29T06:55:53+00:00"
+        }
+    ],
+    "changed": [
+        {
+            "value": "2026-10-29T06:55:53+00:00"
+        }
+    ],
+    "promote": [
+        {
+            "value": false
+        }
+    ],
+    "sticky": [
+        {
+            "value": false
+        }
+    ],
+    "default_langcode": [
+        {
+            "value": true
+        }
+    ],
+    "revision_translation_affected": [
+        {
+            "value": true
+        }
+    ],
+    "path": [
+        {
+            "alias": null,
+            "pid": null,
+            "langcode": "en"
+        }
+    ],
+    "body": [
+        {
+            "value": "<p>This site has no Drupal.<\/p><p>Open the network tab: static files only. Everything you see was exported, built and published without a backend.<\/p>",
+            "format": "basic_html",
+            "processed": "<p>This site has no Drupal.<\/p><p>Open the network tab: static files only. Everything you see was exported, built and published without a backend.<\/p>",
+            "summary": null
+        }
+    ],
+    "field_layout": [
+        {
+            "value": "statement"
+        }
+    ],
+    "field_order": [
+        {
+            "value": 2
+        }
+    ],
+    "field_link": []
+}

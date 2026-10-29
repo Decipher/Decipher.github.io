@@ -1,0 +1,45 @@
+uuid: 3ad0cd08-a54f-4dfb-96b4-5fde86ffe3ad
+langcode: en
+status: true
+dependencies:
+  module:
+    - node
+    - options
+id: node.field_layout
+field_name: field_layout
+entity_type: node
+type: list_string
+settings:
+  allowed_values:
+    -
+      value: intro
+      label: Intro
+    -
+      value: statement
+      label: Statement
+    -
+      value: bullets
+      label: Bullets
+    -
+      value: code
+      label: Code
+    -
+      value: demo
+      label: Demo
+    -
+      value: vale
+      label: Vale
+    -
+      value: sponsor
+      label: Sponsor
+    -
+      value: close
+      label: Close
+  allowed_values_function: ''
+module: options
+locked: false
+cardinality: 1
+translatable: true
+indexes: {  }
+persist_with_no_fields: false
+custom_storage: false
