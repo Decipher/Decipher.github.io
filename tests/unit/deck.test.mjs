@@ -1,0 +1,153 @@
+// What the deck makes of a slide's body, and how a reader moves through it.
+//
+// A slide is a node: a title, a body, an order and a layout. Each layout reads
+// the body differently, and the reading is a decision worth testing without a
+// browser, so it is pure code here and the components only draw it.
+
+import assert from 'node:assert/strict'
+import test from 'node:test'
+
+import {
+  codeBlockWarnings,
+  demoStep,
+  keyAction,
+  linkHostAllowed,
+  orderSlides,
+  readBody,
+} from '../../nuxt/lib/deck.mjs'
+
+const slide = (order, layout, extra = {}) => ({
+  id: `uuid-${order}`,
+  type: 'node--slide',
+  attributes: { title: `Slide ${order}`, field_order: order, field_layout: layout, ...extra },
+})
+
+test('slides come out in their order, whatever order they arrived in', () => {
+  const sorted = orderSlides([slide(3, 'close'), slide(1, 'intro'), slide(2, 'statement')])
+  assert.deepEqual(
+    sorted.map((s) => s.attributes.field_order),
+    [1, 2, 3]
+  )
+})
+
+test('a demo slide knows which demo it is of how many', () => {
+  const deck = [
+    slide(1, 'intro'),
+    slide(2, 'demo'),
+    slide(3, 'code'),
+    slide(4, 'demo'),
+    slide(5, 'demo'),
+  ]
+  assert.deepEqual(demoStep(deck, 1), { step: 1, of: 3 })
+  assert.deepEqual(demoStep(deck, 4), { step: 3, of: 3 })
+  assert.equal(demoStep(deck, 0), null, 'not a demo slide')
+})
+
+test('an intro reads its first paragraph as the speaker line', () => {
+  const read = readBody('intro', '<p>Stuart Clark, Deciphered</p><p>The rest of it.</p>')
+  assert.equal(read.lead, 'Stuart Clark, Deciphered')
+  assert.deepEqual(read.rest, ['The rest of it.'])
+})
+
+test('a statement is one sentence and an optional subline', () => {
+  const read = readBody('statement', '<p>This site has no Drupal.</p><p>Open the network tab.</p>')
+  assert.equal(read.lead, 'This site has no Drupal.')
+  assert.deepEqual(read.rest, ['Open the network tab.'])
+  assert.deepEqual(readBody('statement', '<p>Only one.</p>').rest, [])
+})
+
+test('bullets are the first list, at most five of them', () => {
+  const items = ['a', 'b', 'c', 'd', 'e', 'f'].map((t) => `<li>${t}</li>`).join('')
+  const read = readBody('bullets', `<p>ignored</p><ul>${items}</ul><ul><li>second list</li></ul>`)
+  assert.deepEqual(read.items, ['a', 'b', 'c', 'd', 'e'])
+})
+
+test('a code slide takes the first code block and its language', () => {
+  const read = readBody(
+    'code',
+    '<pre><code class="language-json">{\n  "a": 1\n}</code></pre><pre><code>second</code></pre>'
+  )
+  assert.equal(read.code, '{\n  "a": 1\n}')
+  assert.equal(read.language, 'json')
+})
+
+test('a code block keeps its entities decoded and its inner markup stripped', () => {
+  const read = readBody(
+    'code',
+    '<pre><code class="language-html">&lt;p&gt;hi&lt;/p&gt; &amp; <span>x</span></code></pre>'
+  )
+  assert.equal(read.code, '<p>hi</p> & x')
+  assert.equal(read.language, 'html')
+})
+
+test('a demo reads the instruction and then the subline', () => {
+  const read = readBody(
+    'demo',
+    '<p>Sign in on the session URL.</p><p>PKCE.</p><p>Public client.</p>'
+  )
+  assert.equal(read.lead, 'Sign in on the session URL.')
+  assert.deepEqual(read.rest, ['PKCE.', 'Public client.'])
+})
+
+test('a vale slide keeps every paragraph as an example', () => {
+  const read = readBody('vale', '<p>One.</p><p>Two.</p>')
+  assert.deepEqual(read.examples, ['One.', 'Two.'])
+})
+
+test('inline markup inside a paragraph survives as text, not as tags', () => {
+  const read = readBody(
+    'statement',
+    '<p>This <strong>site</strong> has no <code>Drupal</code>.</p>'
+  )
+  assert.equal(read.lead, 'This site has no Drupal.')
+})
+
+test('an empty or missing body reads as nothing, not as an error', () => {
+  assert.deepEqual(readBody('bullets', '').items, [])
+  assert.equal(readBody('intro', undefined).lead, '')
+  assert.equal(readBody('code', '<p>no code</p>').code, '')
+})
+
+test('only the two hosts the talk points at may be encoded as a QR code', () => {
+  assert.equal(linkHostAllowed('https://stuar.tc'), true)
+  assert.equal(linkHostAllowed('https://stuar.tc/writing/'), true)
+  assert.equal(linkHostAllowed('https://github.com/sponsors/Decipher'), true)
+  assert.equal(linkHostAllowed('https://github.com/sponsors/Decipher?o=esb'), true)
+  assert.equal(linkHostAllowed('https://github.com/Decipher'), false, 'not the sponsors page')
+  assert.equal(linkHostAllowed('https://evil.example/stuar.tc'), false)
+  assert.equal(linkHostAllowed('https://something.trycloudflare.com'), false, 'never a session URL')
+  assert.equal(linkHostAllowed('not a url'), false)
+})
+
+test('a code block that will not fit gets a warning naming the slide', () => {
+  const long = Array.from({ length: 13 }, (_, i) => `line ${i}`).join('\n')
+  assert.match(codeBlockWarnings('Slide 6', long)[0], /Slide 6.*13 lines/)
+  const wide = 'x'.repeat(65)
+  assert.match(codeBlockWarnings('Slide 6', wide)[0], /Slide 6.*65 columns/)
+  assert.deepEqual(codeBlockWarnings('Slide 6', 'short'), [])
+})
+
+test('keys move the deck, and clickers send page keys', () => {
+  const press = (key, target = { tagName: 'BODY' }) => keyAction({ key, target })
+  for (const key of ['ArrowRight', 'ArrowDown', ' ', 'PageDown'])
+    assert.equal(press(key), 'next', key)
+  for (const key of ['ArrowLeft', 'ArrowUp', 'PageUp']) assert.equal(press(key), 'previous', key)
+  assert.equal(press('Home'), 'first')
+  assert.equal(press('End'), 'last')
+  assert.equal(press('f'), 'fullscreen')
+  assert.equal(press('t'), 'theme')
+  assert.equal(press('x'), null)
+})
+
+test('keys are ignored while focus is in something that takes typing', () => {
+  const press = (target) => keyAction({ key: 'ArrowRight', target })
+  assert.equal(press({ tagName: 'INPUT' }), null)
+  assert.equal(press({ tagName: 'TEXTAREA' }), null)
+  assert.equal(press({ tagName: 'DIV', isContentEditable: true }), null)
+  assert.equal(
+    press({ tagName: 'DIV', closest: (sel) => (sel.includes('.ck') ? {} : null) }),
+    null,
+    'inside CKEditor'
+  )
+  assert.equal(press({ tagName: 'DIV', closest: () => null }), 'next')
+})

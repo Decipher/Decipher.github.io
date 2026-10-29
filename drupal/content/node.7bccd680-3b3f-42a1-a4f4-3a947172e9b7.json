@@ -1,0 +1,103 @@
+{
+    "uuid": [
+        {
+            "value": "7bccd680-3b3f-42a1-a4f4-3a947172e9b7"
+        }
+    ],
+    "langcode": [
+        {
+            "value": "en"
+        }
+    ],
+    "type": [
+        {
+            "target_id": "slide",
+            "target_type": "node_type",
+            "target_uuid": "ef998fba-c0db-42b5-b8d8-148210b7c2bf"
+        }
+    ],
+    "revision_timestamp": [
+        {
+            "value": "2026-10-29T06:55:53+00:00"
+        }
+    ],
+    "revision_uid": [
+        {
+            "target_type": "user",
+            "target_uuid": "27a72419-c5b9-44d0-8b2d-6f9b0cca9354"
+        }
+    ],
+    "revision_log": [],
+    "status": [
+        {
+            "value": true
+        }
+    ],
+    "uid": [
+        {
+            "target_type": "user",
+            "target_uuid": "27a72419-c5b9-44d0-8b2d-6f9b0cca9354"
+        }
+    ],
+    "title": [
+        {
+            "value": "What a session gives you"
+        }
+    ],
+    "created": [
+        {
+            "value": "2026-10-29T06:55:53+00:00"
+        }
+    ],
+    "changed": [
+        {
+            "value": "2026-10-29T06:55:53+00:00"
+        }
+    ],
+    "promote": [
+        {
+            "value": false
+        }
+    ],
+    "sticky": [
+        {
+            "value": false
+        }
+    ],
+    "default_langcode": [
+        {
+            "value": true
+        }
+    ],
+    "revision_translation_affected": [
+        {
+            "value": true
+        }
+    ],
+    "path": [
+        {
+            "alias": null,
+            "pid": null,
+            "langcode": "en"
+        }
+    ],
+    "body": [
+        {
+            "value": "<ul><li>A throwaway Drupal on a GitHub Actions runner<\/li><li>A Cloudflare quick tunnel in front of it<\/li><li>A published record the deck reads to find it<\/li><li>About an hour, then it is gone<\/li><\/ul>",
+            "format": "basic_html",
+            "processed": "<ul><li>A throwaway Drupal on a GitHub Actions runner<\/li><li>A Cloudflare quick tunnel in front of it<\/li><li>A published record the deck reads to find it<\/li><li>About an hour, then it is gone<\/li><\/ul>",
+            "summary": null
+        }
+    ],
+    "field_layout": [
+        {
+            "value": "bullets"
+        }
+    ],
+    "field_order": [
+        {
+            "value": 3
+        }
+    ],
+    "field_link": []
+}

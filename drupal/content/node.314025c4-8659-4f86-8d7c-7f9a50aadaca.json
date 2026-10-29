@@ -1,0 +1,103 @@
+{
+    "uuid": [
+        {
+            "value": "314025c4-8659-4f86-8d7c-7f9a50aadaca"
+        }
+    ],
+    "langcode": [
+        {
+            "value": "en"
+        }
+    ],
+    "type": [
+        {
+            "target_id": "slide",
+            "target_type": "node_type",
+            "target_uuid": "ef998fba-c0db-42b5-b8d8-148210b7c2bf"
+        }
+    ],
+    "revision_timestamp": [
+        {
+            "value": "2026-10-29T06:55:53+00:00"
+        }
+    ],
+    "revision_uid": [
+        {
+            "target_type": "user",
+            "target_uuid": "27a72419-c5b9-44d0-8b2d-6f9b0cca9354"
+        }
+    ],
+    "revision_log": [],
+    "status": [
+        {
+            "value": true
+        }
+    ],
+    "uid": [
+        {
+            "target_type": "user",
+            "target_uuid": "27a72419-c5b9-44d0-8b2d-6f9b0cca9354"
+        }
+    ],
+    "title": [
+        {
+            "value": "One PATCH, one check"
+        }
+    ],
+    "created": [
+        {
+            "value": "2026-10-29T06:55:53+00:00"
+        }
+    ],
+    "changed": [
+        {
+            "value": "2026-10-29T06:55:53+00:00"
+        }
+    ],
+    "promote": [
+        {
+            "value": false
+        }
+    ],
+    "sticky": [
+        {
+            "value": false
+        }
+    ],
+    "default_langcode": [
+        {
+            "value": true
+        }
+    ],
+    "revision_translation_affected": [
+        {
+            "value": true
+        }
+    ],
+    "path": [
+        {
+            "alias": null,
+            "pid": null,
+            "langcode": "en"
+        }
+    ],
+    "body": [
+        {
+            "value": "<pre><code class=\"language-json\">PATCH \/jsonapi\/node\/slide\/{uuid}\n{\n  \"data\": {\n    \"type\": \"node--slide\",\n    \"id\": \"{uuid}\",\n    \"attributes\": { \"body\": { \"value\": \"...\" } }\n  }\n}\n\n422 Unprocessable Content\n{ \"errors\": [ { \"source\": { \"pointer\": \"\/data\/attributes\/body\" } } ] }<\/code><\/pre>",
+            "format": "basic_html",
+            "processed": "<code>PATCH \/jsonapi\/node\/slide\/{uuid}\n{\n  \"data\": {\n    \"type\": \"node--slide\",\n    \"id\": \"{uuid}\",\n    \"attributes\": { \"body\": { \"value\": \"...\" } }\n  }\n}\n\n422 Unprocessable Content\n{ \"errors\": [ { \"source\": { \"pointer\": \"\/data\/attributes\/body\" } } ] }<\/code>",
+            "summary": null
+        }
+    ],
+    "field_layout": [
+        {
+            "value": "code"
+        }
+    ],
+    "field_order": [
+        {
+            "value": 6
+        }
+    ],
+    "field_link": []
+}

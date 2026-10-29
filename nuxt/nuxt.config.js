@@ -215,6 +215,30 @@ const declaredRegions = async function (baseUrl) {
   }
 }
 
+/**
+ * One route per published slide, in deck order.
+ *
+ * Asked of the build backend the same way the regions are, and for the same
+ * reason: the deck is static, so the build has to know how many slides there
+ * are. A backend that does not answer builds a site with no deck rather than
+ * no site.
+ */
+const slideRoutes = async function (baseUrl) {
+  const axios = require('axios')
+  const endpoint = `${String(baseUrl).replace(/\/+$/, '')}/jsonapi/node/slide`
+  try {
+    const { data: body } = await axios.get(endpoint, {
+      params: { 'filter[status]': 1, 'fields[node--slide]': 'field_order', 'page[limit]': 50 },
+      headers: { Accept: 'application/vnd.api+json' },
+      timeout: 15000,
+    })
+    const count = (body.data || []).length
+    return Array.from({ length: count }, (_, i) => `/slides/${i + 1}`)
+  } catch {
+    return []
+  }
+}
+
 const localhostListenURL = function () {
   this.nuxt.hook('listen', (server, listener) => {
     listener.host = 'localhost'
@@ -237,9 +261,26 @@ export default async () => ({
     base: process.env.ROUTER_BASE || '/',
   },
 
-  // Ensure the root route is generated and crawled.
+  // Ensure the root route is generated and crawled, and generate every slide:
+  // the deck's routes are not linked from the site, so the crawler never
+  // reaches them on its own.
   generate: {
-    routes: ['/']
+    routes: async () => ['/', ...(await slideRoutes(baseUrl))],
+  },
+
+  // A route that throws while generating is a page the site would ship broken,
+  // or not at all. Nuxt 2 logs it and still exits 0, so a deploy could carry a
+  // missing slide or a QR code that points somewhere it must not. Fail the
+  // build instead. A handled error, such as a 404 the page asked for, is not
+  // one of these.
+  hooks: {
+    'generate:done': (generator, errors) => {
+      const unhandled = (errors || []).filter((e) => e.type === 'unhandled')
+      if (unhandled.length) {
+        const routes = unhandled.map((e) => e.route).join(', ')
+        throw new Error(`${unhandled.length} route(s) failed to generate: ${routes}`)
+      }
+    },
   },
 
   // Nuxt 2 defaults to binding 'localhost' (loopback only), which is not
@@ -285,6 +326,9 @@ export default async () => ({
     '@fontsource/archivo/600.css',
     '@fontsource/jetbrains-mono/400.css',
     '~/assets/css/main.css',
+    // The deck's own tokens and frame. Global because Nuxt 2 CSS is, and
+    // harmless elsewhere: everything in it is scoped under `.deck`.
+    '~/assets/css/deck.css',
   ],
 
   // Plugins to run before rendering page: https://go.nuxtjs.dev/config-plugins

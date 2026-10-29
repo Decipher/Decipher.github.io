@@ -1,0 +1,11 @@
+uuid: ef998fba-c0db-42b5-b8d8-148210b7c2bf
+langcode: en
+status: true
+dependencies: {  }
+name: Slide
+type: slide
+description: 'One slide of the talk. The deck orders them and reads each body by its layout.'
+help: null
+new_revision: true
+preview_mode: 1
+display_submitted: false

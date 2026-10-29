@@ -1,0 +1,376 @@
+/*
+ * The deck: one slide at a time, laid out at 1280 by 720 and scaled as a whole.
+ *
+ * Every size inside a slide is in `--u`, one 1280th of the frame's width, so
+ * the same slide fits a projector, the session frame and the preview frame
+ * without a breakpoint anywhere. The frame is a CSS container; `cqw` is what
+ * makes the unit follow the frame rather than the viewport.
+ *
+ * The colours are the talk's own tokens from the design canvas, not the site's
+ * Tailwind ramp: a deck on a projector wants more contrast than a page does.
+ */
+.deck {
+  --bg: #faf9f7;
+  --ink: #18181a;
+  --body: #403e3a;
+  --quiet: #57554f;
+  --line: #d4d2cb;
+  --acc: #c21a74;
+  --ok: #1a7f4b;
+  --warn: #b5430a;
+  --warnbg: #fff4eb;
+  --code-bg: #0f0f10;
+  --code-line: #232220;
+  --code-caption: #a8a59c;
+  --code-text: #e7e6e1;
+  --code-key: #8eb5ff;
+  --code-string: #e6b84a;
+  --code-number: #f4a3cd;
+  background: var(--bg);
+  color: var(--body);
+  color-scheme: light;
+}
+
+.deck[data-theme='dark'] {
+  --bg: #0f0f10;
+  --ink: #faf9f7;
+  --body: #e7e6e1;
+  --quiet: #a8a59c;
+  --line: #403e3a;
+  --acc: #e8479b;
+  --ok: #4cc38a;
+  --warn: #fb923c;
+  --warnbg: #2a1608;
+  color-scheme: dark;
+}
+
+/* The whole viewport, with the frame letterboxed in the middle of it. */
+.deck-stage {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  min-height: 100vh;
+  background: var(--bg);
+}
+
+.deck-frame {
+  container-type: inline-size;
+  width: min(100vw, calc(100vh * 16 / 9));
+  aspect-ratio: 16 / 9;
+}
+
+/* Inside a smaller box, such as a preview frame, the frame is the box. */
+.deck-frame--fit {
+  width: 100%;
+}
+
+.deck-slide {
+  --u: calc(100cqw / 1280);
+  position: relative;
+  display: grid;
+  width: 100cqw;
+  height: calc(100cqw * 9 / 16);
+  /* The clear zones: a top band for the editing bar, a left gutter for Vale
+     markers, a footer for save status. Content sits in the middle cell. */
+  grid-template-rows: calc(var(--u) * 56) 1fr calc(var(--u) * 60);
+  grid-template-columns: calc(var(--u) * 72) 1fr;
+  font-family: Archivo, system-ui, sans-serif;
+  font-size: calc(var(--u) * 28);
+  line-height: 1.4;
+  color: var(--body);
+  /* Nothing in a slide clips: Vale underlines and tooltips hang outside. */
+  overflow: visible;
+}
+
+.deck-top {
+  grid-row: 1;
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: calc(var(--u) * 12);
+  padding: 0 calc(var(--u) * 40);
+}
+
+.deck-gutter {
+  grid-row: 2;
+  grid-column: 1;
+}
+
+.deck-body {
+  grid-row: 2;
+  grid-column: 2;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: calc(var(--u) * 24);
+  padding: 0 calc(var(--u) * 80) 0 0;
+  min-width: 0;
+}
+
+/* A demo slide keeps a stage on the right for the preview to dock in. */
+.deck-slide--demo .deck-body {
+  display: grid;
+  grid-template-columns: 1fr calc(var(--u) * 480);
+  column-gap: calc(var(--u) * 48);
+  align-items: center;
+}
+
+.deck-right {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  border-left: 1px solid var(--line);
+}
+
+.deck-foot {
+  grid-row: 3;
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: calc(var(--u) * 24);
+  padding: 0 calc(var(--u) * 40) 0 calc(var(--u) * 72);
+  border-top: 1px solid var(--line);
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: calc(var(--u) * 16);
+  color: var(--quiet);
+}
+
+/* Type. */
+.deck-eyebrow {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: calc(var(--u) * 18);
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--acc);
+}
+
+.deck-title {
+  font-size: calc(var(--u) * 64);
+  font-weight: 600;
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+  text-wrap: balance;
+}
+
+.deck-title--huge {
+  font-size: calc(var(--u) * 88);
+}
+
+.deck-lead {
+  font-size: calc(var(--u) * 40);
+  line-height: 1.2;
+  color: var(--ink);
+  text-wrap: balance;
+}
+
+.deck-statement {
+  font-size: calc(var(--u) * 60);
+  font-weight: 600;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+  text-wrap: balance;
+}
+
+.deck-sub {
+  font-size: calc(var(--u) * 28);
+  color: var(--quiet);
+}
+
+.deck-speaker {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: calc(var(--u) * 22);
+  color: var(--quiet);
+}
+
+.deck-bullets {
+  display: grid;
+  gap: calc(var(--u) * 18);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: calc(var(--u) * 36);
+  line-height: 1.25;
+  color: var(--ink);
+}
+
+.deck-bullets li {
+  position: relative;
+  padding-left: calc(var(--u) * 44);
+}
+
+.deck-bullets li::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: calc(var(--u) * 16);
+  width: calc(var(--u) * 20);
+  height: calc(var(--u) * 4);
+  background: var(--acc);
+}
+
+/* Code is dark in both themes. */
+.deck-code {
+  border-radius: calc(var(--u) * 8);
+  background: var(--code-bg);
+  color: var(--code-text);
+  overflow: visible;
+}
+
+.deck-code__caption {
+  padding: calc(var(--u) * 10) calc(var(--u) * 24);
+  border-bottom: 1px solid var(--code-line);
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: calc(var(--u) * 18);
+  font-weight: 500;
+  color: var(--code-caption);
+}
+
+.deck-code pre {
+  margin: 0;
+  padding: calc(var(--u) * 24);
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: calc(var(--u) * 28);
+  line-height: 1.5;
+  white-space: pre;
+  overflow: visible;
+}
+
+/* A QR code: dark modules on a white tile, in both themes, with its caption. */
+.deck-qr {
+  display: grid;
+  justify-items: center;
+  gap: calc(var(--u) * 16);
+}
+
+.deck-qr__tile {
+  width: calc(var(--u) * 420);
+  height: calc(var(--u) * 420);
+  background: #fff;
+  border-radius: calc(var(--u) * 12);
+}
+
+.deck-qr__tile svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.deck-qr__caption {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: calc(var(--u) * 22);
+  color: var(--ink);
+}
+
+/* The step numeral that fills a demo's stage when nothing is docked there. */
+.deck-numeral {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: calc(var(--u) * 320);
+  line-height: 1;
+  font-weight: 400;
+  color: var(--line);
+}
+
+/* The Vale slide: examples with their alerts, then a box to try a sentence. */
+.deck-vale {
+  display: grid;
+  gap: calc(var(--u) * 16);
+}
+
+.deck-vale__example {
+  display: grid;
+  gap: calc(var(--u) * 4);
+  padding-left: calc(var(--u) * 20);
+  border-left: calc(var(--u) * 4) solid var(--line);
+  font-size: calc(var(--u) * 26);
+  color: var(--ink);
+}
+
+.deck-vale__example--error {
+  border-left-color: var(--warn);
+}
+
+.deck-vale__example--clean {
+  border-left-color: var(--ok);
+}
+
+.deck-vale__alert {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: calc(var(--u) * 16);
+  color: var(--warn);
+}
+
+.deck-vale__alert--clean {
+  color: var(--ok);
+}
+
+.deck-vale textarea {
+  width: 100%;
+  min-height: calc(var(--u) * 110);
+  padding: calc(var(--u) * 12) calc(var(--u) * 16);
+  border: 1px solid var(--line);
+  border-radius: calc(var(--u) * 8);
+  background: transparent;
+  font: inherit;
+  font-size: calc(var(--u) * 24);
+  color: var(--ink);
+  resize: vertical;
+}
+
+.deck-vale__row {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--u) * 16);
+}
+
+.deck-button {
+  padding: calc(var(--u) * 8) calc(var(--u) * 20);
+  border: 1px solid var(--acc);
+  border-radius: calc(var(--u) * 6);
+  background: var(--acc);
+  color: #fff;
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: calc(var(--u) * 18);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.deck-button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.deck-status {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: calc(var(--u) * 16);
+  color: var(--quiet);
+}
+
+/* Between slides: a short fade, and none at all for people who asked for none. */
+.deck-fade-enter-active,
+.deck-fade-leave-active {
+  transition: opacity 220ms ease;
+}
+
+.deck-fade-enter,
+.deck-fade-leave-to {
+  opacity: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .deck-fade-enter-active,
+  .deck-fade-leave-active {
+    transition: none;
+  }
+}
+
+/* The editing wrapper the site puts around every entity has no business
+   adding a bar inside a slide's frame, so its controls go to the top band. */
+.deck .authoring-entity {
+  height: 100%;
+}
