@@ -35,5 +35,9 @@
   },
   "engines": {
     "node": ">=16.20.1"
+  },
+  "jest-junit": {
+    "outputDirectory": "reports/junit",
+    "outputName": "junit.xml"
   }
 }
