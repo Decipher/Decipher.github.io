@@ -1,4 +1,4 @@
-formats: {}
+formats: {  }
 default_extension: html
 timeout: 10
 publish_only: false
