@@ -8,7 +8,7 @@
     <!-- The top band: clear, except for the authoring controls when a backend is about. -->
     <div class="deck-top">
       <client-only>
-        <template v-if="backend">
+        <template v-if="backend && !preview">
           <AuthoringLoginTrigger />
           <AuthoringEditToggle />
           <AuthoringCartToggle />
@@ -110,6 +110,8 @@ export default {
     deck: { type: Array, default: () => [] },
     qr: { type: String, default: '' },
     theme: { type: String, default: 'light' },
+    /** Inside a node preview: the slide as it would read, with no editing controls. */
+    preview: { type: Boolean, default: false },
   },
   computed: {
     merged() {
