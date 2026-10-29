@@ -38,6 +38,11 @@ require_once __DIR__ . '/helpers.php';
 // backend at a different frontend is a one-variable change.
 $site_origin = rtrim(resolve_env_value('SITE_ORIGIN', 'https://decipher.github.io')[0], '/');
 $oauth_callback = resolve_env_value('OAUTH_CALLBACK', $site_origin . '/callback')[0];
+// A session serves the frontend itself, on a tunnel hostname assigned just
+// before this runs. That origin signs in too, and it is where a node preview
+// renders, so it gets a redirect URI and the preview target. Empty outside a
+// session, and then the deployed site's origin is both.
+$session_origin = rtrim(resolve_env_value('SESSION_ORIGIN', '')[0], '/');
 
 // -----------------------------------------------------------------------------
 
@@ -70,6 +75,9 @@ if ($dirty !== '') {
 
 NOTE('Frontend origin: %s', $site_origin);
 NOTE('OAuth callback:  %s', $oauth_callback);
+if ($session_origin) {
+  NOTE('Session origin:  %s', $session_origin);
+}
 echo PHP_EOL;
 
 // -----------------------------------------------------------------------------
@@ -98,7 +106,7 @@ write_host_settings();
 PASS('Trusted host and reverse proxy settings written.');
 
 TASK('Pointing consumer_node_preview at the frontend.');
-write_preview_settings($site_origin);
+write_preview_settings($session_origin ?: $site_origin);
 PASS('Preview target written.');
 
 // -----------------------------------------------------------------------------
@@ -138,6 +146,7 @@ TASK('Creating the authoring OAuth Consumer.');
 $client_id = resolve_env_value('OAUTH_CLIENT_ID', 'dfdd3969-6fe2-4a6f-92bb-82b6f59013ed')[0];
 putenv('OAUTH_CLIENT_ID=' . $client_id);
 putenv('OAUTH_CALLBACK=' . $oauth_callback);
+putenv('SESSION_CALLBACK=' . ($session_origin ? $session_origin . '/callback' : ''));
 drush('php-eval %s', <<<'PHP'
 // Simple OAuth 6 rejects an authorize request when it cannot resolve a
 // scope, and its default provider is "Dynamic (entity)" with no scopes
@@ -193,7 +202,7 @@ $values = ([
   // 3000 lands on the next free HOST port when 3000 is taken - league then
   // rejects the unregistered redirect_uri as, confusingly, invalid_client.
   "redirect"     => array_values(array_unique(array_merge(
-    [$callback],
+    array_filter([$callback, getenv("SESSION_CALLBACK") ?: NULL]),
     array_map(fn ($port) => "http://localhost:{$port}/callback", range(3000, 3009)),
   ))),
 ]);

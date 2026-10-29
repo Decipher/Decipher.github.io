@@ -251,7 +251,11 @@ const localhostListenURL = function () {
 // loaded. Nuxt 2 accepts a function returning a promise here.
 export default async () => ({
   // Target full static build.
-  target: 'static',
+  // Static for the deployed site. A session builds a server target instead,
+  // because the proxy that puts Drupal under the frontend's origin is server
+  // middleware, and neither the generated files nor `nuxt start` on them run
+  // it. See scripts/session.sh.
+  target: process.env.NUXT_TARGET === 'server' ? 'server' : 'static',
 
   // Serving path. A `<user>.github.io` user site serves from the domain root
   // and needs nothing here, which is why the PoC targets one. A project site at
@@ -480,6 +484,12 @@ export default async () => ({
     // nor `nuxt start` on them run server middleware.
     admin: {
       mode: process.env.DRUXT_ADMIN_MODE || 'link',
+      // In proxy mode this frontend is the backend's origin as well. The data,
+      // sign-in and prose-check routes go to Drupal through the same proxy as
+      // the administration, so sign-in, inline editing and a node preview share
+      // one site and one session cookie. /node/preview is this site's own page
+      // and stays out of the list.
+      backendPaths: [...require('@druxt-contrib/admin').BACKEND_PATHS, '/jsonapi', '/router', '/oauth', '/vale'],
     },
 
     // Copy the editor builds into this site and load them from here. Needed

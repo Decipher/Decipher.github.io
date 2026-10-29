@@ -63,6 +63,14 @@ if [ "${1:-}" = "--stop" ]; then
   exit 0
 fi
 
+# `--no-wait` reports the hostname as soon as it is assigned, without waiting
+# for the origin to answer. A session opens its tunnel before the frontend it
+# will serve exists, because provisioning needs the hostname first.
+NO_WAIT=0
+if [ "${1:-}" = "--no-wait" ]; then
+  NO_WAIT=1
+fi
+
 # Resolve cloudflared: prefer PATH, then mise. mise installs it without
 # necessarily activating a shim on PATH, so `command -v` alone misses a
 # perfectly usable binary.
@@ -83,6 +91,10 @@ mkdir -p "$LOG_DIR"
 
 WEBSERVER_PORT="${WEBSERVER_PORT:-$(grep -m1 '^WEBSERVER_PORT=' "$ENV_FILE" 2>/dev/null | cut -d= -f2- || true)}"
 WEBSERVER_PORT="${WEBSERVER_PORT:-8888}"
+# The port to expose: the backend's by default, or TUNNEL_PORT, which a session
+# sets to the frontend's so that one hostname serves the site with Drupal
+# proxied under it.
+TUNNEL_PORT="${TUNNEL_PORT:-$WEBSERVER_PORT}"
 
 # Health-check an existing tunnel before reusing it. A live cloudflared process
 # does not mean a live tunnel: quick tunnels can be dropped at the edge while
@@ -100,9 +112,9 @@ if [ -f "$PID_FILE" ] && kill -0 "$(cat "$PID_FILE")" 2>/dev/null; then
   sleep 1
 fi
 
-echo "[tunnel] Starting for http://localhost:${WEBSERVER_PORT} ..."
+echo "[tunnel] Starting for http://localhost:${TUNNEL_PORT} ..."
 : > "$LOG_FILE"
-nohup "$CLOUDFLARED" tunnel --url "http://localhost:${WEBSERVER_PORT}" --no-autoupdate \
+nohup "$CLOUDFLARED" tunnel --url "http://localhost:${TUNNEL_PORT}" --no-autoupdate \
   >"$LOG_FILE" 2>&1 &
 echo $! > "$PID_FILE"
 
@@ -123,6 +135,11 @@ fi
 # Cloudflare hands back the hostname before the edge is necessarily routing to
 # it, so wait for the URL to actually answer rather than reporting success on a
 # name alone.
+if [ "$NO_WAIT" = 1 ]; then
+  env_write TUNNEL_URL "$URL"
+  echo "[tunnel] Assigned: ${URL} (not waiting for the origin)."
+  exit 0
+fi
 for _ in $(seq 1 30); do
   if curl -sf -o /dev/null -m 5 "$URL"; then
     env_write TUNNEL_URL "$URL"
