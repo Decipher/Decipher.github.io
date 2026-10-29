@@ -7,6 +7,14 @@ dependencies:
     - node.type.slide
   module:
     - text
+    - vale
+third_party_settings:
+  vale:
+    enabled: true
+    min_level: suggestion
+    disabled_rules: {  }
+    level_overrides: {  }
+    profile: ''
 id: node.slide.body
 field_name: body
 entity_type: node

@@ -1,0 +1,8 @@
+# An em dash is refused. This is the error-level rule: a save that trips it
+# gets a 422 from JSON:API, and the check endpoint reports it as an error.
+extends: existence
+message: "Use a comma, a full stop or a colon instead of an em dash."
+level: error
+nonword: true
+tokens:
+  - '—'

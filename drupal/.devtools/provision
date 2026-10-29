@@ -103,6 +103,17 @@ file_put_contents(
 );
 PASS('Forwarded scheme and host will be honoured.');
 
+// Where the vale module finds its binary and rules: the pinned install from
+// .devtools/assemble, and the committed .vale.ini beside the web root.
+TASK('Pointing the vale module at its binary and rules.');
+file_put_contents(
+  'web/sites/default/settings.local.php',
+  "\n\$settings['vale_binary'] = \$app_root . '/../bin/vale';\n"
+    . "\$settings['vale_config'] = \$app_root . '/../.vale.ini';\n",
+  FILE_APPEND
+);
+PASS('Vale settings written.');
+
 // The authoring provisioner writes its CORS settings to their own file and
 // registers it here. This script rewrites this file from scratch, so a plain
 // re-provision drops that registration and takes cross-origin authoring with

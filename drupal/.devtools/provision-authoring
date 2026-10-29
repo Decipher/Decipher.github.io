@@ -97,6 +97,10 @@ TASK('Trusting tunnel hostnames and the local webserver.');
 write_host_settings();
 PASS('Trusted host and reverse proxy settings written.');
 
+TASK('Pointing consumer_node_preview at the frontend.');
+write_preview_settings($site_origin);
+PASS('Preview target written.');
+
 // -----------------------------------------------------------------------------
 // 4. OAuth: keys, a scope, and a consumer.
 // -----------------------------------------------------------------------------
@@ -276,6 +280,39 @@ echo '> Next steps:' . PHP_EOL;
 echo '  .devtools/start           # Start the webserver' . PHP_EOL;
 echo '  .devtools/tunnel          # Expose it, and trust the hostname' . PHP_EOL;
 echo PHP_EOL;
+
+/**
+ * Tell consumer_node_preview where the frontend renders a preview.
+ *
+ * A settings target rather than one on the consumer entity, because the origin
+ * is the session's and changes every time. The frontend's /node/preview page
+ * reads the JSON:API preview document from the path in the fragment, through
+ * the proxy on its own origin, so the editor's session cookie goes with it.
+ */
+function write_preview_settings(string $origin): void {
+  $settings_local = 'web/sites/default/settings.local.php';
+  $contents = file_exists($settings_local) ? (string) file_get_contents($settings_local) : "<?php\n";
+  if (str_contains($contents, 'consumer_node_preview')) {
+    return;
+  }
+  $url = var_export($origin . '/node/preview?vm=[view_mode]&layout=[layout]#[jsonapi_node_preview_path]', TRUE);
+  $contents .= <<<PHP
+
+// Authoring: where a node's Preview button sends the editor.
+\$settings['consumer_node_preview'] = [
+  'targets' => [
+    'frontend' => [
+      'label' => 'Frontend',
+      'url' => {$url},
+      'layouts' => ['default'],
+    ],
+  ],
+  'default' => 'settings:frontend',
+];
+
+PHP;
+  file_put_contents($settings_local, $contents);
+}
 
 /**
  * Trust the hostnames a session can be served on.
