@@ -84,7 +84,7 @@
       <!-- sponsor: the QR code to GitHub Sponsors, with a line about it. -->
       <template v-else-if="layout === 'sponsor'">
         <div class="deck-sponsor">
-          <p class="deck-eyebrow">Sponsor the work</p>
+          <p class="deck-eyebrow">Thank you</p>
           <h2 class="deck-title deck-title--demo">{{ title }}</h2>
           <p class="deck-sub">{{ read.lead }}</p>
         </div>
