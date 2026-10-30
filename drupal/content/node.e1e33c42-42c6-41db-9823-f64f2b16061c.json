@@ -51,7 +51,7 @@
     ],
     "changed": [
         {
-            "value": "2026-10-29T06:55:53+00:00"
+            "value": "2026-10-30T00:07:02+00:00"
         }
     ],
     "promote": [
@@ -83,9 +83,9 @@
     ],
     "body": [
         {
-            "value": "<p>Stuart Clark, Deciphered<\/p><p>A static Druxt site on GitHub Pages, a Drupal that exists only while someone is writing, and four pieces of work that have never run together before tonight.<\/p>",
+            "value": "<p>Stuart Clark<\/p><p>Deciphered<\/p>",
             "format": "basic_html",
-            "processed": "<p>Stuart Clark, Deciphered<\/p><p>A static Druxt site on GitHub Pages, a Drupal that exists only while someone is writing, and four pieces of work that have never run together before tonight.<\/p>",
+            "processed": "<p>Stuart Clark<\/p><p>Deciphered<\/p>",
             "summary": null
         }
     ],

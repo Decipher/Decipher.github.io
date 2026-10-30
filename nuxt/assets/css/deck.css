@@ -6,8 +6,10 @@
  * without a breakpoint anywhere. The frame is a CSS container; `cqw` is what
  * makes the unit follow the frame rather than the viewport.
  *
- * The colours are the talk's own tokens from the design canvas, not the site's
- * Tailwind ramp: a deck on a projector wants more contrast than a page does.
+ * The sizes are the design canvas's boards, drawn at 1280 wide, so a value
+ * here is the board's pixel value times `--u`. The colours are the talk's own
+ * tokens, not the site's Tailwind ramp: a deck on a projector wants more
+ * contrast than a page does.
  */
 .deck {
   --bg: #faf9f7;
@@ -19,6 +21,7 @@
   --ok: #1a7f4b;
   --warn: #b5430a;
   --warnbg: #fff4eb;
+  --badge-ink: #fff;
   --code-bg: #0f0f10;
   --code-line: #232220;
   --code-caption: #a8a59c;
@@ -26,6 +29,7 @@
   --code-key: #8eb5ff;
   --code-string: #e6b84a;
   --code-number: #f4a3cd;
+  --mono: 'JetBrains Mono', ui-monospace, monospace;
   background: var(--bg);
   color: var(--body);
   color-scheme: light;
@@ -41,6 +45,7 @@
   --ok: #4cc38a;
   --warn: #fb923c;
   --warnbg: #2a1608;
+  --badge-ink: #0f0f10;
   color-scheme: dark;
 }
 
@@ -78,18 +83,59 @@
   font-size: calc(var(--u) * 28);
   line-height: 1.4;
   color: var(--body);
-  /* Nothing in a slide clips: Vale underlines and tooltips hang outside. */
+  /* Nothing in a slide clips: Vale underlines and badges hang outside. */
   overflow: visible;
 }
 
+/* The top band: the session line on the left, the edit bar on the right. */
 .deck-top {
   grid-row: 1;
   grid-column: 1 / -1;
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  gap: calc(var(--u) * 8);
+  padding: 0 calc(var(--u) * 72);
+  font-family: var(--mono);
+  font-size: calc(var(--u) * 16);
+  color: var(--quiet);
+}
+
+.deck-top__session {
+  display: flex;
+  align-items: center;
   gap: calc(var(--u) * 12);
-  padding: 0 calc(var(--u) * 40);
+  margin-right: auto;
+}
+
+.deck-top__session strong {
+  font-weight: 600;
+  color: var(--acc);
+}
+
+/* The authoring controls, drawn as the board's buttons rather than the site's
+   menu links: sentence case mono, a line border, the accent on the live one. */
+.deck .deck-top button {
+  margin: 0;
+  height: calc(var(--u) * 36);
+  padding: 0 calc(var(--u) * 14);
+  border: calc(var(--u) * 2) solid var(--line);
+  border-radius: calc(var(--u) * 6);
+  background: var(--bg);
+  font-family: var(--mono);
+  font-size: calc(var(--u) * 16);
+  font-weight: 600;
+  letter-spacing: 0;
+  line-height: 1;
+  text-transform: none;
+  text-decoration: none;
+  color: var(--ink);
+}
+
+.deck .deck-top button[aria-pressed='true'],
+.deck .deck-top button[aria-expanded='true'] {
+  border-color: var(--acc);
+  background: var(--acc);
+  color: #fff;
 }
 
 .deck-gutter {
@@ -103,99 +149,263 @@
   display: flex;
   flex-direction: column;
   justify-content: center;
-  gap: calc(var(--u) * 24);
-  padding: 0 calc(var(--u) * 80) 0 0;
+  gap: calc(var(--u) * 40);
+  padding: 0 calc(var(--u) * 72) 0 0;
+  min-width: 0;
+}
+
+/* Intro and sponsor: the words on the left, the QR tile on the right. */
+.deck-slide--intro .deck-body,
+.deck-slide--sponsor .deck-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) calc(var(--u) * 400);
+  column-gap: calc(var(--u) * 64);
+  align-items: center;
+}
+
+.deck-slide--sponsor .deck-body {
+  grid-template-columns: minmax(0, 1fr) calc(var(--u) * 440);
+}
+
+.deck-intro,
+.deck-sponsor,
+.deck-demo {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--u) * 28);
   min-width: 0;
 }
 
 /* A demo slide keeps a stage on the right for the preview to dock in. */
 .deck-slide--demo .deck-body {
   display: grid;
-  grid-template-columns: 1fr calc(var(--u) * 480);
-  column-gap: calc(var(--u) * 48);
-  align-items: center;
+  grid-template-columns: minmax(0, 1fr) calc(var(--u) * 480);
+  column-gap: calc(var(--u) * 56);
+  align-items: stretch;
+  padding-top: calc(var(--u) * 8);
+  padding-bottom: calc(var(--u) * 40);
+}
+
+.deck-slide--demo .deck-demo {
+  justify-content: center;
 }
 
 .deck-right {
   display: grid;
   place-items: center;
   height: 100%;
-  border-left: 1px solid var(--line);
+  border: calc(var(--u) * 2) dashed var(--line);
+  border-radius: calc(var(--u) * 8);
 }
 
+/* Statement: the bar, the sentence, the line under it. */
+.deck-slide--statement .deck-body {
+  gap: calc(var(--u) * 36);
+  max-width: calc(var(--u) * 1040);
+}
+
+.deck-bar {
+  width: calc(var(--u) * 96);
+  height: calc(var(--u) * 8);
+  border-radius: calc(var(--u) * 2);
+  background: var(--acc);
+}
+
+/* Close: the mark, the question, the address. */
+.deck-slide--close .deck-body {
+  align-items: center;
+  text-align: center;
+}
+
+.deck-slide--close .deck-mark {
+  width: calc(var(--u) * 102);
+  height: calc(var(--u) * 90);
+  color: var(--acc);
+}
+
+.deck-close__row {
+  display: flex;
+  gap: calc(var(--u) * 40);
+  font-family: var(--mono);
+  font-size: calc(var(--u) * 30);
+}
+
+.deck-close__row strong {
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.deck-close__row span {
+  color: var(--quiet);
+}
+
+/* The footer: the mark, the name, the slogan, and the slide number. */
 .deck-foot {
   grid-row: 3;
   grid-column: 1 / -1;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: calc(var(--u) * 24);
-  padding: 0 calc(var(--u) * 40) 0 calc(var(--u) * 72);
-  border-top: 1px solid var(--line);
-  font-family: 'JetBrains Mono', ui-monospace, monospace;
-  font-size: calc(var(--u) * 16);
+  gap: calc(var(--u) * 16);
+  padding: 0 calc(var(--u) * 72);
+  border-top: calc(var(--u) * 2) solid var(--line);
+  font-family: var(--mono);
+  font-size: calc(var(--u) * 18);
   color: var(--quiet);
+}
+
+.deck-foot .deck-mark {
+  width: calc(var(--u) * 27);
+  height: calc(var(--u) * 24);
+  color: var(--acc);
+}
+
+.deck-foot__name {
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.deck-foot__number {
+  margin-left: auto;
+}
+
+/* A refused save takes the footer over until the next save. */
+.deck-notice {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--u) * 12);
+  width: 100%;
+  height: calc(var(--u) * 44);
+  padding: 0 calc(var(--u) * 14);
+  border: calc(var(--u) * 2) solid var(--warn);
+  border-radius: calc(var(--u) * 6);
+  background: var(--warnbg);
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.deck-notice strong {
+  font-weight: 600;
+  color: var(--warn);
 }
 
 /* Type. */
 .deck-eyebrow {
-  font-family: 'JetBrains Mono', ui-monospace, monospace;
-  font-size: calc(var(--u) * 18);
-  font-weight: 500;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  font-family: var(--mono);
+  font-size: calc(var(--u) * 22);
+  font-weight: 600;
   color: var(--acc);
 }
 
+.deck-eyebrow::before {
+  content: '// ';
+}
+
 .deck-title {
+  margin: 0;
+  font-size: calc(var(--u) * 56);
+  font-weight: 700;
+  line-height: 1.02;
+  letter-spacing: -0.035em;
+  color: var(--ink);
+  text-wrap: balance;
+}
+
+.deck-title--display {
+  font-size: calc(var(--u) * 80);
+  line-height: 0.96;
+  letter-spacing: -0.045em;
+}
+
+.deck-title--demo {
   font-size: calc(var(--u) * 64);
-  font-weight: 600;
-  line-height: 1.05;
-  letter-spacing: -0.02em;
-  color: var(--ink);
-  text-wrap: balance;
+  letter-spacing: -0.04em;
 }
 
-.deck-title--huge {
-  font-size: calc(var(--u) * 88);
+.deck-title--code {
+  font-size: calc(var(--u) * 48);
 }
 
-.deck-lead {
-  font-size: calc(var(--u) * 40);
-  line-height: 1.2;
-  color: var(--ink);
-  text-wrap: balance;
+.deck-title--close {
+  font-size: calc(var(--u) * 132);
+  line-height: 0.92;
+  letter-spacing: -0.05em;
 }
 
 .deck-statement {
-  font-size: calc(var(--u) * 60);
-  font-weight: 600;
-  line-height: 1.1;
-  letter-spacing: -0.02em;
+  font-size: calc(var(--u) * 88);
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.045em;
   color: var(--ink);
   text-wrap: balance;
 }
 
 .deck-sub {
-  font-size: calc(var(--u) * 28);
-  color: var(--quiet);
+  font-size: calc(var(--u) * 32);
+  line-height: 1.35;
+  color: var(--body);
+}
+
+.deck-lead {
+  font-size: calc(var(--u) * 30);
+  line-height: 1.35;
+  color: var(--body);
 }
 
 .deck-speaker {
-  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--u) * 4);
+  margin-top: calc(var(--u) * 12);
+}
+
+.deck-speaker__name {
+  font-size: calc(var(--u) * 36);
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.deck-speaker__role {
+  font-family: var(--mono);
   font-size: calc(var(--u) * 22);
   color: var(--quiet);
 }
 
+/* The session pill on a demo slide: a green dot, and when the session ends. */
+.deck-pill {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  gap: calc(var(--u) * 10);
+  height: calc(var(--u) * 40);
+  padding: 0 calc(var(--u) * 16);
+  border: calc(var(--u) * 2) solid var(--line);
+  border-radius: 999px;
+  font-family: var(--mono);
+  font-size: calc(var(--u) * 20);
+  font-weight: 500;
+  color: var(--ink);
+}
+
+.deck-pill::before {
+  content: '';
+  width: calc(var(--u) * 12);
+  height: calc(var(--u) * 12);
+  border-radius: 50%;
+  background: var(--ok);
+}
+
 .deck-bullets {
   display: grid;
-  gap: calc(var(--u) * 18);
+  gap: calc(var(--u) * 22);
   margin: 0;
   padding: 0;
   list-style: none;
-  font-size: calc(var(--u) * 36);
-  line-height: 1.25;
-  color: var(--ink);
+  font-size: calc(var(--u) * 34);
+  line-height: 1.3;
+  color: var(--body);
 }
 
 .deck-bullets li {
@@ -207,24 +417,29 @@
   content: '';
   position: absolute;
   left: 0;
-  top: calc(var(--u) * 16);
-  width: calc(var(--u) * 20);
-  height: calc(var(--u) * 4);
+  top: 0.42em;
+  width: calc(var(--u) * 16);
+  height: calc(var(--u) * 16);
+  border-radius: calc(var(--u) * 2);
   background: var(--acc);
 }
 
 /* Code is dark in both themes. */
 .deck-code {
-  border-radius: calc(var(--u) * 8);
+  border: calc(var(--u) * 2) solid var(--code-line);
+  border-radius: calc(var(--u) * 6);
   background: var(--code-bg);
   color: var(--code-text);
   overflow: visible;
 }
 
 .deck-code__caption {
-  padding: calc(var(--u) * 10) calc(var(--u) * 24);
-  border-bottom: 1px solid var(--code-line);
-  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  display: flex;
+  align-items: center;
+  height: calc(var(--u) * 44);
+  padding: 0 calc(var(--u) * 24);
+  border-bottom: calc(var(--u) * 2) solid var(--code-line);
+  font-family: var(--mono);
   font-size: calc(var(--u) * 18);
   font-weight: 500;
   color: var(--code-caption);
@@ -232,8 +447,8 @@
 
 .deck-code pre {
   margin: 0;
-  padding: calc(var(--u) * 24);
-  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  padding: calc(var(--u) * 22) calc(var(--u) * 24);
+  font-family: var(--mono);
   font-size: calc(var(--u) * 28);
   line-height: 1.5;
   white-space: pre;
@@ -245,13 +460,24 @@
   display: grid;
   justify-items: center;
   gap: calc(var(--u) * 16);
+  margin: 0;
 }
 
 .deck-qr__tile {
-  width: calc(var(--u) * 420);
-  height: calc(var(--u) * 420);
+  box-sizing: border-box;
+  width: calc(var(--u) * 400);
+  height: calc(var(--u) * 400);
+  /* The quiet zone a camera needs is the tile's own padding. */
+  padding: calc(var(--u) * 40);
   background: #fff;
-  border-radius: calc(var(--u) * 12);
+  border: calc(var(--u) * 2) solid var(--line);
+  border-radius: calc(var(--u) * 8);
+}
+
+.deck-slide--sponsor .deck-qr__tile {
+  width: calc(var(--u) * 440);
+  height: calc(var(--u) * 440);
+  padding: calc(var(--u) * 44);
 }
 
 .deck-qr__tile svg {
@@ -261,64 +487,79 @@
 }
 
 .deck-qr__caption {
-  font-family: 'JetBrains Mono', ui-monospace, monospace;
-  font-size: calc(var(--u) * 22);
+  font-family: var(--mono);
+  font-size: calc(var(--u) * 28);
+  font-weight: 600;
   color: var(--ink);
+}
+
+.deck-slide--sponsor .deck-qr__caption {
+  font-size: calc(var(--u) * 24);
 }
 
 /* The step numeral that fills a demo's stage when nothing is docked there. */
 .deck-numeral {
-  font-family: 'JetBrains Mono', ui-monospace, monospace;
-  font-size: calc(var(--u) * 320);
+  font-family: var(--mono);
+  font-size: calc(var(--u) * 280);
   line-height: 1;
-  font-weight: 400;
+  font-weight: 600;
   color: var(--line);
 }
 
-/* The Vale slide: examples with their alerts, then a box to try a sentence. */
+/* Editing: the regions that can be edited are outlined on the slide. */
+.deck-slide--editing .deck-title,
+.deck-slide--editing .deck-statement,
+.deck-slide--editing .deck-bullets,
+.deck-slide--editing .deck-lead {
+  outline: calc(var(--u) * 2) dashed var(--acc);
+  outline-offset: calc(var(--u) * 10);
+  border-radius: calc(var(--u) * 2);
+}
+
+/* A Vale finding: the words it is about, and a badge in the gutter. */
+.deck-flag {
+  text-decoration: underline wavy var(--warn) calc(var(--u) * 3);
+  text-underline-offset: calc(var(--u) * 7);
+  background: none;
+  color: inherit;
+}
+
+.deck-bullets li.deck-flagged::after {
+  content: '!';
+  position: absolute;
+  left: calc(var(--u) * -60);
+  top: 0.2em;
+  width: calc(var(--u) * 32);
+  height: calc(var(--u) * 32);
+  border-radius: calc(var(--u) * 6);
+  background: var(--warn);
+  font-family: var(--mono);
+  font-size: calc(var(--u) * 20);
+  font-weight: 700;
+  line-height: calc(var(--u) * 32);
+  text-align: center;
+  color: var(--badge-ink);
+}
+
+/* The Vale slide: the examples as a list, then a box to try a sentence. */
 .deck-vale {
   display: grid;
-  gap: calc(var(--u) * 16);
-}
-
-.deck-vale__example {
-  display: grid;
-  gap: calc(var(--u) * 4);
-  padding-left: calc(var(--u) * 20);
-  border-left: calc(var(--u) * 4) solid var(--line);
-  font-size: calc(var(--u) * 26);
-  color: var(--ink);
-}
-
-.deck-vale__example--error {
-  border-left-color: var(--warn);
-}
-
-.deck-vale__example--clean {
-  border-left-color: var(--ok);
-}
-
-.deck-vale__alert {
-  font-family: 'JetBrains Mono', ui-monospace, monospace;
-  font-size: calc(var(--u) * 16);
-  color: var(--warn);
-}
-
-.deck-vale__alert--clean {
-  color: var(--ok);
+  gap: calc(var(--u) * 28);
 }
 
 .deck-vale textarea {
+  box-sizing: border-box;
   width: 100%;
-  min-height: calc(var(--u) * 110);
+  min-height: calc(var(--u) * 96);
   padding: calc(var(--u) * 12) calc(var(--u) * 16);
-  border: 1px solid var(--line);
-  border-radius: calc(var(--u) * 8);
+  border: calc(var(--u) * 2) solid var(--line);
+  border-radius: calc(var(--u) * 6);
   background: transparent;
   font: inherit;
-  font-size: calc(var(--u) * 24);
+  font-size: calc(var(--u) * 26);
+  line-height: 1.3;
   color: var(--ink);
-  resize: vertical;
+  resize: none;
 }
 
 .deck-vale__row {
@@ -328,15 +569,16 @@
 }
 
 .deck-button {
-  padding: calc(var(--u) * 8) calc(var(--u) * 20);
-  border: 1px solid var(--acc);
+  height: calc(var(--u) * 36);
+  padding: 0 calc(var(--u) * 14);
+  border: calc(var(--u) * 2) solid var(--acc);
   border-radius: calc(var(--u) * 6);
   background: var(--acc);
   color: #fff;
-  font-family: 'JetBrains Mono', ui-monospace, monospace;
-  font-size: calc(var(--u) * 18);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  font-family: var(--mono);
+  font-size: calc(var(--u) * 16);
+  font-weight: 600;
+  line-height: 1;
   cursor: pointer;
 }
 
@@ -346,9 +588,15 @@
 }
 
 .deck-status {
-  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-family: var(--mono);
   font-size: calc(var(--u) * 16);
   color: var(--quiet);
+}
+
+.deck-vale__clean {
+  font-family: var(--mono);
+  font-size: calc(var(--u) * 16);
+  color: var(--ok);
 }
 
 /* Between slides: a short fade, and none at all for people who asked for none. */

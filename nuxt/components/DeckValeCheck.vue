@@ -1,26 +1,41 @@
 <template>
   <div class="deck-vale" data-testid="deck-vale">
-    <!-- The preset examples, each with whatever Vale said about it. -->
-    <div
-      v-for="(example, i) in examples"
-      :key="i"
-      class="deck-vale__example"
-      :class="exampleClass(i)"
-      data-testid="deck-vale-example"
-    >
-      <span>{{ example }}</span>
-      <template v-if="results[i]">
-        <span v-if="results[i].length === 0" class="deck-vale__alert deck-vale__alert--clean">clean</span>
-        <span v-for="(alert, j) in results[i]" :key="j" class="deck-vale__alert">{{ describe(alert) }}</span>
-      </template>
-    </div>
+    <!-- The preset examples, each marked the way an edit is: the words Vale
+         flagged underlined, and a badge in the gutter. -->
+    <ul class="deck-bullets">
+      <li
+        v-for="(example, i) in examples"
+        :key="i"
+        :class="{ 'deck-flagged': flagged(results[i]) }"
+        data-testid="deck-vale-example"
+        :data-alerts="results[i] ? results[i].length : null"
+      >
+        <template v-for="(part, j) in flagText(example, results[i])">
+          <mark v-if="part.flagged" :key="j" class="deck-flag" :title="part.title">{{ part.text }}</mark>
+          <template v-else>{{ part.text }}</template>
+        </template>
+      </li>
+      <!-- A sentence of the room's own, once it has been checked. -->
+      <li
+        v-if="alerts"
+        :class="{ 'deck-flagged': alerts.length > 0 }"
+        data-testid="deck-vale-result"
+        :data-alerts="alerts.length"
+      >
+        <template v-for="(part, j) in flagText(checked, alerts)">
+          <mark v-if="part.flagged" :key="j" class="deck-flag" :title="part.title">{{ part.text }}</mark>
+          <template v-else>{{ part.text }}</template>
+        </template>
+        <span v-if="alerts.length === 0" class="deck-vale__clean"> clean</span>
+      </li>
+    </ul>
 
-    <!-- A sentence of the room's own. -->
     <textarea
       v-model="text"
       data-testid="deck-vale-text"
       placeholder="Type a sentence, then press Check."
       aria-label="A sentence to check"
+      rows="2"
     ></textarea>
     <div class="deck-vale__row">
       <button type="button" class="deck-button" :disabled="!canCheck" data-testid="deck-vale-check" @click="check">
@@ -28,22 +43,20 @@
       </button>
       <span class="deck-status" data-testid="deck-vale-status">{{ status }}</span>
     </div>
-    <div v-if="alerts" class="deck-vale__example" :class="alerts.length ? 'deck-vale__example--error' : 'deck-vale__example--clean'" data-testid="deck-vale-result">
-      <span v-if="alerts.length === 0" class="deck-vale__alert deck-vale__alert--clean">clean</span>
-      <span v-for="(alert, j) in alerts" :key="j" class="deck-vale__alert">{{ describe(alert) }}</span>
-    </div>
   </div>
 </template>
 
 <script>
+import { flagText } from '../lib/deck.mjs'
+
 /**
  * The live Vale check on the Vale slide.
  *
  * Posts text to the backend's `/vale/check`, which checks without saving, and
- * shows the alerts it answers with. The examples are checked once when a
- * backend is there to ask; the textarea is checked on the button, never on a
- * keystroke, because the endpoint is rate limited and a room full of typing
- * would spend the limit before the demo did.
+ * marks what it answers with. The examples are checked once when a backend is
+ * there to ask; the textarea is checked on the button, never on a keystroke,
+ * because the endpoint is rate limited and a room full of typing would spend
+ * the limit before the demo did.
  */
 export default {
   props: {
@@ -51,6 +64,7 @@ export default {
   },
   data: () => ({
     text: '',
+    checked: '',
     alerts: null,
     results: {},
     status: '',
@@ -78,16 +92,14 @@ export default {
     },
   },
   methods: {
+    flagText,
+    flagged(alerts) {
+      return Array.isArray(alerts) && alerts.length > 0
+    },
     describe(alert) {
       // The module's keys, not Vale's own: level, rule, line and message.
-      const where = alert.line ? `line ${alert.line}` : ''
       const rule = alert.rule ? ` ${alert.rule}` : ''
-      return `${alert.level || 'alert'}${rule}${where ? `, ${where}` : ''}: ${alert.message || ''}`.trim()
-    },
-    exampleClass(i) {
-      const result = this.results[i]
-      if (!result) return ''
-      return result.length ? 'deck-vale__example--error' : 'deck-vale__example--clean'
+      return `${alert.level || 'alert'}${rule}: ${alert.message || ''}`.trim()
     },
     async checkExamples() {
       const results = {}
@@ -101,9 +113,11 @@ export default {
       if (!this.canCheck) return
       this.busy = true
       this.status = 'Checking...'
-      const answer = await this.ask(this.text)
+      const text = this.text
+      const answer = await this.ask(text)
+      this.checked = text
       this.alerts = answer.alerts || null
-      this.status = answer.message || ''
+      this.status = answer.message || (answer.alerts && answer.alerts.length ? this.describe(answer.alerts[0]) : '')
       this.busy = false
     },
     /**

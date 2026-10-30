@@ -328,7 +328,11 @@ export default async () => ({
     // the whole family.
     '@fontsource/archivo/400.css',
     '@fontsource/archivo/600.css',
+    '@fontsource/archivo/700.css',
     '@fontsource/jetbrains-mono/400.css',
+    '@fontsource/jetbrains-mono/500.css',
+    '@fontsource/jetbrains-mono/600.css',
+    '@fontsource/jetbrains-mono/700.css',
     '~/assets/css/main.css',
     // The deck's own tokens and frame. Global because Nuxt 2 CSS is, and
     // harmless elsewhere: everything in it is scoped under `.deck`.
