@@ -51,7 +51,7 @@
     ],
     "changed": [
         {
-            "value": "2026-10-29T06:55:53+00:00"
+            "value": "2026-10-30T00:07:02+00:00"
         }
     ],
     "promote": [
@@ -83,9 +83,9 @@
     ],
     "body": [
         {
-            "value": "<pre><code class=\"language-json\">PATCH \/jsonapi\/node\/slide\/{uuid}\n{\n  \"data\": {\n    \"type\": \"node--slide\",\n    \"id\": \"{uuid}\",\n    \"attributes\": { \"body\": { \"value\": \"...\" } }\n  }\n}\n\n422 Unprocessable Content\n{ \"errors\": [ { \"source\": { \"pointer\": \"\/data\/attributes\/body\" } } ] }<\/code><\/pre>",
+            "value": "<p>PATCH \/jsonapi\/node\/slide\/{uuid}<\/p><pre><code class=\"language-json\">{ \"data\": { \"type\": \"node--slide\", \"id\": \"{uuid}\",\n  \"attributes\": { \"body\": { \"value\": \"...\" } } } }\n\n422 Unprocessable Content\n{ \"errors\": [ {\n  \"detail\": \"Simply put: an AI tell. Say it plainly.\",\n  \"source\": { \"pointer\": \"\/data\/attributes\/body\/value\" }\n} ] }<\/code><\/pre>",
             "format": "basic_html",
-            "processed": "<code>PATCH \/jsonapi\/node\/slide\/{uuid}\n{\n  \"data\": {\n    \"type\": \"node--slide\",\n    \"id\": \"{uuid}\",\n    \"attributes\": { \"body\": { \"value\": \"...\" } }\n  }\n}\n\n422 Unprocessable Content\n{ \"errors\": [ { \"source\": { \"pointer\": \"\/data\/attributes\/body\" } } ] }<\/code>",
+            "processed": "<p>PATCH \/jsonapi\/node\/slide\/{uuid}<\/p><code>{ \"data\": { \"type\": \"node--slide\", \"id\": \"{uuid}\",\n  \"attributes\": { \"body\": { \"value\": \"...\" } } } }\n\n422 Unprocessable Content\n{ \"errors\": [ {\n  \"detail\": \"Simply put: an AI tell. Say it plainly.\",\n  \"source\": { \"pointer\": \"\/data\/attributes\/body\/value\" }\n} ] }<\/code>",
             "summary": null
         }
     ],

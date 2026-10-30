@@ -64,7 +64,8 @@ async function qrFor(slide) {
   return QRCode.toString(link, {
     type: 'svg',
     errorCorrectionLevel: 'M',
-    margin: 4,
+    // No quiet zone in the code itself: the tile's padding is the quiet zone.
+    margin: 0,
     color: { dark: '#18181a', light: '#ffffff' },
   })
 }

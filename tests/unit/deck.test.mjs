@@ -10,10 +10,12 @@ import test from 'node:test'
 import {
   codeBlockWarnings,
   demoStep,
+  flagText,
   keyAction,
   linkHostAllowed,
   orderSlides,
   readBody,
+  sessionLabel,
 } from '../../nuxt/lib/deck.mjs'
 
 const slide = (order, layout, extra = {}) => ({
@@ -69,6 +71,12 @@ test('a code slide takes the first code block and its language', () => {
   )
   assert.equal(read.code, '{\n  "a": 1\n}')
   assert.equal(read.language, 'json')
+})
+
+test('a code slide captions its block with the paragraph before it', () => {
+  const read = readBody('code', '<p>PATCH /jsonapi/node/slide/{uuid}</p><pre><code>{}</code></pre>')
+  assert.equal(read.lead, 'PATCH /jsonapi/node/slide/{uuid}')
+  assert.equal(read.code, '{}')
 })
 
 test('a code block keeps its entities decoded and its inner markup stripped', () => {
@@ -150,4 +158,40 @@ test('keys are ignored while focus is in something that takes typing', () => {
     'inside CKEditor'
   )
   assert.equal(press({ tagName: 'DIV', closest: () => null }), 'next')
+})
+
+test('a sentence is cut around the words Vale matched, in order, once each', () => {
+  const alerts = [
+    { match: 'synergy', message: 'Jargon.' },
+    { match: 'Simply put', message: 'An AI tell.' },
+  ]
+  assert.deepEqual(flagText('Simply put, a robust synergy.', alerts), [
+    { text: 'Simply put', flagged: true, title: 'An AI tell.' },
+    { text: ', a robust ', flagged: false, title: '' },
+    { text: 'synergy', flagged: true, title: 'Jargon.' },
+    { text: '.', flagged: false, title: '' },
+  ])
+  // The same words flagged twice land on two occurrences, not one.
+  const twice = flagText('very, very good', [{ match: 'very' }, { match: 'very' }])
+  assert.equal(twice.filter((part) => part.flagged).length, 2)
+})
+
+test('an alert with no match, or one not in the text, flags nothing', () => {
+  assert.deepEqual(flagText('Plain words.', [{ message: 'no match' }, { match: 'absent' }]), [
+    { text: 'Plain words.', flagged: false, title: '' },
+  ])
+  assert.deepEqual(flagText('', []), [{ text: '', flagged: false, title: '' }])
+  assert.deepEqual(flagText('Clean.', null), [{ text: 'Clean.', flagged: false, title: '' }])
+})
+
+test('a demo slide says when the session ends, and nothing with no backend', () => {
+  assert.equal(sessionLabel(null), '')
+  assert.equal(sessionLabel({}), '')
+  assert.equal(sessionLabel({ url: 'https://x.test' }), 'Session live')
+  assert.equal(sessionLabel({ url: 'https://x.test', expiresAt: 'not a date' }), 'Session live')
+  const now = new Date('2026-11-06T10:00:00Z')
+  const later = new Date('2026-11-06T11:30:00Z').toISOString()
+  assert.match(sessionLabel({ url: 'https://x.test', expiresAt: later }, now), /^live until \d/)
+  const earlier = new Date('2026-11-06T09:00:00Z').toISOString()
+  assert.equal(sessionLabel({ url: 'https://x.test', expiresAt: earlier }, now), 'Session over')
 })

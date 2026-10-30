@@ -47,7 +47,8 @@ export function layoutOf(slide) {
  *
  * Always the same shape, so a component can read any key without checking
  * the layout first: `lead` and `rest` for the paragraph layouts, `items` for
- * bullets, `code` and `language` for code, `examples` for the Vale slide.
+ * bullets, `code` and `language` for code, `examples` for the Vale slide. A
+ * code slide's `lead` is the paragraph before the block: its caption.
  */
 export function readBody(layout, html) {
   const paragraphs = paragraphsOf(html)
@@ -121,8 +122,56 @@ export function linkHostAllowed(href) {
   return ALLOWED_LINKS.some((allowed) => allowed(url))
 }
 
+/**
+ * A sentence cut around what Vale flagged in it.
+ *
+ * Segments in order, each `{ text, flagged, title }`. A flagged segment is the
+ * text an alert matched, with the alert's message as its title. Alerts with no
+ * match, or whose match is not in the text, flag nothing.
+ */
+export function flagText(text = '', alerts = []) {
+  const value = String(text || '')
+  const spans = []
+  for (const alert of Array.isArray(alerts) ? alerts : []) {
+    const match = String((alert || {}).match || '')
+    if (!match) continue
+    let from = 0
+    let at = value.indexOf(match, from)
+    while (at !== -1 && spans.some((span) => at < span.end && at + match.length > span.start)) {
+      from = at + 1
+      at = value.indexOf(match, from)
+    }
+    if (at === -1) continue
+    spans.push({ start: at, end: at + match.length, title: String(alert.message || '') })
+  }
+  spans.sort((a, b) => a.start - b.start)
+  const parts = []
+  let cursor = 0
+  for (const span of spans) {
+    if (span.start > cursor) parts.push({ text: value.slice(cursor, span.start), flagged: false, title: '' })
+    parts.push({ text: value.slice(span.start, span.end), flagged: true, title: span.title })
+    cursor = span.end
+  }
+  if (cursor < value.length || !parts.length) parts.push({ text: value.slice(cursor), flagged: false, title: '' })
+  return parts
+}
+
+/**
+ * What a demo slide says about the session: when it ends, if that is known.
+ *
+ * Empty with no session. "Session live" when there is one with no known end.
+ */
+export function sessionLabel(state, now = new Date()) {
+  if (!state || !state.url) return ''
+  if (!state.expiresAt) return 'Session live'
+  const ends = new Date(state.expiresAt)
+  if (Number.isNaN(ends.getTime())) return 'Session live'
+  const hhmm = ends.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+  return ends > now ? `live until ${hhmm}` : 'Session over'
+}
+
 /** Build-time warnings for a code block the slide cannot fit. */
-export function codeBlockWarnings(name, code = '', { lines = 12, columns = 64 } = {}) {
+export function codeBlockWarnings(name, code = '', { lines = 10, columns = 64 } = {}) {
   const rows = String(code || '').split('\n')
   const warnings = []
   if (rows.length > lines) warnings.push(`${name}: the code block is ${rows.length} lines, and about ${lines} fit.`)

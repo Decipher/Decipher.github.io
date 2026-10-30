@@ -1,10 +1,20 @@
 <template>
   <footer class="deck-foot" data-testid="deck-footer">
-    <span data-testid="deck-slogan">{{ slogan }}</span>
-    <client-only>
-      <span v-if="session" data-testid="deck-session">{{ session }}</span>
-    </client-only>
-    <span data-testid="deck-number">{{ number }} / {{ total }}</span>
+    <!-- A refused save takes the footer over until the next save clears it. -->
+    <p v-if="refused" class="deck-notice" role="status" data-testid="deck-refused">
+      <strong>Save refused · 422</strong>
+      <span>{{ refused }}</span>
+    </p>
+    <template v-else-if="closing">
+      <span data-testid="deck-slogan">Thanks, Drupal Melbourne</span>
+    </template>
+    <template v-else>
+      <DeckMark />
+      <span class="deck-foot__name">Stuart Clark</span>
+      <span aria-hidden="true">·</span>
+      <span data-testid="deck-slogan">{{ slogan }}</span>
+    </template>
+    <span class="deck-foot__number" data-testid="deck-number">{{ number }} / {{ total }}</span>
   </footer>
 </template>
 
@@ -12,38 +22,32 @@
 import { siteIdentity } from '../lib/settings.mjs'
 
 /**
- * The band under every slide: the slogan, the session, the slide number.
+ * The band under every slide: the mark, the name, the slogan, the slide number.
  *
  * The slogan is Decoupled Settings. The build bakes it in, and once a backend
  * is connected the footer asks that backend for the live value, so a slogan
  * changed in Drupal during the talk shows on whichever slide is up next. The
- * session line only ever renders in the browser, from what the authoring
- * layer knows, so the public export carries nothing about sessions at all.
+ * session is not here: it is on the demo slides, where it matters, and it only
+ * ever renders in the browser, so the public export carries nothing about it.
  */
 export default {
   props: {
     number: { type: Number, default: 1 },
     total: { type: Number, default: 1 },
+    /** The closing slide thanks the room instead of naming the site. */
+    closing: { type: Boolean, default: false },
+    /** Why the last save was refused, or nothing. */
+    refused: { type: String, default: '' },
   },
-  data: () => ({ live: null, now: Date.now() }),
+  data: () => ({ live: null }),
   computed: {
     slogan() {
       if (this.live) return this.live
       return siteIdentity((this.$config || {}).decoupledSettings, { slogan: 'Serverless Drupal' }).slogan
     },
-    state() {
-      return (this.$druxtIce && this.$druxtIce.state) || null
-    },
     backendUrl() {
-      return (this.state && this.state.url) || ''
-    },
-    session() {
-      if (!this.state || !this.state.url) return ''
-      if (!this.state.expiresAt) return 'Session live'
-      const ends = new Date(this.state.expiresAt)
-      if (Number.isNaN(ends.getTime())) return 'Session live'
-      const hhmm = ends.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-      return `Session live, ends ${hhmm}`
+      const state = (this.$druxtIce && this.$druxtIce.state) || null
+      return (state && state.url) || ''
     },
   },
   watch: {
