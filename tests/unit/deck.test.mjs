@@ -45,10 +45,13 @@ test('a demo slide knows which demo it is of how many', () => {
   assert.equal(demoStep(deck, 0), null, 'not a demo slide')
 })
 
-test('an intro reads its first paragraph as the speaker line', () => {
-  const read = readBody('intro', '<p>Stuart Clark, Deciphered</p><p>The rest of it.</p>')
-  assert.equal(read.lead, 'Stuart Clark, Deciphered')
-  assert.deepEqual(read.rest, ['The rest of it.'])
+test('an intro reads the speaker, the role, then the event line', () => {
+  const read = readBody(
+    'intro',
+    '<p>Stuart Clark</p><p>Deciphered</p><p>Drupal Melbourne · 5 November 2026</p>'
+  )
+  assert.equal(read.lead, 'Stuart Clark')
+  assert.deepEqual(read.rest, ['Deciphered', 'Drupal Melbourne · 5 November 2026'])
 })
 
 test('a statement is one sentence and an optional subline', () => {

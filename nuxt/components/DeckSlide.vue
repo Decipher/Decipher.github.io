@@ -22,10 +22,10 @@
     <div class="deck-gutter" aria-hidden="true"></div>
 
     <div class="deck-body" v-bind="bodyAnchors">
-      <!-- intro: the title, the speaker, and the QR code to stuar.tc. -->
+      <!-- intro: the event line, the title, the speaker, and the QR code to stuar.tc. -->
       <template v-if="layout === 'intro'">
         <div class="deck-intro">
-          <p class="deck-eyebrow">Drupal Melbourne · 6 November 2026</p>
+          <p class="deck-eyebrow">{{ read.rest[1] || 'Drupal Melbourne' }}</p>
           <h1 class="deck-title deck-title--display">{{ title }}</h1>
           <div class="deck-speaker">
             <span class="deck-speaker__name">{{ read.lead }}</span>

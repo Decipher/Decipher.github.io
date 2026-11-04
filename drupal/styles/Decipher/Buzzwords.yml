@@ -1,0 +1,17 @@
+# Words that sound like a claim and make none. A warning: the save goes through
+# and the alert arrives in meta.vale.
+extends: existence
+message: "'%s' is a buzzword. Say what it does."
+level: warning
+ignorecase: true
+tokens:
+  - robust
+  - synergy
+  - synergies
+  - seamless
+  - seamlessly
+  - cutting-edge
+  - game-changer
+  - game-changing
+  - holistic
+  - best-in-class
