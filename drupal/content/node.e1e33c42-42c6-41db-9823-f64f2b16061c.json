@@ -51,7 +51,7 @@
     ],
     "changed": [
         {
-            "value": "2026-10-30T00:07:02+00:00"
+            "value": "2026-11-04T20:34:20+00:00"
         }
     ],
     "promote": [
@@ -83,9 +83,9 @@
     ],
     "body": [
         {
-            "value": "<p>Stuart Clark<\/p><p>Deciphered<\/p>",
+            "value": "<p>Stuart Clark<\/p><p>Deciphered<\/p><p>Drupal Melbourne \u00b7 5 November 2026<\/p>",
             "format": "basic_html",
-            "processed": "<p>Stuart Clark<\/p><p>Deciphered<\/p>",
+            "processed": "<p>Stuart Clark<\/p><p>Deciphered<\/p><p>Drupal Melbourne \u00b7 5 November 2026<\/p>",
             "summary": null
         }
     ],
