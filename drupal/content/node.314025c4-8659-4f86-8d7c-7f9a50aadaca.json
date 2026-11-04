@@ -51,7 +51,7 @@
     ],
     "changed": [
         {
-            "value": "2026-11-04T20:34:20+00:00"
+            "value": "2026-11-04T20:37:56+00:00"
         }
     ],
     "promote": [
@@ -83,9 +83,9 @@
     ],
     "body": [
         {
-            "value": "<p>PATCH \/jsonapi\/node\/slide\/{uuid}<\/p><pre><code class=\"language-json\">{ \"data\": { \"type\": \"node--slide\", \"id\": \"{uuid}\",\n  \"attributes\": { \"body\": { \"value\": \"...\" } } } }\n\n422 Unprocessable Content\n{ \"errors\": [ {\n  \"detail\": \"Simply put: an AI tell. Say it plainly.\",\n  \"source\": { \"pointer\": \"\/data\/attributes\/body\/value\" }\n} ] }<\/code><\/pre>",
+            "value": "<p>PATCH \/jsonapi\/node\/slide\/{uuid}<\/p><pre><code class=\"language-json\">PATCH \/jsonapi\/node\/slide\/{uuid}\n{ \"data\": { \"type\": \"node--slide\", \"id\": \"{uuid}\",\n  \"attributes\": { \"body\": { \"value\": \"&lt;p&gt;Simply put, ...\" } } } }\n422 Unprocessable Content\n{ \"errors\": [ {\n  \"detail\": \"body.0.value: Body: Decipher.AiTells:\n    'Simply put' is an AI tell. Say it plainly.\n    (line 1: \\\"Simply put\\\")\",\n  \"source\": { \"pointer\": \"\/data\/attributes\/body\/value\" }\n} ] }<\/code><\/pre>",
             "format": "basic_html",
-            "processed": "<p>PATCH \/jsonapi\/node\/slide\/{uuid}<\/p><code>{ \"data\": { \"type\": \"node--slide\", \"id\": \"{uuid}\",\n  \"attributes\": { \"body\": { \"value\": \"...\" } } } }\n\n422 Unprocessable Content\n{ \"errors\": [ {\n  \"detail\": \"Simply put: an AI tell. Say it plainly.\",\n  \"source\": { \"pointer\": \"\/data\/attributes\/body\/value\" }\n} ] }<\/code>",
+            "processed": "<p>PATCH \/jsonapi\/node\/slide\/{uuid}<\/p><code>PATCH \/jsonapi\/node\/slide\/{uuid}\n{ \"data\": { \"type\": \"node--slide\", \"id\": \"{uuid}\",\n  \"attributes\": { \"body\": { \"value\": \"&lt;p&gt;Simply put, ...\" } } } }\n422 Unprocessable Content\n{ \"errors\": [ {\n  \"detail\": \"body.0.value: Body: Decipher.AiTells:\n    'Simply put' is an AI tell. Say it plainly.\n    (line 1: \\\"Simply put\\\")\",\n  \"source\": { \"pointer\": \"\/data\/attributes\/body\/value\" }\n} ] }<\/code>",
             "summary": null
         }
     ],
