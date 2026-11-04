@@ -64,7 +64,9 @@
 
 .deck-frame {
   container-type: inline-size;
-  width: min(100vw, calc(100vh * 16 / 9));
+  /* The column's width, not the viewport's: beside the edits drawer the slide
+     shrinks, and every unit on it follows, instead of the drawer covering it. */
+  width: min(100%, calc(100vh * 16 / 9));
   aspect-ratio: 16 / 9;
 }
 
