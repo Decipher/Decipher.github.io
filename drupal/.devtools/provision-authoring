@@ -114,6 +114,18 @@ drush('pm:enable simple_oauth');
 // so an existing pair is kept here. Replacing it would log out every session
 // that holds a token signed with it.
 $keys_dir = getcwd() . '/keys';
+// A pair that does not match signs tokens nobody can verify, and the checks
+// below only test that the files exist. Derive the public key from the private
+// one and compare, and start again when they differ.
+if (is_file($keys_dir . '/private.key') && is_file($keys_dir . '/public.key')) {
+  $private = openssl_pkey_get_private((string) file_get_contents($keys_dir . '/private.key'));
+  $derived = $private ? (openssl_pkey_get_details($private)['key'] ?? NULL) : NULL;
+  if ($derived === NULL || trim($derived) !== trim((string) file_get_contents($keys_dir . '/public.key'))) {
+    TASK('The OAuth key pair does not match; generating a new one.');
+    unlink($keys_dir . '/private.key');
+    unlink($keys_dir . '/public.key');
+  }
+}
 if (!is_file($keys_dir . '/private.key') || !is_file($keys_dir . '/public.key')) {
   if (!is_dir($keys_dir) && !mkdir($keys_dir, 0755, TRUE) && !is_dir($keys_dir)) {
     FAIL('Unable to create %s.', $keys_dir);

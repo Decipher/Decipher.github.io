@@ -128,7 +128,7 @@ describe('vendorSync', () => {
     return result.stdout.trim()
   }
 
-  function makeModule() {
+  function makeModule(overrides = {}) {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'vendor-module-'))
     const manifest = {
       name: '@druxt-contrib/fake',
@@ -141,6 +141,7 @@ describe('vendorSync', () => {
           "node -e \"require('fs').mkdirSync('dist',{recursive:true});require('fs').writeFileSync('dist/index.ssr.js','module.exports = 1\\n')\"",
       },
       devDependencies: {},
+      ...overrides,
     }
     fs.writeFileSync(path.join(root, 'package.json'), JSON.stringify(manifest, null, 2))
     fs.writeFileSync(
@@ -209,6 +210,32 @@ describe('vendorSync', () => {
     vendorSync({ name: 'fake', checkout, vendorDir })
 
     assert.equal(fs.existsSync(path.join(vendorDir, 'fake', 'dist', 'stale.js')), false)
+  })
+
+  it('honours a glob in the manifest files, as npm would', () => {
+    const checkout = makeModule({ files: ['dist/**', 'templates'] })
+    const vendorDir = fs.mkdtempSync(path.join(os.tmpdir(), 'vendor-out-'))
+
+    const result = vendorSync({ name: 'fake', checkout, vendorDir })
+
+    assert.deepEqual(result.copied, ['dist', 'templates'])
+    assert.equal(fs.existsSync(path.join(vendorDir, 'fake', 'dist', 'index.ssr.js')), true)
+  })
+
+  it('keeps the previous copy when the build leaves no entry point', () => {
+    const checkout = makeModule({ scripts: { build: 'node -e "0"' } })
+    const vendorDir = fs.mkdtempSync(path.join(os.tmpdir(), 'vendor-out-'))
+    fs.mkdirSync(path.join(vendorDir, 'fake', 'dist'), { recursive: true })
+    fs.writeFileSync(path.join(vendorDir, 'fake', 'dist', 'index.ssr.js'), 'previous\n')
+
+    assert.throws(
+      () => vendorSync({ name: 'fake', checkout, vendorDir }),
+      /did not produce the manifest's main/
+    )
+    assert.equal(
+      fs.readFileSync(path.join(vendorDir, 'fake', 'dist', 'index.ssr.js'), 'utf8'),
+      'previous\n'
+    )
   })
 
   it('refuses a name that is not a directory name', () => {

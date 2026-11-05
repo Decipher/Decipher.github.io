@@ -1,6 +1,6 @@
 <template>
   <div class="authoring-callback">
-    <p v-if="error" data-testid="callback-error">{{ error }}</p>
+    <p v-if="error" data-testid="callback-error">{{ error }} <nuxt-link to="/">Try signing in again.</nuxt-link></p>
     <p v-else data-testid="callback-status">Completing sign in...</p>
   </div>
 </template>
@@ -11,9 +11,10 @@
  *
  * druxt-auth exchanges the code before this page renders, and on success it
  * returns the author to the page they signed in from, so what is left to
- * show here is a refusal: the backend reports its own in the query rather
- * than by failing the redirect, and that message is the useful one, not a
- * page that says "Completing" for ever.
+ * show here is a refusal. The backend reports its own in the query. A failed
+ * exchange is caught by the auth module and kept on `$auth.error`, so that is
+ * read too, and listened for, rather than leaving a page that says
+ * "Completing" for ever.
  */
 export default {
   name: 'AuthoringCallback',
@@ -25,6 +26,13 @@ export default {
     } else if (!params.get('code')) {
       this.error = 'No authorisation code was returned.'
     }
+    const auth = this.$auth
+    if (!auth) return
+    const failed = (reason) => {
+      if (reason) this.error = reason.message || String(reason)
+    }
+    failed(auth.error)
+    if (typeof auth.onError === 'function') auth.onError(failed)
   },
 }
 </script>

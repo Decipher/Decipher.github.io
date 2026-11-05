@@ -20,6 +20,7 @@ import { spawnSync } from 'node:child_process'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+import { pathToFileURL } from 'node:url'
 
 import { exitWithError, NUXT_DIR } from './lib.mjs'
 import {
@@ -29,6 +30,16 @@ import {
   repositoryName,
   vendoredManifest,
 } from './vendor.mjs'
+
+/** Dependencies whose install scripts build a binary the module's build needs. */
+const NATIVE_DEPENDENCIES = ['esbuild']
+
+/** The files npm would pack from a checkout, as npm resolves the manifest's `files`. */
+function packedFiles(cwd) {
+  const output = run('npm', ['pack', '--dry-run', '--json', '--ignore-scripts'], cwd)
+  const [packed] = JSON.parse(output)
+  return (packed.files || []).map((file) => file.path)
+}
 
 function run(command, args, cwd) {
   const result = spawnSync(command, args, { cwd, encoding: 'utf8' })
@@ -65,46 +76,62 @@ export function vendorSync({ name, checkout, ref, vendorDir }) {
     }
 
     // The module's own install scripts stay off: its postinstall configures
-    // git hooks, and a worktree shares its checkout's git config. Its
-    // dependencies' install scripts do run, through `npm rebuild`: esbuild,
-    // which every one of these builds uses, installs its binary that way and
-    // fails the build without it.
+    // git hooks, and a worktree shares its checkout's git config. A bare
+    // `npm rebuild` would run the root's scripts as well, so only the
+    // dependencies that need a native build are rebuilt: esbuild, which every
+    // one of these builds uses, installs its binary that way and fails the
+    // build without it.
     run('npm', ['ci', '--ignore-scripts', '--no-audit', '--no-fund'], worktree)
-    run('npm', ['rebuild'], worktree)
+    const native = NATIVE_DEPENDENCIES.filter((dependency) =>
+      fs.existsSync(path.join(worktree, 'node_modules', dependency))
+    )
+    if (native.length) run('npm', ['rebuild', ...native], worktree)
     run('npm', ['run', 'build'], worktree)
 
     const manifest = JSON.parse(fs.readFileSync(path.join(worktree, 'package.json'), 'utf8'))
-    const target = path.join(vendorDir, name)
-    fs.rmSync(target, { recursive: true, force: true })
-    fs.mkdirSync(target, { recursive: true })
+    // The files npm itself would publish, so a glob in `files` is honoured.
+    const files = packedFiles(worktree).filter((file) => file !== 'package.json')
 
-    const copied = []
-    for (const entry of packageFiles(manifest)) {
-      const from = path.join(worktree, entry)
-      if (!fs.existsSync(from)) continue
-      fs.cpSync(from, path.join(target, entry), { recursive: true })
-      copied.push(entry)
+    // Into a staging directory first. The vendored copy is replaced only once
+    // the build is known to be whole, so a failed build leaves it as it was.
+    const staging = fs.mkdtempSync(path.join(os.tmpdir(), `vendor-${name}-staging-`))
+    try {
+      for (const file of files) {
+        fs.mkdirSync(path.dirname(path.join(staging, file)), { recursive: true })
+        fs.cpSync(path.join(worktree, file), path.join(staging, file))
+      }
+      if (!files.length)
+        throw new Error(`The build produced none of: ${packageFiles(manifest).join(', ')}`)
+      for (const entry of ['main', 'module']) {
+        if (manifest[entry] && !fs.existsSync(path.join(staging, manifest[entry]))) {
+          throw new Error(`The build did not produce the manifest's ${entry}: ${manifest[entry]}`)
+        }
+      }
+      fs.writeFileSync(
+        path.join(staging, 'package.json'),
+        `${JSON.stringify(vendoredManifest(manifest), null, 2)}\n`
+      )
+      fs.writeFileSync(
+        path.join(staging, 'README.md'),
+        provenance({ name, packageName: manifest.name, repository, ref: wanted, commit })
+      )
+
+      const target = path.join(vendorDir, name)
+      fs.rmSync(target, { recursive: true, force: true })
+      fs.mkdirSync(path.dirname(target), { recursive: true })
+      fs.cpSync(staging, target, { recursive: true })
+      const copied = [...new Set(files.map((file) => file.split('/')[0]))].sort()
+      return { target, commit, repository, ref: wanted, copied, warnings }
+    } finally {
+      fs.rmSync(staging, { recursive: true, force: true })
     }
-    if (!copied.length)
-      throw new Error(`The build produced none of: ${packageFiles(manifest).join(', ')}`)
-
-    fs.writeFileSync(
-      path.join(target, 'package.json'),
-      `${JSON.stringify(vendoredManifest(manifest), null, 2)}\n`
-    )
-    fs.writeFileSync(
-      path.join(target, 'README.md'),
-      provenance({ name, packageName: manifest.name, repository, ref: wanted, commit })
-    )
-
-    return { target, commit, repository, ref: wanted, copied, warnings }
   } finally {
     spawnSync('git', ['worktree', 'remove', '--force', worktree], { cwd: source })
     fs.rmSync(worktree, { recursive: true, force: true })
   }
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
   const [name, checkout, ref] = process.argv.slice(2)
   if (!name || !checkout) {
     exitWithError('Usage: npm run vendor:sync -- <name> <checkout> [ref]')

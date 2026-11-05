@@ -77,42 +77,42 @@
     "scopes": [],
     "redirect": [
         {
-            "value": "https:\/\/decipher.github.io\/callback"
+            "value": "https://decipher.github.io/callback"
         },
         {
-            "value": "http:\/\/localhost:3000\/callback"
+            "value": "http://localhost:3000/callback"
         },
         {
-            "value": "http:\/\/localhost:3001\/callback"
+            "value": "http://localhost:3001/callback"
         },
         {
-            "value": "http:\/\/localhost:3002\/callback"
+            "value": "http://localhost:3002/callback"
         },
         {
-            "value": "http:\/\/localhost:3003\/callback"
+            "value": "http://localhost:3003/callback"
         },
         {
-            "value": "http:\/\/localhost:3004\/callback"
+            "value": "http://localhost:3004/callback"
         },
         {
-            "value": "http:\/\/localhost:3005\/callback"
+            "value": "http://localhost:3005/callback"
         },
         {
-            "value": "http:\/\/localhost:3006\/callback"
+            "value": "http://localhost:3006/callback"
         },
         {
-            "value": "http:\/\/localhost:3007\/callback"
+            "value": "http://localhost:3007/callback"
         },
         {
-            "value": "http:\/\/localhost:3008\/callback"
+            "value": "http://localhost:3008/callback"
         },
         {
-            "value": "http:\/\/localhost:3009\/callback"
+            "value": "http://localhost:3009/callback"
         }
     ],
     "access_token_expiration": [
         {
-            "value": 300
+            "value": 7200
         }
     ],
     "refresh_token_expiration": [
