@@ -1,0 +1,22 @@
+uuid: 4fcb5089-954b-4d52-9a4c-7577ddddf260
+langcode: en
+status: true
+dependencies:
+  config:
+    - simple_oauth.oauth2_scope.authoring
+    - user.role.administrator
+id: authoring_administrator
+name: authoring_administrator
+description: 'Content authoring from the static frontend, as an administrator.'
+grant_types:
+  authorization_code:
+    status: true
+    description: 'Authorization code grant.'
+  refresh_token:
+    status: true
+    description: 'Refresh token grant.'
+umbrella: false
+parent: authoring
+granularity_id: role
+granularity_configuration:
+  role: administrator

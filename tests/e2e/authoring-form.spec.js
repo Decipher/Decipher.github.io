@@ -139,17 +139,24 @@ async function stubBackend(page) {
   return writes
 }
 
+/**
+ * Connect to the stub backend and sign in, the way nuxt/auth keeps a sign-in:
+ * the strategy and its token in its cookie, under its own keys. The account
+ * comes from the stubbed userinfo route.
+ */
+async function connectAndSignIn(page) {
+  await page.evaluate((backend) => {
+    localStorage.setItem('authoring.backend', JSON.stringify({ url: backend, clientId: null }))
+    document.cookie = 'auth.strategy=drupal-authorization_code; path=/'
+    document.cookie = `auth._token.drupal-authorization_code=${encodeURIComponent('Bearer stub-token')}; path=/`
+  }, BACKEND)
+}
+
 /** Connect, sign in, turn on edit mode and open the first article's form. */
 async function openForm(page) {
   await page.goto('/')
   await appReady(page)
-  await page.evaluate((backend) => {
-    localStorage.setItem('authoring.backend', JSON.stringify({ url: backend, clientId: null }))
-    // Signed in, the way nuxt/auth keeps it: the strategy and its token, under
-    // its own keys. The account comes from the stubbed userinfo route.
-    localStorage.setItem('auth.strategy', 'drupal-authorization_code')
-    localStorage.setItem('auth._token.drupal-authorization_code', 'Bearer stub-token')
-  }, BACKEND)
+  await connectAndSignIn(page)
 
   await page.goto('/authoring', { waitUntil: 'networkidle' })
   await appReady(page)
@@ -302,11 +309,7 @@ test.describe('the edit form', () => {
     await stubBackend(page)
     await page.goto('/')
     await appReady(page)
-    await page.evaluate((backend) => {
-      localStorage.setItem('authoring.backend', JSON.stringify({ url: backend, clientId: null }))
-      localStorage.setItem('auth.strategy', 'drupal-authorization_code')
-      localStorage.setItem('auth._token.drupal-authorization_code', 'Bearer stub-token')
-    }, BACKEND)
+    await connectAndSignIn(page)
     await page.goto('/authoring', { waitUntil: 'networkidle' })
     await appReady(page)
     await page.getByTestId('authoring-edit-toggle').click()

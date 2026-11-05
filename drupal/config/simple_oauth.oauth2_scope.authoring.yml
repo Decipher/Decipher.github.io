@@ -12,8 +12,7 @@ grant_types:
   refresh_token:
     status: true
     description: 'Refresh token grant.'
-umbrella: false
+umbrella: true
 parent: null
-granularity_id: role
-granularity_configuration:
-  role: authenticated
+granularity_id: null
+granularity_configuration: null

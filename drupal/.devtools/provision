@@ -160,8 +160,37 @@ foreach (["public_key", "private_key"] as $key) {
     throw new \RuntimeException(sprintf("simple_oauth.settings %s points at %s, which does not exist.", $key, $path));
   }
 }
+// A token's permissions are the scope's roles that the account also holds,
+// so a scope that grants only `authenticated` signs an editor in to a site
+// they cannot edit. Build the token Simple OAuth would issue to an editor,
+// without saving anything, and ask it the question a save would. Nothing is
+// saved because Tome exports content entities on save, and a check must not
+// leave a user or a token in the content export. The account gets an id so
+// that it counts as signed in, which is what decides its locked role.
+$token_user = function (array $roles) use ($consumer) {
+  $account = \Drupal\user\Entity\User::create(["uid" => 2147483647, "name" => "scope-check", "roles" => $roles]);
+  $token = \Drupal::entityTypeManager()->getStorage("oauth2_token")->create([
+    "bundle" => "access_token",
+    "client" => $consumer,
+    "auth_user_id" => $account,
+    "scopes" => [["scope_id" => "authoring"]],
+  ]);
+  return new \Drupal\simple_oauth\Authentication\TokenAuthUser(
+    \Drupal::service("permission_checker"),
+    $token,
+    \Drupal::service("psr7.http_message_factory"),
+    \Drupal::service("request_stack"),
+  );
+};
+$editor = $token_user(["content_editor"]);
+if (!$editor->hasPermission("create page content") || !$editor->hasPermission("edit own page content")) {
+  throw new \RuntimeException(sprintf("An editor's `authoring` token carries the roles [%s], which cannot edit content.", implode(", ", $editor->getRoles())));
+}
+if ($token_user([])->hasPermission("create page content")) {
+  throw new \RuntimeException("A token for an account with no roles can create content, so the check above proves nothing.");
+}
 PHP));
-PASS('Consumer %s, the authoring scope and the key pair are all in place.', $client_id);
+PASS('Consumer %s, the authoring scope with its editor role, and the key pair are all in place.', $client_id);
 
 echo PHP_EOL;
 echo '===============================' . PHP_EOL;

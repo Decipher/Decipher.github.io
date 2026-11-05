@@ -1,0 +1,22 @@
+uuid: 797115e8-c011-4f6d-9431-d11f5bbb5aae
+langcode: en
+status: true
+dependencies:
+  config:
+    - simple_oauth.oauth2_scope.authoring
+    - user.role.content_editor
+id: authoring_editor
+name: authoring_editor
+description: 'Content authoring from the static frontend, as a content editor.'
+grant_types:
+  authorization_code:
+    status: true
+    description: 'Authorization code grant.'
+  refresh_token:
+    status: true
+    description: 'Refresh token grant.'
+umbrella: false
+parent: authoring
+granularity_id: role
+granularity_configuration:
+  role: content_editor

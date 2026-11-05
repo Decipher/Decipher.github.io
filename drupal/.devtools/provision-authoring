@@ -124,44 +124,28 @@ TASK('Creating the authoring OAuth Consumer.');
 // it is a public client (PKCE, no secret), and the frontend sends it in every
 // authorize request.
 // The committed Consumer is the one the frontend is built for, so the ID
-// resolves to it, with two exceptions. A value in the process environment
-// was set on purpose, and a frontend built with it would send an ID this
-// backend does not have, so that run stops here rather than at a failed
-// sign-in. A value in ../.env was written by an earlier run of this script,
-// whose default may since have changed, so it gives way to the committed ID
-// and is written again below.
+// resolves to it. nuxt.config.js reads OAUTH_CLIENT_ID from the process
+// environment and from the same ../.env, so a different value in either is a
+// frontend built for a Consumer this backend will not have. That run stops
+// here rather than at a failed sign-in.
 $committed_id = committed_consumer_id();
 [$client_id, $client_id_source] = resolve_env_value('OAUTH_CLIENT_ID', $committed_id);
 if ($client_id !== $committed_id) {
-  if ($client_id_source === 'env') {
-    FAIL('OAUTH_CLIENT_ID %s is not the committed Consumer %s. Unset it, or commit a Consumer with that ID and build the frontend for it.', $client_id, $committed_id);
-  }
-  NOTE('OAUTH_CLIENT_ID %s from %s is not the committed Consumer %s; using the committed one.', $client_id, $client_id_source, $committed_id);
-  $client_id = $committed_id;
+  FAIL('OAUTH_CLIENT_ID %s from %s is not the committed Consumer %s. Remove it, or commit a Consumer with that ID and build the frontend for it.', $client_id, $client_id_source, $committed_id);
 }
 putenv('OAUTH_CLIENT_ID=' . $client_id);
 putenv('OAUTH_CALLBACK=' . $oauth_callback);
 drush('php-eval %s', <<<'PHP'
 // Simple OAuth 6 rejects an authorize request when it cannot resolve a
 // scope, and its default provider is "Dynamic (entity)" with no scopes
-// shipped - so a fresh site has none and every login fails with
-// "Check the `scope` parameter", whether the frontend sends a scope or
-// not. Create one and make it the consumer default, which is what
-// ScopeRepository::finalizeScopes() falls back to.
+// shipped, so the Consumer below names one as its default, which is what
+// ScopeRepository::finalizeScopes() falls back to. The scope is committed
+// under drupal/config as an umbrella over an editor scope and an
+// administrator scope, so a token carries whichever of those roles the
+// account holds. `provision` has already checked it arrived.
 $scope_id = "authoring";
 if (!\Drupal::entityTypeManager()->getStorage("oauth2_scope")->load($scope_id)) {
-  \Drupal\simple_oauth\Entity\Oauth2Scope::create([
-    "id" => $scope_id,
-    "name" => $scope_id,
-    "description" => "Content authoring from the static frontend.",
-    "grant_types" => [
-      "authorization_code" => ["status" => TRUE, "description" => "Authorization code grant."],
-      "refresh_token" => ["status" => TRUE, "description" => "Refresh token grant."],
-    ],
-    "umbrella" => FALSE,
-    "granularity_id" => "role",
-    "granularity_configuration" => ["role" => "authenticated"],
-  ])->save();
+  throw new \RuntimeException("The `authoring` scope is missing. It is committed under drupal/config; run .devtools/provision first.");
 }
 
 $client_id = getenv("OAUTH_CLIENT_ID") ?: \Drupal::service("uuid")->generate();

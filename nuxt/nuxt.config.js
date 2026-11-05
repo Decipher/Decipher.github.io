@@ -353,6 +353,17 @@ export default async () => ({
     },
   },
 
+  // Where nuxt/auth keeps the sign-in. Its default is a cookie and local
+  // storage, both readable by any script on this origin, and local storage
+  // outlives the browser. The cookie alone is enough: it carries the strategy,
+  // the tokens, and the state and code verifier that an OAuth round trip has
+  // to find again on the way back from the backend, which is why the sign-in
+  // cannot live in memory only. With no expiry set it is a session cookie,
+  // gone when the browser closes.
+  auth: {
+    localStorage: false,
+  },
+
   // Auto import components: https://go.nuxtjs.dev/config-components
   components: true,
 
