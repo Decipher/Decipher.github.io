@@ -7,6 +7,12 @@ stages:
 variables:
   PHP_APT_PACKAGES: 'git unzip libsqlite3-dev libzip-dev libicu-dev libpng-dev libjpeg62-turbo-dev libfreetype6-dev libonig-dev libxml2-dev'
   PHP_EXTENSIONS: 'mbstring pdo_sqlite intl gd xml zip opcache'
+  # The site is published from its GitHub repository, and a build learns that
+  # from the environment there. This mirror has no GitHub remote to read it
+  # from, so it is named: a build here then knows where sessions publish
+  # themselves and where a backend can be started, the same as a build there,
+  # and the two test suites see the same site.
+  CONTENT_REPOSITORY: 'Decipher/Decipher.github.io'
 
 cache:
   paths:
