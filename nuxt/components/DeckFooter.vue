@@ -7,7 +7,7 @@
       holds still under a pointer, and under reduced motion.
     -->
     <p v-if="refused" class="deck-notice" role="status" data-testid="deck-refused">
-      <strong>Save refused · 422</strong>
+      <strong>Save refused</strong>
       <span ref="track" class="deck-notice__track"
         ><span ref="text" class="deck-notice__text" :class="{ 'deck-notice__text--drift': drift > 0 }" :style="driftStyle">{{
           refused

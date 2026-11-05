@@ -44,12 +44,14 @@ const THEME_KEY = 'deck.theme'
 const ALLOWED = 'https://stuar.tc or https://github.com/sponsors/Decipher'
 
 /**
- * The QR code for a slide's link, as inline SVG, made when the site is built.
+ * The QR code for a slide's link, as inline SVG.
  *
- * At build time only: `qrcode` is a Node library and the result travels in the
- * page's payload, so the browser never needs it. A link to anywhere but the two
- * hosts the talk points at stops the build here, naming the slide, because a
- * QR code is the one thing on a slide that nobody can read before scanning.
+ * Made wherever asyncData runs: at build time for the static site, where it
+ * travels in the page's payload, and in the browser on the served site, where
+ * Nuxt runs asyncData again on every move between slides. A link to anywhere
+ * but the two hosts the talk points at stops the build here, naming the slide,
+ * because a QR code is the one thing on a slide that nobody can read before
+ * scanning.
  */
 async function qrFor(slide) {
   const link = ((slide.attributes || {}).field_link || {}).uri
@@ -59,7 +61,6 @@ async function qrFor(slide) {
       `Slide "${slide.attributes.title}" links to ${link}, and a QR code may only point at ${ALLOWED}.`
     )
   }
-  if (!process.server) return ''
   const QRCode = require('qrcode')
   return QRCode.toString(link, {
     type: 'svg',
