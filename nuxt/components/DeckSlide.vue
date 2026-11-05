@@ -33,6 +33,7 @@
           </div>
         </div>
         <DeckQr v-if="qr" :svg="qr" :caption="linkTitle" />
+        <p v-else-if="qrRefused" class="deck-qr-refused">{{ qrRefused }}</p>
       </template>
 
       <!-- statement: the bar, one sentence, and a line under it. -->
@@ -111,6 +112,7 @@
           <p class="deck-sub">{{ read.lead }}</p>
         </div>
         <DeckQr v-if="qr" :svg="qr" :caption="linkTitle" />
+        <p v-else-if="qrRefused" class="deck-qr-refused">{{ qrRefused }}</p>
       </template>
 
       <!-- close: the mark, the question, and where to find the speaker. -->
@@ -152,6 +154,8 @@ export default {
     index: { type: Number, default: 0 },
     deck: { type: Array, default: () => [] },
     qr: { type: String, default: '' },
+    /** Why there is no QR code, when the slide's link was refused in the browser. */
+    qrRefused: { type: String, default: '' },
     theme: { type: String, default: 'light' },
     /** Inside a node preview: the slide as it would read, with no editing controls. */
     preview: { type: Boolean, default: false },
@@ -274,14 +278,11 @@ export default {
      */
     console() {
       if (this.refused) {
-        // The store keeps the message, not the status. Vale's refusal has a
-        // shape the parser recognises; anything else gets no status it cannot
-        // vouch for.
-        const vale = this.refusedLines.length >= 3
+        // The store keeps the message, not the status, so none is named here.
         return {
           kind: 'refused',
           key: this.refused,
-          status: vale ? 'Save refused · 422 Unprocessable Content' : 'Save refused',
+          status: 'Save refused',
           lines: this.refusedLines,
         }
       }

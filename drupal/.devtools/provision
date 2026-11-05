@@ -181,6 +181,13 @@ foreach (["content_editor", "administrator"] as $role) {
     throw new \RuntimeException(sprintf("The `authoring` scope grants the roles [%s], not %s, so that account's token could not edit.", implode(", ", $granted), $role));
   }
 }
+// And the editor role has to be able to edit what this site is made of.
+$editor = \Drupal\user\Entity\Role::load("content_editor");
+foreach (["create slide content", "edit any slide content"] as $permission) {
+  if (!$editor->hasPermission($permission)) {
+    throw new \RuntimeException(sprintf("The content_editor role lacks `%s`, so an editor's token could sign in but not edit a slide.", $permission));
+  }
+}
 PHP));
 PASS('Consumer %s, the authoring scope with its editor role, and the key pair are all in place.', $client_id);
 

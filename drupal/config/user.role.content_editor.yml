@@ -5,6 +5,7 @@ dependencies:
   config:
     - node.type.article
     - node.type.page
+    - node.type.slide
     - taxonomy.vocabulary.tags
   module:
     - contextual
@@ -29,13 +30,16 @@ permissions:
   - 'administer url aliases'
   - 'create article content'
   - 'create page content'
+  - 'create slide content'
   - 'create terms in tags'
   - 'create url aliases'
   - 'delete article revisions'
   - 'delete own article content'
   - 'delete own files'
   - 'delete own page content'
+  - 'delete own slide content'
   - 'delete page revisions'
+  - 'edit any slide content'
   - 'edit own article content'
   - 'edit own page content'
   - 'edit terms in tags'

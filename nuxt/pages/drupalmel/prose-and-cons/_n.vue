@@ -24,6 +24,7 @@
                 :index="index"
                 :deck="deck"
                 :qr="qr"
+                :qr-refused="qrRefused"
                 :theme="theme"
               />
             </template>
@@ -49,9 +50,10 @@ const ALLOWED = 'https://stuar.tc or https://github.com/sponsors/Decipher'
  * Made wherever asyncData runs: at build time for the static site, where it
  * travels in the page's payload, and in the browser on the served site, where
  * Nuxt runs asyncData again on every move between slides. A link to anywhere
- * but the two hosts the talk points at stops the build here, naming the slide,
+ * but the two hosts the talk points at is refused here, naming the slide,
  * because a QR code is the one thing on a slide that nobody can read before
- * scanning.
+ * scanning. At build time that stops the build; in the browser the slide
+ * stays reachable and the refusal takes the code's place on the stage.
  */
 async function qrFor(slide) {
   const link = ((slide.attributes || {}).field_link || {}).uri
@@ -105,7 +107,15 @@ export default {
         console.warn(`[deck] ${warning}`)
       }
     }
-    return { deck, index, qr: await qrFor(current) }
+    let qr = ''
+    let qrRefused = ''
+    try {
+      qr = await qrFor(current)
+    } catch (e) {
+      if (process.server) throw e
+      qrRefused = e.message
+    }
+    return { deck, index, qr, qrRefused }
   },
 
   data: () => ({

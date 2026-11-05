@@ -155,10 +155,20 @@ drush('php-eval %s', <<<'PHP'
 // ScopeRepository::finalizeScopes() falls back to. The scope is committed
 // under drupal/config as an umbrella over an editor scope and an
 // administrator scope, so a token carries whichever of those roles the
-// account holds. `provision` has already checked it arrived.
+// account holds. A backend provisioned before the umbrella existed still
+// has the old shape, so the three are brought in line with the committed
+// files here, in place, rather than by a reinstall.
 $scope_id = "authoring";
-if (!\Drupal::entityTypeManager()->getStorage("oauth2_scope")->load($scope_id)) {
-  throw new \RuntimeException("The `authoring` scope is missing. It is committed under drupal/config; run .devtools/provision first.");
+$sync = \Drupal::service("config.storage.sync");
+$scopes = \Drupal::entityTypeManager()->getStorage("oauth2_scope");
+foreach ([$scope_id, "authoring_editor", "authoring_administrator"] as $id) {
+  $values = $sync->read("simple_oauth.oauth2_scope." . $id);
+  if (!$values) {
+    throw new \RuntimeException("drupal/config has no simple_oauth.oauth2_scope.$id.yml.");
+  }
+  $scope = $scopes->load($id);
+  $scope = $scope ? $scopes->updateFromStorageRecord($scope, $values) : $scopes->createFromStorageRecord($values);
+  $scope->save();
 }
 
 $client_id = getenv("OAUTH_CLIENT_ID") ?: \Drupal::service("uuid")->generate();

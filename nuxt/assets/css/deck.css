@@ -653,6 +653,14 @@
 }
 
 /* A QR code: dark modules on a white tile, in both themes, with its caption. */
+/* Where the QR code would be, when the slide's link was refused in the browser. */
+.deck-qr-refused {
+  max-width: 22rem;
+  font-size: 0.8rem;
+  line-height: 1.4;
+  color: var(--deck-muted, #6b6b70);
+}
+
 .deck-qr {
   display: grid;
   justify-items: center;
