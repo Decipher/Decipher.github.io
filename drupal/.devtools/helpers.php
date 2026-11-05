@@ -548,15 +548,19 @@ function drush(string $command, mixed $args = NULL, ?int &$exit_code = NULL): st
  * public key is missing or does not match, it is written again from the
  * private one rather than both being replaced. The two are compared as
  * OpenSSL writes them, so the stored file's own line endings and wrapping do
- * not count as a difference. A new pair is made only when there is no private
- * key to read.
+ * not count as a difference. A private key that is there but cannot be read
+ * stops the run: a permission slip must not cost every session its token.
+ * A new pair is made only when there is no private key at all.
  */
 function ensure_oauth_keys(string $keys_dir): void {
   $private_file = $keys_dir . '/private.key';
   $public_file = $keys_dir . '/public.key';
-  $private = is_file($private_file) ? openssl_pkey_get_private((string) file_get_contents($private_file)) : FALSE;
-  $derived = $private ? (openssl_pkey_get_details($private)['key'] ?? NULL) : NULL;
-  if ($derived !== NULL) {
+  if (is_file($private_file)) {
+    $private = openssl_pkey_get_private((string) file_get_contents($private_file));
+    $derived = $private ? (openssl_pkey_get_details($private)['key'] ?? NULL) : NULL;
+    if ($derived === NULL) {
+      FAIL('The private key at %s exists but cannot be read. Fix it, or remove it to start a new pair; every token signed with it stops working then.', $private_file);
+    }
     $public = is_file($public_file) ? openssl_pkey_get_public((string) file_get_contents($public_file)) : FALSE;
     $stored = $public ? (openssl_pkey_get_details($public)['key'] ?? NULL) : NULL;
     if ($stored === $derived) {
@@ -564,15 +568,15 @@ function ensure_oauth_keys(string $keys_dir): void {
       return;
     }
     NOTE('The public key at %s is missing or does not match; writing it from the private key.', $keys_dir);
-    file_put_contents($public_file, $derived);
-    chmod($public_file, 0600);
+    if (file_put_contents($public_file, $derived) !== strlen($derived) || !chmod($public_file, 0600)) {
+      FAIL('Unable to write %s.', $public_file);
+    }
     PASS('OAuth public key written at %s.', $keys_dir);
     return;
   }
-  if (is_file($private_file) || is_file($public_file)) {
-    NOTE('No readable private key at %s; generating a new pair.', $keys_dir);
-    @unlink($private_file);
-    @unlink($public_file);
+  if (is_file($public_file)) {
+    NOTE('A public key with no private key at %s; generating a new pair.', $keys_dir);
+    unlink($public_file);
   }
   if (!is_dir($keys_dir) && !mkdir($keys_dir, 0755, TRUE) && !is_dir($keys_dir)) {
     FAIL('Unable to create %s.', $keys_dir);

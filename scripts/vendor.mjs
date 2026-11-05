@@ -21,10 +21,22 @@
  */
 export const DROPPED_KEYS = ['scripts', 'devDependencies', 'packageManager', 'publishConfig']
 
+/** The file an export condition names: the string itself, or its `default`, however deep. */
+function conditionTarget(value) {
+  if (typeof value === 'string') return value
+  if (!value || typeof value !== 'object') return ''
+  if ('default' in value) return conditionTarget(value.default)
+  for (const nested of Object.values(value)) {
+    const target = conditionTarget(nested)
+    if (target) return target
+  }
+  return ''
+}
+
 /** The manifest's CommonJS entry, as `require` resolves it. */
 export function cjsEntry(manifest = {}) {
   const root = manifest.exports && manifest.exports['.']
-  return (root && root.require) || manifest.main || ''
+  return conditionTarget(root && root.require) || manifest.main || ''
 }
 
 /** What a built package ships, from its own `files` list. */

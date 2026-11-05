@@ -69,6 +69,17 @@ describe('cjsEntry', () => {
     assert.equal(cjsEntry({ main: 'dist/index.ssr.js' }), 'dist/index.ssr.js')
     assert.equal(cjsEntry({}), '')
   })
+
+  it('resolves a nested require condition to its file', () => {
+    assert.equal(
+      cjsEntry({ exports: { '.': { require: { types: './a.d.ts', default: './dist/a.cjs' } } } }),
+      './dist/a.cjs'
+    )
+    assert.equal(
+      cjsEntry({ exports: { '.': { require: { node: { default: './dist/b.cjs' } } } } }),
+      './dist/b.cjs'
+    )
+  })
 })
 
 describe('vendoredManifest keeps type for a .cjs build', () => {

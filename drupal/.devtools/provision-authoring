@@ -123,13 +123,19 @@ TASK('Creating the authoring OAuth Consumer.');
 // would mean a second Consumer file on every provision. It is not a secret:
 // it is a public client (PKCE, no secret), and the frontend sends it in every
 // authorize request.
-// The committed Consumer is the one the frontend is built for. A checkout
-// that ran an earlier version of this script has that version's default
-// pinned in ../.env, which would otherwise win here, replace the committed
-// Consumer with one the frontend does not know, and be pinned again below.
+// The committed Consumer is the one the frontend is built for, so the ID
+// resolves to it, with two exceptions. A value in the process environment
+// was set on purpose, and a frontend built with it would send an ID this
+// backend does not have, so that run stops here rather than at a failed
+// sign-in. A value in ../.env was written by an earlier run of this script,
+// whose default may since have changed, so it gives way to the committed ID
+// and is written again below.
 $committed_id = committed_consumer_id();
 [$client_id, $client_id_source] = resolve_env_value('OAUTH_CLIENT_ID', $committed_id);
 if ($client_id !== $committed_id) {
+  if ($client_id_source === 'env') {
+    FAIL('OAUTH_CLIENT_ID %s is not the committed Consumer %s. Unset it, or commit a Consumer with that ID and build the frontend for it.', $client_id, $committed_id);
+  }
   NOTE('OAUTH_CLIENT_ID %s from %s is not the committed Consumer %s; using the committed one.', $client_id, $client_id_source, $committed_id);
   $client_id = $committed_id;
 }
