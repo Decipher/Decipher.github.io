@@ -22,6 +22,7 @@ cd "$(dirname "$0")/.."
 
 LOG_DIR=".logs"
 PID_FILE="$LOG_DIR/cloudflared.pid"
+PORT_FILE="$LOG_DIR/cloudflared.port"
 LOG_FILE="$LOG_DIR/cloudflared.log"
 ENV_FILE="../.env"
 
@@ -52,7 +53,7 @@ extract_url() {
 stop_tunnel() {
   if [ -f "$PID_FILE" ]; then
     kill "$(cat "$PID_FILE")" 2>/dev/null || true
-    rm -f "$PID_FILE"
+    rm -f "$PID_FILE" "$PORT_FILE"
   fi
   env_clear TUNNEL_URL
   echo "[tunnel] Stopped."
@@ -100,14 +101,22 @@ TUNNEL_PORT="${TUNNEL_PORT:-$WEBSERVER_PORT}"
 # does not mean a live tunnel: quick tunnels can be dropped at the edge while
 # the process stays up perfectly happily, and reusing one of those gives a
 # session whose URL simply does not answer.
+# And only a tunnel to the same port: a healthy tunnel to the backend is the
+# wrong tunnel for a session, which publishes a URL that must serve the
+# frontend. Drupal answers the readiness checks too, so nothing later would
+# notice.
 if [ -f "$PID_FILE" ] && kill -0 "$(cat "$PID_FILE")" 2>/dev/null; then
   EXISTING_URL="$(extract_url)"
-  if [ -n "$EXISTING_URL" ] && curl -sf -o /dev/null -m 5 "$EXISTING_URL"; then
+  EXISTING_PORT="$(cat "$PORT_FILE" 2>/dev/null || true)"
+  if [ "$EXISTING_PORT" != "$TUNNEL_PORT" ]; then
+    echo "[tunnel] Existing tunnel serves port ${EXISTING_PORT:-unknown}, not ${TUNNEL_PORT}; restarting."
+  elif [ -n "$EXISTING_URL" ] && curl -sf -o /dev/null -m 5 "$EXISTING_URL"; then
     echo "[tunnel] Reusing healthy tunnel: ${EXISTING_URL}"
     env_write TUNNEL_URL "$EXISTING_URL"
     exit 0
+  else
+    echo "[tunnel] Existing tunnel is unhealthy; restarting."
   fi
-  echo "[tunnel] Existing tunnel is unhealthy; restarting."
   kill "$(cat "$PID_FILE")" 2>/dev/null || true
   sleep 1
 fi
@@ -117,6 +126,7 @@ echo "[tunnel] Starting for http://localhost:${TUNNEL_PORT} ..."
 nohup "$CLOUDFLARED" tunnel --url "http://localhost:${TUNNEL_PORT}" --no-autoupdate \
   >"$LOG_FILE" 2>&1 &
 echo $! > "$PID_FILE"
+echo "$TUNNEL_PORT" > "$PORT_FILE"
 
 URL=""
 for _ in $(seq 1 30); do

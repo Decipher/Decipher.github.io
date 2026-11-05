@@ -202,9 +202,13 @@ const KEYS = {
  *
  * Nothing while focus is somewhere that takes typing: an input, a textarea, a
  * contenteditable element or CKEditor, so the arrow keys move the caret during
- * the live edit instead of changing the slide under it.
+ * the live edit instead of changing the slide under it. Nothing either while a
+ * modifier is held: those are the browser's own shortcuts.
  */
 export function keyAction(event) {
+  // With a modifier the press belongs to the browser: find, history, the
+  // start of the document. Taking it would also stop that from happening.
+  if (event && (event.ctrlKey || event.metaKey || event.altKey)) return null
   const target = (event || {}).target || {}
   const tag = String(target.tagName || '').toUpperCase()
   if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return null

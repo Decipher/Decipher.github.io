@@ -160,6 +160,21 @@ test('keys move the deck, and clickers send page keys', () => {
   assert.equal(press('x'), null)
 })
 
+test('a key held with a modifier is left to the browser', () => {
+  for (const modifier of ['ctrlKey', 'metaKey', 'altKey']) {
+    assert.equal(keyAction({ key: 'f', [modifier]: true, target: { tagName: 'BODY' } }), null)
+    assert.equal(
+      keyAction({ key: 'ArrowLeft', [modifier]: true, target: { tagName: 'BODY' } }),
+      null
+    )
+    assert.equal(keyAction({ key: 'Home', [modifier]: true, target: { tagName: 'BODY' } }), null)
+  }
+  assert.notEqual(
+    keyAction({ key: 'ArrowLeft', shiftKey: true, target: { tagName: 'BODY' } }),
+    null
+  )
+})
+
 test('keys are ignored while focus is in something that takes typing', () => {
   const press = (target) => keyAction({ key: 'ArrowRight', target })
   assert.equal(press({ tagName: 'INPUT' }), null)

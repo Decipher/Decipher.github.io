@@ -442,17 +442,25 @@ export default {
     // A refetch replaces what was fetched, so the overlay goes on again. The
     // merged entity this component emits comes back the same way, through the
     // module's model, and that echo is not a refetch: acting on it would emit
-    // again, and again, with no end.
+    // again, and again, with no end. The echo is the very object this emitted,
+    // while Druxt copies every fetch before it hands it over, so identity tells
+    // the two apart where the content alone could not: a fetch that happens to
+    // read the same as the overlay is still the backend speaking.
     entity: {
       deep: true,
       immediate: true,
       handler(next) {
-        const json = JSON.stringify(next || {})
-        if (json === this.shown) return
-        this.fetched = JSON.parse(json)
+        if (next && next === this.emitted) return
+        this.fetched = JSON.parse(JSON.stringify(next || {}))
         this.showStaged()
       },
     },
+  },
+
+  created() {
+    // The last object emitted, kept off the reactive state: it is only ever
+    // compared by identity.
+    this.emitted = null
   },
 
   mounted() {
@@ -517,6 +525,7 @@ export default {
       const json = JSON.stringify(next)
       if (json === this.shown) return
       this.shown = json
+      this.emitted = next
       this.$emit('input', next)
     },
   },

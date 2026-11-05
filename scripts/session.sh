@@ -103,7 +103,10 @@ trap 'exit 130' INT TERM
 FRONTEND_PID_FILE="$REPO_ROOT/drupal/.logs/frontend.pid"
 stop_frontend() {
   if [ -f "$FRONTEND_PID_FILE" ]; then
-    kill "$(cat "$FRONTEND_PID_FILE")" 2>/dev/null || true
+    # The whole process group where there is one: npm passes a signal on to
+    # its script, which can leave Nuxt itself running and holding the port.
+    FRONTEND_PID="$(cat "$FRONTEND_PID_FILE")"
+    kill -- "-${FRONTEND_PID}" 2>/dev/null || kill "$FRONTEND_PID" 2>/dev/null || true
     rm -f "$FRONTEND_PID_FILE"
   fi
 }
@@ -141,7 +144,13 @@ npm run build || exit 1
 
 log "Starting the frontend on port $FRONTEND_PORT"
 mkdir -p "$REPO_ROOT/drupal/.logs"
-HOST=127.0.0.1 PORT="$FRONTEND_PORT" nohup npm run start > "$REPO_ROOT/drupal/.logs/frontend.log" 2>&1 &
+# In a process group of its own where setsid exists, so teardown can end
+# Nuxt and not only the npm that started it.
+if command -v setsid >/dev/null 2>&1; then
+  HOST=127.0.0.1 PORT="$FRONTEND_PORT" setsid nohup npm run start > "$REPO_ROOT/drupal/.logs/frontend.log" 2>&1 &
+else
+  HOST=127.0.0.1 PORT="$FRONTEND_PORT" nohup npm run start > "$REPO_ROOT/drupal/.logs/frontend.log" 2>&1 &
+fi
 echo $! > "$FRONTEND_PID_FILE"
 cd "$REPO_ROOT/drupal"
 

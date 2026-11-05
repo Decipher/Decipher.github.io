@@ -26,9 +26,30 @@ settings:
       - '|'
       - heading
       - code
+      - codeBlock
       - '|'
       - sourceEditing
   plugins:
+    ckeditor5_codeBlock:
+      languages:
+        -
+          label: 'Plain text'
+          language: plaintext
+        -
+          label: JSON
+          language: json
+        -
+          label: PHP
+          language: php
+        -
+          label: JavaScript
+          language: javascript
+        -
+          label: YAML
+          language: yaml
+        -
+          label: Shell
+          language: bash
     ckeditor5_heading:
       enabled_headings:
         - heading2
