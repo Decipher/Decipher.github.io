@@ -7,10 +7,12 @@
  * the committed config (adopting its site UUID), import Tome-tracked
  * content and files.
  *
- * No OAuth/Consumer step here - unlike quickstart-druxt-site-tome, this
- * repo has no simple_oauth/consumers in its committed config. It builds
- * to full static output with no live Drupal backend at runtime (see
- * `nuxt generate`), so there's nothing to authenticate against.
+ * The sign-in pieces are committed: simple_oauth and consumers are in the
+ * config, the `authoring` scope is config, and the frontend's Consumer is
+ * Tome content. Only the OAuth key pair is made here, because a private key
+ * is never committed. `.devtools/provision-authoring` then adds what is per
+ * backend: the frontend origin's CORS rules, the trusted hosts and the
+ * session's own callback URL.
  *
  * `drush site-install --existing-config` installs straight from the
  * committed config, adopting its site UUID. A plain `tome:install` does
@@ -128,9 +130,48 @@ TASK('Running drush site-install --existing-config.');
 drush('site-install --existing-config');
 PASS('Site installed from committed config.');
 
+TASK('Making the OAuth key pair, if this checkout has none.');
+ensure_oauth_keys(getcwd() . '/keys');
+
 TASK('Importing Tome-tracked content and files.');
 drush('tome:import');
 PASS('Content and files imported.');
+
+// The frontend can only sign in if these three things came through the
+// install and the import. Each of them was missing once, and each failure
+// showed up only as a failed login on the frontend, so check here instead.
+TASK('Checking that the frontend can sign in against this backend.');
+$client_id = committed_consumer_id();
+drush('php-eval %s', str_replace('__CLIENT_ID__', $client_id, <<<'PHP'
+$client_id = "__CLIENT_ID__";
+$consumers = \Drupal::entityTypeManager()->getStorage("consumer")->loadByProperties(["client_id" => $client_id]);
+if (count($consumers) !== 1) {
+  throw new \RuntimeException(sprintf("Expected one Consumer with client_id %s, found %d. Is drupal/content/consumer.%s.json committed and in content/meta/index.json?", $client_id, count($consumers), $client_id));
+}
+$consumer = reset($consumers);
+$scopes = array_column($consumer->get("authorization_code_scopes")->getValue(), "scope_id");
+if (!\Drupal::entityTypeManager()->getStorage("oauth2_scope")->load("authoring") || !in_array("authoring", $scopes, TRUE)) {
+  throw new \RuntimeException("The Consumer has no default `authoring` scope, so every authorize request would be refused.");
+}
+$settings = \Drupal::config("simple_oauth.settings");
+foreach (["public_key", "private_key"] as $key) {
+  $path = DRUPAL_ROOT . "/" . $settings->get($key);
+  if (!is_file($path)) {
+    throw new \RuntimeException(sprintf("simple_oauth.settings %s points at %s, which does not exist.", $key, $path));
+  }
+}
+// A token's permissions are the scope's roles that the account also holds,
+// so a scope that grants only `authenticated` signs an editor in to a site
+// they cannot edit. The scope has to grant the roles that edit.
+$scope_provider = \Drupal::service("simple_oauth.oauth2_scope.provider");
+$granted = $scope_provider->getRoles($scope_provider->load("authoring"));
+foreach (["content_editor", "administrator"] as $role) {
+  if (!in_array($role, $granted, TRUE)) {
+    throw new \RuntimeException(sprintf("The `authoring` scope grants the roles [%s], not %s, so that account's token could not edit.", implode(", ", $granted), $role));
+  }
+}
+PHP));
+PASS('Consumer %s, the authoring scope with its editor role, and the key pair are all in place.', $client_id);
 
 echo PHP_EOL;
 echo '===============================' . PHP_EOL;

@@ -1,0 +1,18 @@
+uuid: 9cf99f91-33a2-4b44-b952-7b4af53dd137
+langcode: en
+status: true
+dependencies: {  }
+id: authoring
+name: authoring
+description: 'Content authoring from the static frontend.'
+grant_types:
+  authorization_code:
+    status: true
+    description: 'Authorization code grant.'
+  refresh_token:
+    status: true
+    description: 'Refresh token grant.'
+umbrella: true
+parent: null
+granularity_id: null
+granularity_configuration: null

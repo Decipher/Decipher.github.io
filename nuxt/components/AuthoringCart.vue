@@ -352,6 +352,7 @@ import {
   tidyResource,
 } from '@druxt-contrib/inline-content-edit'
 import { openChangeRequest } from '../lib/github-client.mjs'
+import { findAnchor } from '@druxt-contrib/anchors'
 
 export default {
   name: 'AuthoringCart',
@@ -511,9 +512,8 @@ export default {
 
     /** What the page is calling this, when the change itself does not say. */
     labelOnPage(type, id) {
-      const el = document.querySelector(
-        `[data-authoring-entity="${type}:${id}"] [data-testid="entity-label"]`
-      )
+      const entity = findAnchor(document, { entity: id, type })
+      const el = entity && entity.querySelector('[data-testid="entity-label"]')
       return el ? el.textContent.trim() : ''
     },
 
@@ -592,9 +592,8 @@ export default {
       const attributes = resource.attributes || {}
       const alias = ((attributes.path || {}).alias || '').trim()
       if (alias) return alias
-      const onPage = document.querySelector(
-        `[data-authoring-entity="${resource.type}:${resource.id}"] [data-testid="entity-link"]`
-      )
+      const entity = findAnchor(document, { entity: resource.id, type: resource.type })
+      const onPage = entity && entity.querySelector('[data-testid="entity-link"]')
       return onPage ? onPage.getAttribute('href') : null
     },
 
@@ -610,7 +609,7 @@ export default {
      * then have to go and find is most of a navigation problem.
      */
     reveal(item) {
-      const entity = document.querySelector(`[data-authoring-entity="${item.type}:${item.id}"]`)
+      const entity = findAnchor(document, { entity: item.id, type: item.type })
       if (!entity) {
         this.refusal = 'That content is not on this page.'
         return
@@ -625,7 +624,7 @@ export default {
         ...(item.relationships || {}),
       })
       const found = changed
-        .map((field) => entity.querySelector(`[data-authoring-field="${field}"]`))
+        .map((field) => findAnchor(entity, { field }))
         .filter(Boolean)
       const targets = found.length ? found : [entity]
 

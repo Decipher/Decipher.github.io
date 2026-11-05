@@ -2,7 +2,7 @@
   <div
     class="authoring-entity"
     :class="{ 'is-staged': staged, group: editable }"
-    :data-authoring-entity="`${entity.type}:${entity.id}`"
+    v-bind="anchors"
   >
     <!-- The entity as the site renders it, edit mode or not. -->
     <div v-if="!open">
@@ -72,7 +72,7 @@
         <h2
           v-if="showLabel"
           class="mb-2 text-lg"
-          data-authoring-field="title"
+          v-bind="titleAnchors"
           data-testid="entity-label"
         >
           <!--
@@ -163,6 +163,7 @@
 </template>
 
 <script>
+import { entityAnchors, fieldAnchors } from '@druxt-contrib/anchors'
 import { asText } from '@druxt-contrib/inline-content-edit'
 /**
  * The theme component for every entity the site renders.
@@ -270,6 +271,22 @@ export default {
   },
 
   computed: {
+    /**
+     * How this entity names itself on the page.
+     *
+     * The shared contract rather than a private attribute, so a diff overlay or
+     * an editor from another module finds the same element the site rendered.
+     * Entity and type sit here on the wrapper; each field names itself inside.
+     */
+    anchors() {
+      return entityAnchors((this.entity || {}).type, (this.entity || {}).id)
+    },
+
+    /** The label is a field Drupal renders outside the display, so it is named here. */
+    titleAnchors() {
+      return fieldAnchors('title')
+    },
+
     editing() {
       return this.$store.getters['druxtIce/editing']
     },

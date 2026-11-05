@@ -1,5 +1,5 @@
 <template>
-  <div class="authoring-field" :data-authoring-field="schema.id">
+  <div class="authoring-field" v-bind="anchors">
     <!-- ===== View displays ===== -->
     <template v-if="isSchemaView">
       <div v-if="relationship">
@@ -189,6 +189,7 @@
  * Ported from `druxt/umami.demo.druxtjs.org@feature/239-editbar`, which is the
  * BootstrapVue version of this.
  */
+import { fieldAnchors } from '@druxt-contrib/anchors'
 import { DruxtEntity, DruxtFieldMixin } from 'druxt-entity'
 import Draggable from 'vuedraggable'
 
@@ -280,6 +281,16 @@ export default {
   },
 
   computed: {
+    /**
+     * How this field names itself on the page, inside the entity that owns it.
+     *
+     * The shared contract, so the drawer's "Show", a diff overlay or an editor
+     * from another module all find the same element by the same attribute.
+     */
+    anchors() {
+      return fieldAnchors((this.schema || {}).id)
+    },
+
     /**
      * This field's staged change, marked into the markup it already rendered.
      *

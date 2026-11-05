@@ -67,6 +67,16 @@ async function stubBackend(page) {
 
     if (request.method() === 'OPTIONS') return route.fulfill({ status: 204, headers })
 
+    // Who the token belongs to. nuxt/auth asks on every page load, and a
+    // token with no account behind it is not a sign-in.
+    if (url.pathname === '/oauth/userinfo') {
+      return route.fulfill({
+        status: 200,
+        headers: { ...headers, 'content-type': 'application/json' },
+        body: JSON.stringify({ sub: '1', name: 'admin' }),
+      })
+    }
+
     // A file upload is not a JSON:API document: it is raw bytes at the field's
     // own route, with the filename in a header.
     if (request.method() === 'POST' && url.pathname.endsWith('/field_image')) {
@@ -129,17 +139,24 @@ async function stubBackend(page) {
   return writes
 }
 
+/**
+ * Connect to the stub backend and sign in, the way nuxt/auth keeps a sign-in:
+ * the strategy and its token in its cookie, under its own keys. The account
+ * comes from the stubbed userinfo route.
+ */
+async function connectAndSignIn(page) {
+  await page.evaluate((backend) => {
+    localStorage.setItem('authoring.backend', JSON.stringify({ url: backend, clientId: null }))
+    document.cookie = 'auth.strategy=drupal-authorization_code; path=/'
+    document.cookie = `auth._token.drupal-authorization_code=${encodeURIComponent('Bearer stub-token')}; path=/`
+  }, BACKEND)
+}
+
 /** Connect, sign in, turn on edit mode and open the first article's form. */
 async function openForm(page) {
   await page.goto('/')
   await appReady(page)
-  await page.evaluate((backend) => {
-    localStorage.setItem('authoring.backend', JSON.stringify({ url: backend, clientId: null }))
-    sessionStorage.setItem(
-      'authoring.token',
-      JSON.stringify({ token: 'stub-token', account: 'admin' })
-    )
-  }, BACKEND)
+  await connectAndSignIn(page)
 
   await page.goto('/authoring', { waitUntil: 'networkidle' })
   await appReady(page)
@@ -292,13 +309,7 @@ test.describe('the edit form', () => {
     await stubBackend(page)
     await page.goto('/')
     await appReady(page)
-    await page.evaluate((backend) => {
-      localStorage.setItem('authoring.backend', JSON.stringify({ url: backend, clientId: null }))
-      sessionStorage.setItem(
-        'authoring.token',
-        JSON.stringify({ token: 'stub-token', account: 'admin' })
-      )
-    }, BACKEND)
+    await connectAndSignIn(page)
     await page.goto('/authoring', { waitUntil: 'networkidle' })
     await appReady(page)
     await page.getByTestId('authoring-edit-toggle').click()

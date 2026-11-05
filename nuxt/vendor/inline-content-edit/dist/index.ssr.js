@@ -9,6 +9,198 @@ function _interopDefaultLegacy (e) { return e && typeof e === 'object' && 'defau
 
 const Vue__default = /*#__PURE__*/_interopDefaultLegacy(Vue);
 
+function normaliseUrl(url) {
+  return (url || "").trim().replace(/\/+$/, "");
+}
+function isExpired(expiresAt, now = Date.now()) {
+  if (!expiresAt) return false;
+  const at = new Date(expiresAt).getTime();
+  return Number.isNaN(at) ? true : at <= now;
+}
+const CONFORMANCE_UNREACHABLE = "Could not reach it, or it does not allow a site's origin.";
+async function checkConformance(url, { fetch: fetchImpl, origin } = {}) {
+  const base = normaliseUrl(url);
+  if (!base) return { ok: false, reason: "Enter a backend URL." };
+  if (!/^https?:\/\//.test(base)) {
+    return { ok: false, reason: "That is not an http or https URL." };
+  }
+  let response;
+  try {
+    response = await fetchImpl(`${base}/jsonapi`, {
+      headers: { Accept: "application/vnd.api+json" }
+    });
+  } catch (e) {
+    const suffix = origin ? ` Check it is running, and that its CORS configuration lists ${origin}.` : "";
+    return { ok: false, reason: CONFORMANCE_UNREACHABLE + suffix };
+  }
+  if (!response.ok) {
+    return { ok: false, reason: `JSON:API answered ${response.status}.` };
+  }
+  let body;
+  try {
+    body = await response.json();
+  } catch (e) {
+    body = null;
+  }
+  if (!body || !body.jsonapi) {
+    return {
+      ok: false,
+      reason: "That URL answered, but it is not a JSON:API endpoint."
+    };
+  }
+  return { ok: true, version: body.jsonapi.version };
+}
+async function readSessionRecord(recordUrl, { fetch: fetchImpl, now = Date.now(), token, destination } = {}) {
+  if (!recordUrl) return null;
+  const { url, headers } = destinationRequest(destination, recordUrl, token);
+  let record;
+  try {
+    const response = await fetchImpl(url, { cache: "no-store", headers });
+    if (!response.ok) return null;
+    record = await response.json();
+  } catch (e) {
+    return null;
+  }
+  if (!record || typeof record.url !== "string" || !record.url) return null;
+  if (isExpired(record.expiresAt, now)) return null;
+  return { ...record, url: normaliseUrl(record.url) };
+}
+function destinationRequest(destination, recordUrl, token) {
+  if (destination && typeof destination.recordRequest === "function") {
+    const request = destination.recordRequest(recordUrl, { token });
+    if (request && request.url) return request;
+  }
+  const separator = String(recordUrl).includes("?") ? "&" : "?";
+  return { url: `${recordUrl}${separator}t=${Date.now()}`, headers: void 0 };
+}
+function base64Url(bytes) {
+  let binary = "";
+  for (const byte of new Uint8Array(bytes)) binary += String.fromCharCode(byte);
+  const base64 = typeof btoa === "function" ? btoa(binary) : Buffer.from(binary, "binary").toString("base64");
+  return base64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+function callbackUrl(origin, base = "/") {
+  const path = base.endsWith("/") ? base : `${base}/`;
+  return `${origin}${path}callback`;
+}
+function resolveSource({ query, stored, published }) {
+  if (query) return { url: normaliseUrl(query), source: "query" };
+  if (stored && stored.url)
+    return { ...stored, url: normaliseUrl(stored.url), source: "stored" };
+  if (published && published.url) return { ...published, source: "published" };
+  return null;
+}
+
+function readJson(storage, key) {
+  try {
+    return JSON.parse(storage.getItem(key)) || null;
+  } catch (e) {
+    return null;
+  }
+}
+function writeJson(storage, key, value) {
+  try {
+    if (value) storage.setItem(key, JSON.stringify(value));
+    else storage.removeItem(key);
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+function safeStorage(win) {
+  try {
+    return win && win.localStorage || null;
+  } catch (e) {
+    return null;
+  }
+}
+
+const AUTH_STRATEGY = "drupal-authorization_code";
+const BACKEND_KEY = "authoring.backend";
+function backendFor(context, storage) {
+  const ice = context && (context.app && context.app.$druxtIce || context.$druxtIce) || null;
+  if (ice && ice.state && ice.state.url) {
+    return { url: ice.state.url, clientId: ice.state.clientId || null };
+  }
+  const stored = storage ? readJson(storage, BACKEND_KEY) : null;
+  if (stored && stored.url) {
+    return { url: stored.url, clientId: stored.clientId || null };
+  }
+  return null;
+}
+function pointStrategyAt(options, backend) {
+  if (!options || !backend || !backend.url) return false;
+  const url = normaliseUrl(backend.url);
+  const endpoints = options.endpoints || (options.endpoints = {});
+  endpoints.authorization = `${url}/oauth/authorize`;
+  endpoints.authorizationBackend = `${url}/oauth/authorize`;
+  endpoints.token = `${url}/oauth/token`;
+  endpoints.userInfo = `${url}/oauth/userinfo`;
+  if (backend.clientId) options.clientId = backend.clientId;
+  return true;
+}
+function bareToken(value) {
+  if (!value || typeof value !== "string") return null;
+  return value.replace(/^Bearer\s+/i, "") || null;
+}
+const ISSUER_KEY = "authoringIssuer";
+function tokensAreForeign(issuer, backend) {
+  if (!issuer || !backend || !backend.url) return false;
+  return normaliseUrl(issuer) !== normaliseUrl(backend.url);
+}
+function fetchThroughAxios(axios) {
+  if (!axios || typeof axios.request !== "function") return null;
+  return async (url, init = {}) => {
+    const config = {
+      url,
+      method: String(init.method || "GET").toLowerCase(),
+      headers: init.headers || {},
+      data: init.body,
+      // Text, so a refused save's body reaches `json()` whole; axios still
+      // parses JSON it recognises, and either form is read the same below.
+      responseType: "text"
+    };
+    let response;
+    try {
+      response = await axios.request(config);
+    } catch (error) {
+      if (!error || !error.response) throw error;
+      response = error.response;
+    }
+    return responseFromAxios(response);
+  };
+}
+function responseFromAxios(response) {
+  const data = response.data;
+  const text = typeof data === "string" ? data : data == null ? "" : JSON.stringify(data);
+  const headers = response.headers || {};
+  return {
+    ok: response.status >= 200 && response.status < 300,
+    status: response.status,
+    headers: {
+      get(name) {
+        const value = headers[String(name).toLowerCase()];
+        return value == null ? null : String(value);
+      }
+    },
+    async json() {
+      return JSON.parse(text);
+    },
+    async text() {
+      return text;
+    }
+  };
+}
+function dropForeignTokens(auth, backend) {
+  if (!auth || !auth.$storage || !auth.strategy) return false;
+  const issuer = auth.$storage.getUniversal(ISSUER_KEY);
+  if (!tokensAreForeign(issuer, backend)) return false;
+  auth.strategy.token.reset();
+  if (auth.strategy.refreshToken) auth.strategy.refreshToken.reset();
+  auth.$storage.setUniversal(ISSUER_KEY, false);
+  return true;
+}
+
 const ADAPTER_METHODS = [
   "editableFields",
   "fieldValue",
@@ -95,88 +287,6 @@ function findAnchor(root, { entity, type, field, delta } = {}) {
   }
   if (!parts.length) return null;
   return root.querySelector(parts.join(""));
-}
-
-function normaliseUrl(url) {
-  return (url || "").trim().replace(/\/+$/, "");
-}
-function isExpired(expiresAt, now = Date.now()) {
-  if (!expiresAt) return false;
-  const at = new Date(expiresAt).getTime();
-  return Number.isNaN(at) ? true : at <= now;
-}
-const CONFORMANCE_UNREACHABLE = "Could not reach it, or it does not allow a site's origin.";
-async function checkConformance(url, { fetch: fetchImpl, origin } = {}) {
-  const base = normaliseUrl(url);
-  if (!base) return { ok: false, reason: "Enter a backend URL." };
-  if (!/^https?:\/\//.test(base)) {
-    return { ok: false, reason: "That is not an http or https URL." };
-  }
-  let response;
-  try {
-    response = await fetchImpl(`${base}/jsonapi`, {
-      headers: { Accept: "application/vnd.api+json" }
-    });
-  } catch (e) {
-    const suffix = origin ? ` Check it is running, and that its CORS configuration lists ${origin}.` : "";
-    return { ok: false, reason: CONFORMANCE_UNREACHABLE + suffix };
-  }
-  if (!response.ok) {
-    return { ok: false, reason: `JSON:API answered ${response.status}.` };
-  }
-  let body;
-  try {
-    body = await response.json();
-  } catch (e) {
-    body = null;
-  }
-  if (!body || !body.jsonapi) {
-    return {
-      ok: false,
-      reason: "That URL answered, but it is not a JSON:API endpoint."
-    };
-  }
-  return { ok: true, version: body.jsonapi.version };
-}
-async function readSessionRecord(recordUrl, { fetch: fetchImpl, now = Date.now(), token, destination } = {}) {
-  if (!recordUrl) return null;
-  const { url, headers } = destinationRequest(destination, recordUrl, token);
-  let record;
-  try {
-    const response = await fetchImpl(url, { cache: "no-store", headers });
-    if (!response.ok) return null;
-    record = await response.json();
-  } catch (e) {
-    return null;
-  }
-  if (!record || typeof record.url !== "string" || !record.url) return null;
-  if (isExpired(record.expiresAt, now)) return null;
-  return { ...record, url: normaliseUrl(record.url) };
-}
-function destinationRequest(destination, recordUrl, token) {
-  if (destination && typeof destination.recordRequest === "function") {
-    const request = destination.recordRequest(recordUrl, { token });
-    if (request && request.url) return request;
-  }
-  const separator = String(recordUrl).includes("?") ? "&" : "?";
-  return { url: `${recordUrl}${separator}t=${Date.now()}`, headers: void 0 };
-}
-function base64Url(bytes) {
-  let binary = "";
-  for (const byte of new Uint8Array(bytes)) binary += String.fromCharCode(byte);
-  const base64 = typeof btoa === "function" ? btoa(binary) : Buffer.from(binary, "binary").toString("base64");
-  return base64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-}
-function callbackUrl(origin, base = "/") {
-  const path = base.endsWith("/") ? base : `${base}/`;
-  return `${origin}${path}callback`;
-}
-function resolveSource({ query, stored, published }) {
-  if (query) return { url: normaliseUrl(query), source: "query" };
-  if (stored && stored.url)
-    return { ...stored, url: normaliseUrl(stored.url), source: "stored" };
-  if (published && published.url) return { ...published, source: "published" };
-  return null;
 }
 
 const CAPTIONED = /<(img|drupal-media)\b[^>]*\bdata-caption\s*=\s*("([^"]*)"|'([^']*)')[^>]*>/gi;
@@ -830,26 +940,6 @@ function readyGate(win) {
   };
 }
 
-const BACKEND_KEY = "authoring.backend";
-const TOKEN_KEY = "authoring.token";
-const VERIFIER_KEY = "authoring.verifier";
-const RETURN_KEY = "authoring.return";
-function readJson(storage, key) {
-  try {
-    return JSON.parse(storage.getItem(key)) || null;
-  } catch (e) {
-    return null;
-  }
-}
-function writeJson(storage, key, value) {
-  try {
-    if (value) storage.setItem(key, JSON.stringify(value));
-    else storage.removeItem(key);
-    return true;
-  } catch (e) {
-    return false;
-  }
-}
 function sessionRecordToken(options, storage) {
   const destination = resolveDestination(options.destination, options);
   return destination.token ? destination.token(storage) : void 0;
@@ -934,17 +1024,22 @@ function previewStagedContent(store, app) {
 function refreshFromBackend(app) {
   if (!app) return;
   const store = app.$store;
-  const router = store && store.state && store.state.druxtRouter;
-  if (router) {
-    router.routes = {};
-    router.entities = {};
-    router.route = {};
-    router.redirect = null;
+  const state = store && store.state;
+  if (state && state.druxtRouter) {
+    store.replaceState({
+      ...state,
+      druxtRouter: {
+        ...state.druxtRouter,
+        routes: {},
+        entities: {},
+        route: {},
+        redirect: null
+      }
+    });
   }
-  const druxt = store && store.state && store.state.druxt;
-  if (druxt) {
-    druxt.collections = {};
-    druxt.resources = {};
+  if (store && store.state && store.state.druxt) {
+    store.commit("druxt/flushCollection", {});
+    store.commit("druxt/flushResource", {});
   }
   if (app.$druxt) app.$druxt.index = {};
   const pending = [];
@@ -957,117 +1052,94 @@ function refreshFromBackend(app) {
   refetch(app);
   return Promise.all(pending).then(() => void 0);
 }
-function randomVerifier() {
-  const bytes = new Uint8Array(32);
-  window.crypto.getRandomValues(bytes);
-  return base64Url(bytes);
-}
-async function challengeFor(verifier) {
-  const digest = await window.crypto.subtle.digest(
-    "SHA-256",
-    new TextEncoder().encode(verifier)
-  );
-  return base64Url(digest);
-}
-function createAuth(ice, context) {
-  const routerBase = context.base || "/";
-  const restored = readJson(window.sessionStorage, TOKEN_KEY);
+function createAuth(ice, context, whenReady = (fn) => fn()) {
+  const $auth = () => context.app && context.app.$auth || context.$auth || null;
   const auth = Vue__default["default"].observable({
-    token: restored && restored.token || null,
-    account: restored && restored.account || null,
+    get token() {
+      const a = $auth();
+      return a && a.strategy && a.strategy.token ? bareToken(a.strategy.token.get()) : null;
+    },
+    get account() {
+      const a = $auth();
+      return a && a.user || null;
+    },
     get authenticated() {
-      return Boolean(auth.token);
+      const a = $auth();
+      return Boolean(a && a.loggedIn);
+    },
+    /**
+     * How the cart sends a save: through the client druxt-auth intercepts,
+     * so an expired token is refreshed and the save replayed, rather than
+     * through a bare `fetch` that nothing recovers.
+     */
+    get request() {
+      const client = context.app && context.app.$druxt || context.$druxt;
+      return fetchThroughAxios(client && client.axios);
     },
     async login() {
-      const backend = ice.state.url;
-      const clientId = ice.state.clientId;
-      if (!backend) throw new Error("No backend connected.");
-      if (!clientId) throw new Error("No OAuth client ID for this backend.");
-      const verifier = randomVerifier();
-      window.sessionStorage.setItem(VERIFIER_KEY, verifier);
-      window.sessionStorage.setItem(
-        RETURN_KEY,
+      if (!ice.state.url) throw new Error("No backend connected.");
+      if (!ice.state.clientId) {
+        throw new Error("No OAuth client ID for this backend.");
+      }
+      const a = $auth();
+      if (!a) throw new Error("No sign-in module: druxt-auth is not installed.");
+      a.$storage.setUniversal(
+        "redirect",
         window.location.pathname + window.location.search
       );
-      const params = new URLSearchParams({
-        response_type: "code",
-        client_id: clientId,
-        redirect_uri: callbackUrl(window.location.origin, routerBase),
-        code_challenge: await challengeFor(verifier),
-        code_challenge_method: "S256"
-      });
-      window.location.assign(`${backend}/oauth/authorize?${params}`);
+      return a.loginWith(AUTH_STRATEGY);
     },
-    async completeLogin(code) {
-      const backend = ice.state.url;
-      const verifier = window.sessionStorage.getItem(VERIFIER_KEY);
-      if (!backend) throw new Error("No backend connected.");
-      if (!verifier) throw new Error("No PKCE verifier: start the login again.");
-      const body = new URLSearchParams({
-        grant_type: "authorization_code",
-        client_id: ice.state.clientId,
-        redirect_uri: callbackUrl(window.location.origin, routerBase),
-        code_verifier: verifier,
-        code
-      });
-      const response = await window.fetch(`${backend}/oauth/token`, {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body
-      });
-      window.sessionStorage.removeItem(VERIFIER_KEY);
-      if (!response.ok) {
-        const detail = await response.json().catch(() => ({}));
-        throw new Error(
-          detail.error_description || detail.error || `Token request failed (${response.status}).`
-        );
-      }
-      const payload = await response.json();
-      auth.token = payload.access_token;
-      await auth.loadAccount();
-      persist();
+    async logout() {
+      const a = $auth();
+      if (a) await a.logout();
       applyToken();
-      return auth.token;
     },
-    async loadAccount() {
-      try {
-        const response = await window.fetch(`${ice.state.url}/oauth/userinfo`, {
-          headers: { Authorization: `Bearer ${auth.token}` }
-        });
-        auth.account = response.ok ? await response.json() : null;
-      } catch (e) {
-        auth.account = null;
-      }
-    },
-    consumeReturnPath() {
-      const path = window.sessionStorage.getItem(RETURN_KEY);
-      window.sessionStorage.removeItem(RETURN_KEY);
-      return path || routerBase;
-    },
-    logout() {
-      auth.token = null;
-      auth.account = null;
-      writeJson(window.sessionStorage, TOKEN_KEY, null);
-      applyToken();
+    /**
+     * Drop tokens another backend issued, and take them off the client.
+     *
+     * Called when the connection switches, before any request goes to the
+     * new backend, so the header never carries a token it did not mint.
+     */
+    dropForeignTokens(backend) {
+      const dropped = dropForeignTokens($auth(), backend);
+      if (dropped) applyToken();
+      return dropped;
     }
   });
-  function persist() {
-    writeJson(window.sessionStorage, TOKEN_KEY, {
-      token: auth.token,
-      account: auth.account
-    });
-  }
   function applyToken() {
     const client = context.app && context.app.$druxt || context.$druxt;
     if (!client || !client.axios) return;
-    if (auth.token) {
-      client.axios.defaults.headers.common.Authorization = `Bearer ${auth.token}`;
+    const token = auth.token;
+    if (token) {
+      client.axios.defaults.headers.common.Authorization = `Bearer ${token}`;
     } else {
       delete client.axios.defaults.headers.common.Authorization;
     }
   }
   auth.applyToken = applyToken;
-  applyToken();
+  function sendLiveToken() {
+    const client = context.app && context.app.$druxt || context.$druxt;
+    const axios = client && client.axios;
+    if (!axios || !axios.interceptors || axios.__druxtIceToken) return false;
+    axios.__druxtIceToken = true;
+    axios.interceptors.request.use((config) => {
+      const token = auth.token;
+      if (!token) return config;
+      return {
+        ...config,
+        headers: { ...config.headers, Authorization: `Bearer ${token}` }
+      };
+    });
+    return true;
+  }
+  whenReady(() => {
+    applyToken();
+    sendLiveToken();
+    const a = $auth();
+    if (a && a.$storage && typeof a.$storage.watchState === "function") {
+      a.$storage.watchState("loggedIn", applyToken);
+    }
+  });
   return auth;
 }
 function createIce(options, context) {
@@ -1111,6 +1183,7 @@ function createIce(options, context) {
       state.url = normaliseUrl(url);
       state.source = source;
       state.status = "connected";
+      ice.auth.dropForeignTokens({ url: state.url });
       pointClientAt(context, state.url);
       writeJson(window.localStorage, BACKEND_KEY, {
         url: state.url,
@@ -1191,7 +1264,7 @@ function createIce(options, context) {
       return ice.connect(chosen.url, chosen.source);
     }
   };
-  ice.auth = createAuth(ice, context);
+  ice.auth = createAuth(ice, context, whenReady);
   return ice;
 }
 async function installIce(options, context, inject) {
@@ -1418,6 +1491,18 @@ const state = () => ({
   persistent: true,
   /** Per-entry failure reasons from the last commit. */
   errors: {},
+  /**
+   * Per-entry, per-field reasons from the last commit, where the backend
+   * pointed at a field. The whole-entry message stays in `errors`; this is
+   * what a form shows next to the field it concerns.
+   */
+  fieldErrors: {},
+  /**
+   * Per-entry alerts the backend sent back with an accepted write, as
+   * `meta.vale` carries them. They do not block, so the entry is gone from
+   * the cart by the time they are read, and they survive it going.
+   */
+  warnings: {},
   committing: false
 });
 const getters = {
@@ -1450,7 +1535,16 @@ const getters = {
     })
   ],
   draftFor: (state2) => (type, id) => state2.drafts[cartKey(type, id)] || null,
-  errorFor: (state2) => (type, id) => state2.errors[cartKey(type, id)] || null
+  errorFor: (state2) => (type, id) => state2.errors[cartKey(type, id)] || null,
+  /** `{ field: [reason, ...] }` for an entry the backend refused, or null. */
+  fieldErrorsFor: (state2) => (type, id) => state2.fieldErrors[cartKey(type, id)] || null,
+  /** Alerts the backend sent back with an accepted write, or null. */
+  warningsFor: (state2) => (type, id) => state2.warnings[cartKey(type, id)] || null,
+  /** Every accepted write's alerts, newest last, for a list after a commit. */
+  warnings: (state2) => Object.entries(state2.warnings).map(([key, alerts]) => {
+    const [type, id] = key.split(":");
+    return { type, id, alerts };
+  })
 };
 const mutations = {
   setEditing(state2, editing) {
@@ -1468,14 +1562,18 @@ const mutations = {
   stage(state2, { key, resource }) {
     state2.entries = { ...state2.entries, [key]: resource };
     state2.errors = without(state2.errors, key);
+    state2.fieldErrors = without(state2.fieldErrors, key);
+    state2.warnings = without(state2.warnings, key);
   },
   discardOne(state2, key) {
     state2.entries = without(state2.entries, key);
     state2.errors = without(state2.errors, key);
+    state2.fieldErrors = without(state2.fieldErrors, key);
   },
   discardAll(state2) {
     state2.entries = {};
     state2.errors = {};
+    state2.fieldErrors = {};
   },
   restore(state2, entries) {
     state2.entries = entries;
@@ -1483,8 +1581,12 @@ const mutations = {
   setPersistent(state2, persistent) {
     state2.persistent = persistent;
   },
-  setError(state2, { key, message }) {
+  setError(state2, { key, message, fields }) {
     state2.errors = { ...state2.errors, [key]: message };
+    state2.fieldErrors = fields && Object.keys(fields).length ? { ...state2.fieldErrors, [key]: fields } : without(state2.fieldErrors, key);
+  },
+  setWarnings(state2, { key, alerts }) {
+    state2.warnings = alerts && alerts.length ? { ...state2.warnings, [key]: alerts } : without(state2.warnings, key);
   },
   setCommitting(state2, committing) {
     state2.committing = committing;
@@ -1890,7 +1992,8 @@ const actions = {
     if (!backendUrl) return { ok: false, reason: "No backend connected." };
     if (!token) return { ok: false, reason: "Not signed in to that backend." };
     if (getters2.isEmpty) return { ok: false, reason: "Nothing staged." };
-    const request = fetchImpl || window.fetch.bind(window);
+    const ice = this && this.$druxtIce;
+    const request = fetchImpl || ice && ice.auth && ice.auth.request || window.fetch.bind(window);
     const all = Object.values(state2.entries);
     const chosen = ids ? new Set(withDependencies(ids, all)) : null;
     const sending = chosen ? all.filter((resource) => chosen.has(resource.id)) : all;
@@ -1935,12 +2038,15 @@ const actions = {
         });
         if (!response.ok) {
           const detail = await response.json().catch(() => null);
-          const message = detail && detail.errors && detail.errors[0] && detail.errors[0].detail || `Rejected with ${response.status}.`;
-          commit("setError", { key, message });
+          const errors = detail && detail.errors || [];
+          const message = errors[0] && errors[0].detail || `Rejected with ${response.status}.`;
+          commit("setError", { key, message, fields: fieldErrorsFrom(errors) });
           results.failed += 1;
           continue;
         }
+        const accepted = await response.json().catch(() => null);
         commit("discardOne", key);
+        commit("setWarnings", { key, alerts: warningsFrom(accepted) });
         results.sent += 1;
       } catch (error) {
         commit("setError", { key, message: error.message });
@@ -1952,6 +2058,24 @@ const actions = {
     return { ok: results.failed === 0, ...results };
   }
 };
+function fieldErrorsFrom(errors) {
+  const fields = {};
+  for (const error of Array.isArray(errors) ? errors : []) {
+    const pointer = String(((error || {}).source || {}).pointer || "");
+    const match = /^\/data\/(?:attributes|relationships)\/([^/]+)/.exec(pointer);
+    if (!match) continue;
+    const field = match[1];
+    const reason = String((error || {}).detail || (error || {}).title || "");
+    if (!reason) continue;
+    fields[field] = [...fields[field] || [], reason];
+  }
+  return fields;
+}
+function warningsFrom(document) {
+  const vale = ((document || {}).meta || {}).vale;
+  const alerts = vale && Array.isArray(vale.alerts) ? vale.alerts : [];
+  return alerts.filter((alert) => alert && typeof alert === "object");
+}
 const iceStoreModule = {
   namespaced: true,
   state,
@@ -1977,7 +2101,10 @@ const DEFAULTS = {
   // options reach the plugin through JSON.stringify and functions do not
   // survive it. Null means the default destination: the record's plain URL,
   // and a token wherever `sessionRecord.tokenKey` says one is.
-  destination: null
+  destination: null,
+  // Passed on to druxt-auth, which signs the author in. `false` leaves
+  // druxt-auth out, for a site that brings its own sign-in.
+  auth: {}
 };
 function resolveOptions(moduleOptions = {}, nuxtOptions = {}) {
   const configured = {
@@ -1993,12 +2120,52 @@ function resolveOptions(moduleOptions = {}, nuxtOptions = {}) {
     }
   };
 }
-const NuxtModule = function(moduleOptions = {}) {
+async function requireAuth(container, options) {
+  if (options.auth === false) return false;
+  const required = Object.keys(container.requiredModules || {});
+  if (required.some((key) => key.includes("druxt-auth"))) {
+    console.warn(
+      "[druxt-ice] druxt-auth is already required; list it after this module, or leave it to this module, so signing in follows the connected backend."
+    );
+    return false;
+  }
+  const auth = container.options.auth || {};
+  const strategies = auth.strategies || {};
+  container.options.auth = {
+    ...auth,
+    strategies: {
+      ...strategies,
+      [AUTH_STRATEGY]: {
+        scheme: path.resolve(__dirname, "../templates/auth-scheme.js"),
+        ...strategies[AUTH_STRATEGY] || {}
+      }
+    }
+  };
+  const build = container.options.build || (container.options.build = {});
+  const transpile = build.transpile || (build.transpile = []);
+  if (!transpile.includes("druxt-auth/templates")) {
+    transpile.push("druxt-auth/templates");
+  }
+  const configured = ((container.options.druxt || {}).auth || {}).clientId;
+  await container.requireModule([
+    "druxt-auth",
+    {
+      // The site's dialog is the way in; druxt-auth's login page is not asked
+      // for unless the site asks for it.
+      login: false,
+      ...options.clientId || !configured ? { clientId: options.clientId || "druxt-ice" } : {},
+      ...options.auth || {}
+    }
+  ]);
+  return true;
+}
+const NuxtModule = async function(moduleOptions = {}) {
   const options = resolveOptions(moduleOptions, this.options);
   this.options.store = true;
   this.nuxt.hook("components:dirs", (dirs) => {
     dirs.push({ path: path.join(__dirname, "components") });
   });
+  await requireAuth(this, options);
   this.addPlugin({
     src: path.resolve(__dirname, "../templates/plugin.js"),
     fileName: "druxt-ice.js",
@@ -2008,6 +2175,7 @@ const NuxtModule = function(moduleOptions = {}) {
 
 exports.ADAPTER_METHODS = ADAPTER_METHODS;
 exports.ADVANCED_FIELDS = ADVANCED_FIELDS;
+exports.AUTH_STRATEGY = AUTH_STRATEGY;
 exports.BACKEND_KEY = BACKEND_KEY;
 exports.BUILT = BUILT;
 exports.CAPTION_FILTER = CAPTION_FILTER;
@@ -2019,12 +2187,10 @@ exports.DIFF_TYPE = DIFF_TYPE;
 exports.DRUPAL_FILES = DRUPAL_FILES;
 exports.ENTITY_ATTRIBUTE = ENTITY_ATTRIBUTE;
 exports.FIELD_ATTRIBUTE = FIELD_ATTRIBUTE;
-exports.RETURN_KEY = RETURN_KEY;
+exports.ISSUER_KEY = ISSUER_KEY;
 exports.STAGED = STAGED;
 exports.STATIC_FILES = STATIC_FILES;
-exports.TOKEN_KEY = TOKEN_KEY;
 exports.TYPE_ATTRIBUTE = TYPE_ATTRIBUTE;
-exports.VERIFIER_KEY = VERIFIER_KEY;
 exports.absoluteFileUrls = absoluteFileUrls;
 exports.adapterSupports = adapterSupports;
 exports.applyCaptionFilter = applyCaptionFilter;
@@ -2032,6 +2198,8 @@ exports.asResource = asResource;
 exports.asText = asText;
 exports.autoCreateTarget = autoCreateTarget;
 exports.autocompleteUrl = autocompleteUrl;
+exports.backendFor = backendFor;
+exports.bareToken = bareToken;
 exports.base64Url = base64Url;
 exports.bustCache = bustCache;
 exports.callbackUrl = callbackUrl;
@@ -2055,6 +2223,7 @@ exports.dependencyMap = dependencyMap;
 exports.destinationRequest = destinationRequest;
 exports.destinationSupports = destinationSupports;
 exports.diffLines = diffLines;
+exports.dropForeignTokens = dropForeignTokens;
 exports.druxtClients = druxtClients;
 exports.editModeFeature = editModeFeature;
 exports.editorFileUrls = editorFileUrls;
@@ -2062,8 +2231,10 @@ exports.entityAnchors = entityAnchors;
 exports.exportCart = exportCart;
 exports.exportSummary = exportSummary;
 exports.failsFilters = failsFilters;
+exports.fetchThroughAxios = fetchThroughAxios;
 exports.fieldAnchors = fieldAnchors;
 exports.fieldChanged = fieldChanged;
+exports.fieldErrorsFrom = fieldErrorsFrom;
 exports.fieldOps = fieldOps;
 exports.fieldStatus = fieldStatus;
 exports.fileIsAllowed = fileIsAllowed;
@@ -2098,6 +2269,7 @@ exports.parseSize = parseSize;
 exports.patchBody = patchBody;
 exports.patchUrl = patchUrl;
 exports.pointClientAt = pointClientAt;
+exports.pointStrategyAt = pointStrategyAt;
 exports.previewStagedContent = previewStagedContent;
 exports.previewsFor = previewsFor;
 exports.readJson = readJson;
@@ -2109,6 +2281,7 @@ exports.relativeFileUrls = relativeFileUrls;
 exports.replaceHeldImage = replaceHeldImage;
 exports.requestMethod = requestMethod;
 exports.requestUrl = requestUrl;
+exports.requireAuth = requireAuth;
 exports.requiredBy = requiredBy;
 exports.resolveDestination = resolveDestination;
 exports.resolveFeatures = resolveFeatures;
@@ -2116,6 +2289,7 @@ exports.resolveOptions = resolveOptions;
 exports.resolveSource = resolveSource;
 exports.rewriteFileUrls = rewriteFileUrls;
 exports.safeFilename = safeFilename;
+exports.safeStorage = safeStorage;
 exports.sessionRecordToken = sessionRecordToken;
 exports.stagedDiff = stagedDiff;
 exports.storedFileUrls = storedFileUrls;
@@ -2124,10 +2298,12 @@ exports.tidyResource = tidyResource;
 exports.toDateInput = toDateInput;
 exports.toRelationship = toRelationship;
 exports.toggleEditMode = toggleEditMode;
+exports.tokensAreForeign = tokensAreForeign;
 exports.uploadHeaders = uploadHeaders;
 exports.uploadUrl = uploadUrl;
 exports.valuesBefore = valuesBefore;
 exports.viewModesFor = viewModesFor;
+exports.warningsFrom = warningsFrom;
 exports.withDependencies = withDependencies;
 exports.withoutComputed = withoutComputed;
 exports.words = words;

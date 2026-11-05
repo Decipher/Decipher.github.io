@@ -539,6 +539,69 @@ function drush(string $command, mixed $args = NULL, ?int &$exit_code = NULL): st
 }
 
 /**
+ * Make the OAuth key pair, or keep the one this checkout has.
+ *
+ * The committed simple_oauth settings point at ../keys/*.key, relative to
+ * web/. The files are not committed, so a fresh checkout makes its own pair.
+ * An existing pair is kept: replacing it would log out every session that
+ * holds a token signed with it. The private key is the pair, so when only the
+ * public key is missing or does not match, it is written again from the
+ * private one rather than both being replaced. The two are compared as
+ * OpenSSL writes them, so the stored file's own line endings and wrapping do
+ * not count as a difference. A private key that is there but cannot be read
+ * stops the run: a permission slip must not cost every session its token.
+ * A new pair is made only when there is no private key at all.
+ */
+function ensure_oauth_keys(string $keys_dir): void {
+  $private_file = $keys_dir . '/private.key';
+  $public_file = $keys_dir . '/public.key';
+  if (is_file($private_file)) {
+    $private = openssl_pkey_get_private((string) file_get_contents($private_file));
+    $derived = $private ? (openssl_pkey_get_details($private)['key'] ?? NULL) : NULL;
+    if ($derived === NULL) {
+      FAIL('The private key at %s exists but cannot be read. Fix it, or remove it to start a new pair; every token signed with it stops working then.', $private_file);
+    }
+    $public = is_file($public_file) ? openssl_pkey_get_public((string) file_get_contents($public_file)) : FALSE;
+    $stored = $public ? (openssl_pkey_get_details($public)['key'] ?? NULL) : NULL;
+    if ($stored === $derived) {
+      PASS('OAuth key pair already present at %s.', $keys_dir);
+      return;
+    }
+    NOTE('The public key at %s is missing or does not match; writing it from the private key.', $keys_dir);
+    if (file_put_contents($public_file, $derived) !== strlen($derived) || !chmod($public_file, 0600)) {
+      FAIL('Unable to write %s.', $public_file);
+    }
+    PASS('OAuth public key written at %s.', $keys_dir);
+    return;
+  }
+  if (is_file($public_file)) {
+    NOTE('A public key with no private key at %s; generating a new pair.', $keys_dir);
+    unlink($public_file);
+  }
+  if (!is_dir($keys_dir) && !mkdir($keys_dir, 0755, TRUE) && !is_dir($keys_dir)) {
+    FAIL('Unable to create %s.', $keys_dir);
+  }
+  // An absolute path: the command writes to disk at once, from its own cwd.
+  drush('simple-oauth:generate-keys %s', $keys_dir);
+  PASS('OAuth key pair generated at %s.', $keys_dir);
+}
+
+/**
+ * The client ID of the committed authoring Consumer.
+ *
+ * The Consumer is Tome content, exported under content/ by its client ID, so
+ * the file name is the record. The frontend is built for this ID, and both
+ * provisioning scripts read it from here rather than each pinning a literal.
+ */
+function committed_consumer_id(): string {
+  $exports = glob('content/consumer.*.json') ?: [];
+  if (count($exports) !== 1) {
+    FAIL('Expected one content/consumer.*.json, found %d.', count($exports));
+  }
+  return substr(basename($exports[0], '.json'), strlen('consumer.'));
+}
+
+/**
  * Check if debug mode is enabled.
  */
 function is_debug(): bool {

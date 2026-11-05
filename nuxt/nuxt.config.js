@@ -353,6 +353,25 @@ export default async () => ({
     },
   },
 
+  // Where nuxt/auth keeps the sign-in. Its default is a cookie and local
+  // storage, both readable by any script on this origin, and local storage
+  // outlives the browser. The cookie alone is enough: it carries the strategy,
+  // the tokens, and the state and code verifier that an OAuth round trip has
+  // to find again on the way back from the backend, which is why the sign-in
+  // cannot live in memory only. With no expiry set it is a session cookie,
+  // gone when the browser closes, and a built site sends it over HTTPS only.
+  // The Nuxt CLI sets NODE_ENV before it reads this file, so a build or a
+  // generate is production and `nuxt dev` is not. Browsers treat localhost as
+  // secure, so a built site previewed there still signs in.
+  auth: {
+    localStorage: false,
+    cookie: {
+      options: {
+        secure: process.env.NODE_ENV === 'production',
+      },
+    },
+  },
+
   // Auto import components: https://go.nuxtjs.dev/config-components
   components: true,
 
@@ -402,6 +421,7 @@ export default async () => ({
     // Registers `v-diff`, which marks a field's staged change into the markup
     // that field already rendered.
     '@druxt-contrib/diff',
+    '@druxt-contrib/admin',
     localhostListenURL,
   ],
 
@@ -421,6 +441,16 @@ export default async () => ({
     router: { middleware: false },
     // Set the default theme to render Site regions.
     site: { theme: 'olivero' },
+
+    // Drupal's administration. `link` sends /admin/* to the backend, and a
+    // generated site has no admin routes, so on GitHub Pages it renders
+    // nothing. `DRUXT_ADMIN_MODE=proxy npm run dev` serves Drupal's admin
+    // from this origin instead. That is server middleware, so only `dev` runs
+    // it here: this site is a static target, and neither the generated files
+    // nor `nuxt start` on them run server middleware.
+    admin: {
+      mode: process.env.DRUXT_ADMIN_MODE || 'link',
+    },
 
     // Copy the editor builds into this site and load them from here. Needed
     // because the site is served with no backend attached: an author stages

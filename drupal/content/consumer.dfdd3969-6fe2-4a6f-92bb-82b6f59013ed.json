@@ -1,0 +1,144 @@
+{
+    "uuid": [
+        {
+            "value": "dfdd3969-6fe2-4a6f-92bb-82b6f59013ed"
+        }
+    ],
+    "langcode": [
+        {
+            "value": "en"
+        }
+    ],
+    "owner_id": [
+        {
+            "target_type": "user",
+            "target_uuid": "4816a18c-e7e8-464a-96d0-675084ed414c"
+        }
+    ],
+    "client_id": [
+        {
+            "value": "dfdd3969-6fe2-4a6f-92bb-82b6f59013ed"
+        }
+    ],
+    "label": [
+        {
+            "value": "Authoring"
+        }
+    ],
+    "description": [
+        {
+            "value": "In-place content authoring from the deployed static site."
+        }
+    ],
+    "image": [
+        {
+            "target_id": null,
+            "alt": null,
+            "title": null,
+            "width": null,
+            "height": null
+        }
+    ],
+    "third_party": [
+        {
+            "value": true
+        }
+    ],
+    "is_default": [
+        {
+            "value": false
+        }
+    ],
+    "status": [
+        {
+            "value": true
+        }
+    ],
+    "default_langcode": [
+        {
+            "value": true
+        }
+    ],
+    "decoupled_settings_overrides": [],
+    "secret": [],
+    "grant_types": [
+        {
+            "value": "authorization_code"
+        },
+        {
+            "value": "refresh_token"
+        }
+    ],
+    "confidential": [
+        {
+            "value": false
+        }
+    ],
+    "scopes": [],
+    "redirect": [
+        {
+            "value": "https://decipher.github.io/callback"
+        },
+        {
+            "value": "http://localhost:3000/callback"
+        },
+        {
+            "value": "http://localhost:3001/callback"
+        },
+        {
+            "value": "http://localhost:3002/callback"
+        },
+        {
+            "value": "http://localhost:3003/callback"
+        },
+        {
+            "value": "http://localhost:3004/callback"
+        },
+        {
+            "value": "http://localhost:3005/callback"
+        },
+        {
+            "value": "http://localhost:3006/callback"
+        },
+        {
+            "value": "http://localhost:3007/callback"
+        },
+        {
+            "value": "http://localhost:3008/callback"
+        },
+        {
+            "value": "http://localhost:3009/callback"
+        }
+    ],
+    "access_token_expiration": [
+        {
+            "value": 7200
+        }
+    ],
+    "refresh_token_expiration": [
+        {
+            "value": 1209600
+        }
+    ],
+    "user_id": [],
+    "pkce": [
+        {
+            "value": true
+        }
+    ],
+    "automatic_authorization": [
+        {
+            "value": false
+        }
+    ],
+    "remember_approval": [
+        {
+            "value": true
+        }
+    ],
+    "authorization_code_scopes": [
+        {
+            "scope_id": "authoring"
+        }
+    ]
+}
