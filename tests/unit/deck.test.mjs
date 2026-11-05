@@ -269,6 +269,6 @@ test('a string that runs on to the next line is coloured as a string there too',
   assert.ok(!lines[1].includes('deck-code__number'), 'no number is coloured inside the string')
   assert.ok(
     lines[2].includes('<span class="deck-code__key">&quot;source&quot;</span>'),
-    'tokenising resumes after the string closes'
+    'colouring resumes after the string closes'
   )
 })
