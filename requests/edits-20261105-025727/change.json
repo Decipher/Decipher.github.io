@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "generatedAt": "2026-11-05T02:57:27.377Z",
+  "resources": [
+    {
+      "type": "node--slide",
+      "id": "b88bbcf4-645c-4708-8e86-3c39e89ab3eb",
+      "attributes": {
+        "body": {
+          "value": "<p>Simply put, this slide was edited live.</p>",
+          "format": "basic_html",
+          "summary": null
+        }
+      }
+    }
+  ],
+  "deletions": [],
+  "files": []
+}
