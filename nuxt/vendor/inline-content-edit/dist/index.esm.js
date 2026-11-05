@@ -1109,8 +1109,24 @@ function createAuth(ice, context, whenReady = (fn) => fn()) {
     }
   }
   auth.applyToken = applyToken;
+  function sendLiveToken() {
+    const client = context.app && context.app.$druxt || context.$druxt;
+    const axios = client && client.axios;
+    if (!axios || !axios.interceptors || axios.__druxtIceToken) return false;
+    axios.__druxtIceToken = true;
+    axios.interceptors.request.use((config) => {
+      const token = auth.token;
+      if (!token) return config;
+      return {
+        ...config,
+        headers: { ...config.headers, Authorization: `Bearer ${token}` }
+      };
+    });
+    return true;
+  }
   whenReady(() => {
     applyToken();
+    sendLiveToken();
     const a = $auth();
     if (a && a.$storage && typeof a.$storage.watchState === "function") {
       a.$storage.watchState("loggedIn", applyToken);

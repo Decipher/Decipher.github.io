@@ -1,6 +1,6 @@
 # Vendored: @druxt-contrib/inline-content-edit
 
-Built from `druxt/druxt-inline-content-edit`, `feature/9-tokens-follow-the-backend` at commit `eceacc952ee3`.
+Built from `druxt/druxt-inline-content-edit`, `feature/9-tokens-follow-the-backend` at commit `7ca264bf9d43`.
 
 Vendored rather than installed because the package is not published yet.
 Written by `npm run vendor:sync -- inline-content-edit <checkout> <ref>`: run that again
