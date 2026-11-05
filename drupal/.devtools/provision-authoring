@@ -25,7 +25,7 @@
 
 declare(strict_types=1);
 
-namespace QuickstartServerlessDevTools;
+namespace DecipheredDevTools;
 
 require_once __DIR__ . '/helpers.php';
 
@@ -349,8 +349,10 @@ parameters:
     enabled: true
     # Authorization for the bearer token; Content-Type for JSON:API's
     # application/vnd.api+json, which is not a CORS-safelisted value and so
-    # makes every write a preflighted request.
-    allowedHeaders: ['authorization', 'content-type', 'x-csrf-token']
+    # makes every write a preflighted request; Content-Disposition because a
+    # file upload carries its filename in that header, and without it the
+    # preflight fails and an image can be chosen but never sent.
+    allowedHeaders: ['authorization', 'content-type', 'content-disposition', 'x-csrf-token']
     # Explicit, not ['*']: an empty list rejects the preflight outright, and a
     # wildcard is not honoured by every browser.
     allowedMethods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS']
@@ -373,67 +375,6 @@ YAML);
   }
 }
 
-/**
- * Record which exported paths belong to the authoring setup, not to content.
- *
- * Enabling simple_oauth and consumers creates entities the site did not have:
- * a default consumer, an OAuth scope, token bundles, a JWKS path alias. Tome
- * exports on save, so all of them land in `config/` and `content/`.
- *
- * They must not reach a content pull request. They are session infrastructure,
- * they are recreated on every provision, and `consumers` and `simple_oauth`
- * both give their entities a fresh random UUID each time, so committing them
- * would add new files on every single session.
- *
- * `drupal/files` is watched too, because provisioning deletes the committed
- * `files/public/.htaccess`. That is upstream starterkit behaviour, not
- * something authoring causes, but it would show up as a deletion in every
- * session's pull request all the same.
- *
- * Rather than hardcode a list of what to ignore, which would silently rot the
- * first time either module adds an entity, this exports once now and records
- * whatever moved. A session's own export subtracts exactly that set, so what
- * remains is only what a person changed.
- */
-function record_infrastructure_baseline(): void {
-  drush('tome:export --yes');
-
-  $status = shell_exec('git -C .. status --porcelain -- drupal/config drupal/content drupal/files 2>/dev/null');
-  $paths = [];
-  foreach (explode("\n", (string) $status) as $line) {
-    $line = trim($line);
-    if ($line === '') {
-      continue;
-    }
-    // "XY path" - take everything after the two-character status and space.
-    $paths[] = substr($line, strpos($line, ' ') + 1);
-  }
-
-  file_put_contents(__DIR__ . '/.session-infra', implode("\n", $paths) . (($paths === []) ? '' : "\n"));
-
-  // Put the working tree back. The database is the running site; these files
-  // are only the export of it, so discarding them changes nothing that is
-  // serving, and it leaves a clean tree for the session to diff against.
-  restore_paths($paths);
-}
-
-/**
- * Restore a set of exported paths to their committed state.
- */
-function restore_paths(array $paths): void {
-  foreach ($paths as $path) {
-    $escaped = escapeshellarg($path);
-    // Untracked files have nothing to restore to, so remove them instead.
-    exec('git -C .. ls-files --error-unmatch ' . $escaped . ' 2>/dev/null', $out, $tracked);
-    if ($tracked === 0) {
-      exec('git -C .. checkout -- ' . $escaped . ' 2>/dev/null');
-    }
-    else {
-      @unlink('../' . $path);
-    }
-    $out = [];
-  }
-}
 
 /**
  * Generate a random UUID (v4).

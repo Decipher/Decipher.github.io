@@ -1,11 +1,220 @@
+import { DEFAULT_PACKAGES as CKEDITOR_PACKAGES } from '@druxt-contrib/ckeditor'
+import { repositoryFromRemotes } from './lib/github.mjs'
+
 require('dotenv').config({ path: '../.env' })
 
-const baseUrl = process.env.BASE_URL || 'http://quickstart-druxt-serverless.ddev.site'
+/**
+ * Which repository this build belongs to.
+ *
+ * Set explicitly, given by Actions, or asked of git. The last one is what makes
+ * a plain `npm run generate` in a clone produce a site that can find its own
+ * sessions: without it the build carries no session record address, so it gives
+ * up before fetching anything and waits forever on a backend that is already
+ * running. Nothing about that failure names the variable that was missing.
+ *
+ * A consumer's tarball has no `.git` at all, which is the documented install
+ * route, so this has to be allowed to find nothing.
+ */
+function contentRepository() {
+  if (process.env.CONTENT_REPOSITORY) return process.env.CONTENT_REPOSITORY
+  if (process.env.GITHUB_REPOSITORY) return process.env.GITHUB_REPOSITORY
+  try {
+    const remotes = require('child_process')
+      .execSync('git remote -v', { stdio: ['ignore', 'pipe', 'ignore'] })
+      .toString()
+    return repositoryFromRemotes(remotes)
+  } catch {
+    return ''
+  }
+}
+
+const CONTENT_REPOSITORY = contentRepository()
+
+const baseUrl = process.env.BASE_URL || 'http://deciphered.ddev.site'
+
+/**
+ * Put Drupal's public files where the deployed site can serve them.
+ *
+ * An image inserted into a body field is a Drupal file, and its URL is served
+ * by Drupal. A static build has no Drupal, so those images would all be broken
+ * on the deployed site. Tome already exports the files into the repository, so
+ * this copies them into the static output and `ice/src/files.mjs` points the markup
+ * at the copies.
+ *
+ * Into `static/` rather than `dist/`, so `dev` and `start` serve them too.
+ */
+const copyDrupalFiles = function () {
+  const { cpSync, existsSync, mkdirSync, rmSync } = require('fs')
+  const { join } = require('path')
+  const from = join(__dirname, '..', 'drupal', 'files', 'public')
+  const to = join(__dirname, 'static', 'files')
+  if (!existsSync(from)) return
+  // Removed first, so a file deleted in Drupal stops being served here. The
+  // directory is generated, and gitignored for that reason.
+  rmSync(to, { recursive: true, force: true })
+  mkdirSync(to, { recursive: true })
+  cpSync(from, to, {
+    recursive: true,
+    // Drupal's own protection for its files directory, which says nothing about
+    // a static host and confuses the ones that read it.
+    filter: (path) => !path.endsWith('.htaccess'),
+  })
+}
 
 
-// Bound to 0.0.0.0, Nuxt reports the container-internal interface IP as
-// its listen URL - unreachable from the host. Rewrite the reported URL
-// only: the bind stays 0.0.0.0 so container port forwarding keeps working.
+/**
+ * The toolbar each text format is configured for, read at build time.
+ *
+ * It used to be fetched at runtime from `editor--editor` and nothing else, on
+ * the reasoning that a change made in Drupal should reach the frontend without
+ * a deploy. That resource needs `administer filters`, and the OAuth scope an
+ * author signs in with grants the `authenticated` role, which does not have it.
+ * So every real author got the fallback toolbar: no inline code, no image, none
+ * of the buttons this site's own article is written with. The content could not
+ * have been made with the editor that was being offered.
+ *
+ * Granting `administer filters` to read a toolbar would hand every author the
+ * ability to edit text formats, which is how a text format becomes an XSS. The
+ * configuration is already in the repository, exported by Tome, so the build
+ * reads it from there instead. The runtime fetch still wins when it succeeds,
+ * which keeps the no-deploy property for anyone who can actually use it.
+ */
+const configuredToolbars = function () {
+  const { readdirSync, readFileSync } = require('fs')
+  const { join } = require('path')
+  const yaml = require('js-yaml')
+  const dir = join(__dirname, '..', 'drupal', 'config')
+  const toolbars = {}
+  let names = []
+  try {
+    names = readdirSync(dir).filter((name) => /^editor\.editor\..+\.yml$/.test(name))
+  } catch {
+    // A checkout with no Drupal config still builds; it just has no toolbars.
+    return toolbars
+  }
+
+  for (const name of names) {
+    try {
+      const config = yaml.load(readFileSync(join(dir, name), 'utf8')) || {}
+      const items = (((config.settings || {}).toolbar || {}).items) || []
+      const format = config.format || name.replace(/^editor\.editor\.|\.yml$/g, '')
+      if (items.length) toolbars[format] = items
+    } catch {
+      // One unreadable format is not a reason to build without the others.
+    }
+  }
+  return toolbars
+}
+
+/**
+ * The display modes each bundle has, read at build time.
+ *
+ * Same reasoning as `configuredToolbars`. The editor offers a choice of how to
+ * look at what you are writing, and the list comes from Drupal, and asking
+ * Drupal needs a backend. Editing deliberately works without one, and offering
+ * a single "default" there is offering nothing.
+ *
+ * From the filenames, which encode all three parts:
+ * `core.entity_view_display.<entity type>.<bundle>.<mode>.yml`.
+ */
+const configuredViewModes = function () {
+  const { readdirSync } = require('fs')
+  const { join } = require('path')
+  const modes = {}
+  let names = []
+  try {
+    names = readdirSync(join(__dirname, '..', 'drupal', 'config'))
+  } catch {
+    return modes
+  }
+
+  for (const name of names) {
+    const parts = /^core\.entity_view_display\.([^.]+)\.([^.]+)\.([^.]+)\.yml$/.exec(name)
+    if (!parts) continue
+    const [, entityType, bundle, mode] = parts
+    const type = `${entityType}--${bundle}`
+    modes[type] = modes[type] || ['default']
+    if (!modes[type].includes(mode)) modes[type].push(mode)
+  }
+  return modes
+}
+
+/**
+ * Which filters each text format runs, read at build time.
+ *
+ * A caption is stored one of two ways depending on this. With `filter_caption`
+ * on, Drupal builds the figure at render time from a `data-caption` attribute,
+ * so that is where the caption belongs. With it off, nothing ever reads that
+ * attribute and a caption written into it is a caption nobody sees again.
+ *
+ * The integration used to assume it was on, which is true of every format this
+ * site has and is not a safe thing to assume about someone else's. Same source
+ * and same reasoning as `configuredToolbars`: the runtime resource needs
+ * permission that an author's token does not carry.
+ */
+const configuredFilters = function () {
+  const { readdirSync, readFileSync } = require('fs')
+  const { join } = require('path')
+  const yaml = require('js-yaml')
+  const dir = join(__dirname, '..', 'drupal', 'config')
+  const filters = {}
+  let names = []
+  try {
+    names = readdirSync(dir).filter((name) => /^filter\.format\..+\.yml$/.test(name))
+  } catch {
+    return filters
+  }
+
+  for (const name of names) {
+    try {
+      const config = yaml.load(readFileSync(join(dir, name), 'utf8')) || {}
+      const format = config.format || name.replace(/^filter\.format\.|\.yml$/g, '')
+      filters[format] = Object.keys(config.filters || {})
+    } catch {
+      // One unreadable format is not a reason to build without the others.
+    }
+  }
+  return filters
+}
+
+/**
+ * The order a theme declares its regions in, read at build time.
+ *
+ * Druxt derives the region list from the blocks that are placed, so it arrives
+ * in whatever order that query returned: the account menu before the branding,
+ * and a header rendered backwards. This used to be corrected by a list of
+ * regexes in `lib/regions.mjs` guessing the order from region names, which was
+ * a guess at Olivero's naming made because there was no way to ask.
+ *
+ * `decoupled_settings` can serve the theme's declared order now, behind its
+ * `expose_theme_manifest` setting. Read directly rather than through the
+ * vendored Nuxt module, because the vendored build predates the manifest; when
+ * that build is refreshed this should go and the module should supply it.
+ *
+ * An empty list is the honest answer when nothing served it, and
+ * `layoutFor` then falls back to arrival order rather than to a guess.
+ */
+const declaredRegions = async function (baseUrl) {
+  // `axios`, not `fetch`. This build runs on Node 16, which has no global
+  // fetch, so a fetch here throws and the catch below turns that into "no
+  // manifest" - a silent wrong answer rather than an error. It cost an
+  // afternoon of wondering why the payload was empty when curl could see it.
+  const axios = require('axios')
+  const endpoint = `${String(baseUrl).replace(/\/+$/, '')}/jsonapi/decoupled/settings`
+  try {
+    const { data: body } = await axios.get(endpoint, {
+      headers: { Accept: 'application/vnd.api+json' },
+      timeout: 15000,
+    })
+    const data = Array.isArray(body.data) ? body.data[0] : body.data
+    const regions = (((data || {}).attributes || {}).theme || {}).regions || {}
+    return Object.keys(regions)
+  } catch {
+    // A build with no backend still builds; it just cannot order its regions.
+    return []
+  }
+}
+
 const localhostListenURL = function () {
   this.nuxt.hook('listen', (server, listener) => {
     listener.host = 'localhost'
@@ -13,7 +222,10 @@ const localhostListenURL = function () {
   })
 }
 
-export default {
+// An async factory rather than a plain object, because the site's identity is
+// read from Drupal and `publicRuntimeConfig` is serialised the moment this is
+// loaded. Nuxt 2 accepts a function returning a promise here.
+export default async () => ({
   // Target full static build.
   target: 'static',
 
@@ -43,7 +255,7 @@ export default {
 
   // Global page headers: https://go.nuxtjs.dev/config-head
   head: {
-    title: 'quickstart-druxt-site',
+    title: 'Deciphered',
     htmlAttrs: {
       lang: 'en'
     },
@@ -77,10 +289,11 @@ export default {
 
   // Plugins to run before rendering page: https://go.nuxtjs.dev/config-plugins
   plugins: [
-    // Client only: the backend this site is edited against is resolved in the
-    // browser at runtime, and must not be baked into the generated HTML.
-    '~/plugins/authoring.client.js',
-    { src: '~/plugins/authoring-auth.js', mode: 'client' },
+    // The connection and the OAuth half of authoring now come from
+    // @druxt-contrib/inline-content-edit, which registers its own plugin. The
+    // GitHub destination stays here: the module has no destinations interface
+    // yet, and that is tracked as its own issue.
+    '~/plugins/authoring-github.client.js',
   ],
 
   // Values the authoring layer needs at runtime. For a static target these are
@@ -94,8 +307,36 @@ export default {
     // baseline every time the date rolled over in UTC.
     builtAt: new Date().toISOString(),
     authoring: {
+      // The buttons each text format is configured for, from the committed
+      // config. See `configuredToolbars` for why this is not left to runtime.
+      // The theme's own region order, so the header is not assembled in
+      // whatever order the block query happened to return.
+      regions: await declaredRegions(baseUrl),
+
+      toolbars: configuredToolbars(),
+
+      // The display modes each bundle has, so the editor can offer a choice of
+      // them with no backend to ask. See `configuredViewModes`.
+      viewModes: configuredViewModes(),
+
+      // Which filters each format runs, so the editor knows where a caption
+      // belongs. See `configuredFilters`.
+      filters: configuredFilters(),
+
       // Where a session provider publishes the live backend, if anywhere.
-      sessionRecordUrl: process.env.SESSION_RECORD_URL || '',
+      //
+      // Derived from the repository when nothing sets it, because a build that
+      // does not know where sessions publish cannot ever find one: it returns
+      // early before fetching anything, and the interface sits on "Building..."
+      // about a backend that came up minutes ago. The deploy workflow set no
+      // such variable, so that was every deployed build.
+      sessionRecordUrl:
+        process.env.SESSION_RECORD_URL ||
+        (CONTENT_REPOSITORY
+          ? `https://raw.githubusercontent.com/${CONTENT_REPOSITORY}/${
+              process.env.SESSION_BRANCH || 'session'
+            }/session.json`
+          : ''),
       // The OAuth consumer. Provisioning pins this so it is stable across
       // sessions, which is the whole reason the frontend can hold it at build
       // time. The default matches `.devtools/provision-authoring`, so a build
@@ -103,6 +344,12 @@ export default {
       // the right client id rather than an empty one, which fails login with a
       // confusing `invalid_client`.
       clientId: process.env.OAUTH_CLIENT_ID || 'dfdd3969-6fe2-4a6f-92bb-82b6f59013ed',
+      // Where a change request goes. Defaulted from the repository this site is
+      // built from, so a fork gets its own without editing anything, and
+      // overridable for a build that publishes somewhere else.
+      repository: CONTENT_REPOSITORY,
+      // The workflow that stands a backend up on demand.
+      workflow: process.env.AUTHORING_WORKFLOW || 'authoring.yml',
     },
   },
 
@@ -137,7 +384,24 @@ export default {
   // but `npm start` locally should behave like dev does. Matches the
   // druxt.js monorepo's own example placement.
   modules: [
+    copyDrupalFiles,
+    // Before druxt-site, because it reads `druxt.baseUrl` and writes the
+    // settings into the runtime config the rest of the build then uses.
+    //
+    // Vendored, not installed: the package is not published yet, and a
+    // dependency on the branch it lives on would be a private host in a public
+    // repository. See nuxt/vendor/decoupled-settings/README.md.
+    '~/vendor/decoupled-settings',
     'druxt-site',
+    // The authoring engine and the editor, extracted from this site's own
+    // ice/ directory into contrib modules. In `modules` for the same reason
+    // druxt-site is: they register runtime plugins, and Nuxt 2 does not load
+    // buildModules on `nuxt start`.
+    '@druxt-contrib/inline-content-edit',
+    '@druxt-contrib/ckeditor',
+    // Registers `v-diff`, which marks a field's staged change into the markup
+    // that field already rendered.
+    '@druxt-contrib/diff',
     localhostListenURL,
   ],
 
@@ -157,9 +421,43 @@ export default {
     router: { middleware: false },
     // Set the default theme to render Site regions.
     site: { theme: 'olivero' },
+
+    // Copy the editor builds into this site and load them from here. Needed
+    // because the site is served with no backend attached: an author stages
+    // edits offline, and resolving the scripts against a backend URL would
+    // mean no editor at all.
+    ckeditor: {
+      copy: true,
+      packages: CKEDITOR_PACKAGES,
+    },
+
+    // The authoring engine. The same two values the deleted plugins read out
+    // of publicRuntimeConfig, moved to where the module looks for them. The
+    // rest of `publicRuntimeConfig.authoring` stays: the components and the
+    // GitHub destination still read it, and the module knows nothing of it.
+    ice: {
+      clientId:
+        process.env.OAUTH_CLIENT_ID || 'dfdd3969-6fe2-4a6f-92bb-82b6f59013ed',
+      sessionRecord: {
+        url:
+          process.env.SESSION_RECORD_URL ||
+          (CONTENT_REPOSITORY
+            ? `https://raw.githubusercontent.com/${CONTENT_REPOSITORY}/${
+                process.env.SESSION_BRANCH || 'session'
+              }/session.json`
+            : ''),
+        // Where the GitHub sign-in keeps its token. The module reads it to
+        // ask the contents API for the record rather than the CDN, so a
+        // signed-in author sees a backend the moment its job pushes.
+        tokenKey: 'authoring.github',
+      },
+      // This site's record is published to a raw URL behind a CDN, and the
+      // module does not know that host. The destination tells it.
+      destination: '~/plugins/authoring-github-destination.js',
+    },
   },
 
   // Build Configuration: https://go.nuxtjs.dev/config-build
   build: {
   }
-}
+})

@@ -81,6 +81,181 @@ a {
 }
 
 /*
+ * The editing surface, given the same measure and ground as the page.
+ *
+ * CKEditor's editable also carries `prose-body`, so the rules below apply to
+ * both. These are the few that are only right for the editor: it needs a box
+ * to be a field, and it must not inherit the page's centred measure or the
+ * text would sit in the middle of a full width control.
+ */
+.ck-editor__editable.prose-body {
+  @apply rounded border border-hairline bg-paper px-3 py-2;
+
+  min-height: 12rem;
+}
+
+.ck-editor__editable.prose-body p,
+.ck-editor__editable.prose-body li {
+  max-width: none;
+}
+
+/*
+ * Code, restated for the editor.
+ *
+ * CKEditor ships its own `.ck-content code` and `.ck-content pre`, at the same
+ * specificity as the `.prose-body` rules below and loaded after them, so it
+ * wins on source order and inline code turns grey in the editor while it is
+ * dark on the page. Adding the editable's own class puts these one class ahead
+ * and settles it, rather than leaving the two stylesheets to race.
+ */
+.ck-editor__editable.prose-body code {
+  @apply rounded bg-elevated px-1 py-0.5 font-mono text-[0.8125em] text-ink;
+}
+
+.ck-editor__editable.prose-body pre {
+  @apply overflow-hidden rounded-md border border-hairline bg-ink p-0;
+}
+
+.ck-editor__editable.prose-body pre code {
+  @apply block overflow-x-auto rounded-none bg-ink p-5 font-mono text-[13px] leading-relaxed text-paper;
+}
+
+.ck.ck-toolbar {
+  @apply rounded-t border-hairline bg-elevated;
+}
+
+/*
+ * Body text out of Drupal.
+ *
+ * Tailwind's reset strips headings, lists and code back to plain text, which is
+ * right for an interface and wrong for an article: `field/Default.vue` has been
+ * putting a `prose-body` class on every rendered body field, and nothing ever
+ * defined it, so a thousand words of headings, lists and code blocks all
+ * rendered as one undifferentiated block.
+ *
+ * Written out rather than pulled from a typography plugin, because it is a
+ * short list and the design system already decides every value in it.
+ */
+.prose-body > * + * {
+  @apply mt-4;
+}
+
+.prose-body h2 {
+  @apply mt-10 text-xl font-semibold text-ink;
+}
+
+.prose-body h3 {
+  @apply mt-8 text-lg font-semibold text-ink;
+}
+
+.prose-body p,
+.prose-body li {
+  @apply text-body;
+}
+
+/*
+ * The measure, applied to the column rather than to paragraphs.
+ *
+ * It used to sit on `p` and `li` alone, so a paragraph stopped at 68 characters
+ * while the heading above it and the figure below it ran the full width of the
+ * container. The article read as a narrow column of text with headings and
+ * pictures sticking out to the right of it, which looks like a layout that has
+ * come apart rather than a deliberate measure.
+ *
+ * A figure is the exception, and deliberately: a screenshot of a page is
+ * unreadable at text width, so it is allowed the whole column.
+ *
+ * In rem rather than ch. `ch` is the width of a zero in the element's own font,
+ * so the same 68ch gave a heading 816px and a paragraph 612px, and the column
+ * still had a step in its right edge at every heading.
+ */
+.prose-body > *:not(figure) {
+  max-width: 38rem;
+}
+
+.prose-body ul,
+.prose-body ol {
+  @apply pl-6;
+
+  list-style: revert;
+}
+
+.prose-body li + li {
+  @apply mt-1;
+}
+
+.prose-body strong {
+  @apply font-semibold text-ink;
+}
+
+.prose-body code {
+  @apply rounded bg-elevated px-1 py-0.5 font-mono text-[0.8125em] text-ink;
+}
+
+/*
+ * A code block, after `@stuartclark/ui`'s CodeBlock: a bordered box, a dark
+ * ground, and type a size down from the prose so a long command still fits.
+ *
+ * It scrolls rather than wrapping. A wrapped command is a command somebody
+ * copies wrongly.
+ */
+.prose-body pre {
+  @apply relative overflow-hidden rounded-md border border-hairline;
+}
+
+.prose-body pre code {
+  @apply block overflow-x-auto bg-ink p-5 font-mono text-[13px] leading-relaxed text-paper;
+
+  white-space: pre;
+}
+
+/*
+ * The copy button, put there by the field component after the field renders.
+ *
+ * Visible on hover and on focus, because a control nobody can reach with a
+ * keyboard is a control some people do not have.
+ */
+.prose-body .code-copy {
+  @apply absolute right-2 top-2 rounded border border-hairline bg-surface px-2 py-1 font-mono text-[0.6875rem] uppercase tracking-eyebrow text-muted opacity-0 transition-opacity;
+}
+
+.prose-body pre:hover .code-copy,
+.prose-body .code-copy:focus {
+  @apply opacity-100;
+}
+
+.prose-body .code-copy:hover {
+  @apply border-ink text-ink;
+}
+
+.prose-body blockquote {
+  @apply border-l-2 border-hairline pl-4 text-muted;
+}
+
+/*
+ * A figure, after `@stuartclark/ui`'s ImageLightbox: the image in a bordered,
+ * rounded box, and the caption centred underneath in smaller muted type.
+ */
+.prose-body figure {
+  @apply mt-8;
+}
+
+.prose-body figure img,
+.prose-body p > img {
+  @apply w-full rounded-lg border border-hairline object-contain;
+}
+
+.prose-body figcaption {
+  @apply mt-2.5 text-center text-[0.84375rem] text-muted;
+}
+
+/* Clickable, because a screenshot at column width is a screenshot nobody can
+ * read. The handler is added by the field component. */
+.prose-body .zoomable {
+  cursor: zoom-in;
+}
+
+/*
  * Content images come from Drupal at their original size, which is usually far
  * larger than the column they land in. Cap the height as well as the width, so
  * a tall image cannot push the rest of the page off the screen.
@@ -100,4 +275,114 @@ main img {
     animation-duration: 0.01ms !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+/*
+ * The edit panel, kept inside the viewport.
+ *
+ * It used to be an ordinary block in the page flow, so a long article's form
+ * ran thousands of pixels down and the way out was at the bottom of it: to
+ * close an editor you had opened by mistake, you scrolled to the end of it.
+ *
+ * Pinned under whatever the site has already pinned, and no taller than what is
+ * left. `--sticky-top` is published by the layout, which measures the header and
+ * the breadcrumb bar; the number differs between the front page and an article,
+ * so it cannot be a constant here.
+ *
+ * The gap below is for the floating Edits bar, which sits over the bottom of
+ * the page and would otherwise cover the panel's own buttons.
+ */
+.authoring-panel-body {
+  /*
+   * No vertical padding, and the breathing room given as margin on the children
+   * instead.
+   *
+   * In a scroll container a sticky element stops at the padding box, so a
+   * padding-top left a strip of the container above the pinned toolbar with
+   * content sliding through it. A margin belongs to the child and scrolls away
+   * with it, which is what was wanted: space at rest, nothing in the way once
+   * you move.
+   */
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
+.authoring-panel-body > * {
+  @apply my-4;
+}
+
+.authoring-panel {
+  top: calc(var(--sticky-top, 0px) + 0.75rem);
+
+  max-height: calc(100vh - var(--sticky-top, 0px) - 5.5rem);
+}
+
+/*
+ * Small screens have no room to spare, and no mouse to hover a control with.
+ * The panel takes the whole viewport under the header, which is what a phone
+ * does with any editing surface worth the name.
+ */
+@media (max-width: 640px) {
+  .authoring-panel {
+    top: var(--sticky-top, 0px);
+
+    max-height: calc(100vh - var(--sticky-top, 0px) - 4rem);
+  }
+}
+
+/*
+ * The form's own buttons, pinned to the bottom of the panel that scrolls them.
+ *
+ * Staging is the point of the form and it was the one control you had to reach
+ * the end of the fields to find.
+ */
+.authoring-entity-form-fields > .authoring-form-actions {
+  @apply sticky bottom-0 -mx-4 mt-4 border-t border-hairline bg-paper px-4 pt-3;
+
+  /*
+   * Down to the bottom of the panel, not just to the end of the buttons. The
+   * scroll container has its own padding below this, so a background that
+   * stopped at the button row left a transparent strip with the panel's border
+   * under it, and the content scrolled through the gap.
+   */
+  padding-bottom: 1rem;
+}
+
+/*
+ * CKEditor's toolbar, pinned to the panel rather than to the window.
+ *
+ * CKEditor sticks its toolbar to the viewport, which is right when the page
+ * scrolls and wrong here: the fields scroll inside the panel, so the toolbar
+ * detached and floated over the page while the field it belonged to was
+ * somewhere else. `viewportOffset` cannot fix that, because the offset is not
+ * the problem, the scrolling element is.
+ *
+ * So its own behaviour is turned off and the toolbar is stuck to the top of
+ * the scroller instead, which is what a toolbar in a scrolling panel should do.
+ */
+.authoring-panel-body .ck-sticky-panel__content_sticky {
+  position: static !important;
+  width: auto !important;
+}
+
+.authoring-panel-body .ck-sticky-panel__placeholder {
+  display: none !important;
+}
+
+/*
+ * The editor's top bar, not the toolbar inside it.
+ *
+ * A sticky element moves within its own parent, and every wrapper between the
+ * toolbar and here is exactly as tall as the toolbar, so sticking any of them
+ * had nowhere to go. `.ck-editor__top` is a child of the editor itself, which
+ * is as tall as the field.
+ *
+ * `.ck.` in the selector for weight: CKEditor's own stylesheet is injected at
+ * runtime, so it lands after this one and wins every tie on source order. The
+ * same reason the code styling further down carries the editable's class.
+ */
+.authoring-panel-body .ck.ck-editor__top {
+  @apply sticky top-0 z-10;
+
+  background: theme('colors.paper');
 }

@@ -74,5 +74,5 @@ your local checkout. It's never committed.
 | --- | --- | --- |
 | `WEBSERVER_HOST` | `127.0.0.1` | PHP server bind host |
 | `WEBSERVER_PORT` | auto-discovered (8888+) | PHP server port |
-| `DB_FILE` | `/tmp/quickstart-serverless-drupal-site.sqlite` | SQLite database path |
+| `DB_FILE` | `/tmp/deciphered-<key>-site.sqlite`, where `<key>` is unique to the checkout | SQLite database path |
 | `XDEBUG` | unset | Set to any value to enable Xdebug |

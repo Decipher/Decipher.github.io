@@ -1,0 +1,864 @@
+# decoupled_settings #15: expose the active theme's regions, labels and
+# breakpoints.
+#
+# https://github.com/Decipher/decoupled_settings/pull/15
+#
+# Taken from the pull request diff, with hunks removed that modify files the
+# 1.0.0-beta2 release does not ship, because patch stops on a missing file:
+#   tests/src/Functional/JsonApiSettingsResourceTest.php
+#
+# Files the patch creates are kept, obviously: they are absent because the
+# patch adds them.
+#
+# Dogfooding the theme manifest. The frontend reads the theme's declared
+# region order from it, which replaces a list of regexes in lib/regions.mjs
+# that guessed the order from region names because there was no way to ask.
+#
+# Needs `expose_theme_manifest` on, which this site's committed config sets.
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index 9267910..440ca76 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -6,6 +6,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+ and this project adheres to
+ [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+ 
++## Unreleased
++
++### Added
++- The active theme's structure is available as a `theme` attribute on the
++  response: the theme and admin theme names, the config object its settings
++  are read from, its regions as machine name to label in declared order, the
++  regions it hides, and the breakpoints it declares. Regions live in a
++  theme's `.info.yml`, so they are neither entities nor config and nothing
++  else exposes them. A decoupled frontend that groups blocks by region had
++  to hardcode the region names and the theme, and those copies drifted
++  silently. Off by default, and switched on with **Expose the active theme
++  structure**. Structure rather than settings, so it is the same for every
++  consumer and is not overridable.
++
+ ## 1.0.0-beta2 (2026-08-26)
+ 
+ ### Security
+diff --git a/README.md b/README.md
+index a715456..e78bb34 100644
+--- a/README.md
++++ b/README.md
+@@ -8,8 +8,12 @@ Exposes allowlisted simple config over JSON:API, with global values and
+ per-consumer overrides.
+ 
+ A decoupled site can read the site name, slogan, front page, theme logo and
+-favicon over JSON:API, and each frontend can override any of them without
+-holding a copy of the settings it did not change.
++favicon over JSON:API. Simple config is the configuration that is not an
++entity, such as `system.site`, which core's JSON:API cannot serve.
++
++A consumer is a record of one frontend application, created in Drupal by the
++[Consumers](https://www.drupal.org/project/consumers) module. Each one can be
++given its own value for any exposed setting.
+ 
+ For a full description of the module, visit the
+ [project page](https://www.drupal.org/project/decoupled_settings).
+@@ -21,6 +25,7 @@ Submit bug reports and feature suggestions, or track changes in the
+ 
+ - Requirements
+ - Installation
++- The endpoint
+ - Configuration
+ - Features
+ - FAQ
+@@ -48,96 +53,237 @@ Submit bug reports and feature suggestions, or track changes in the
+    drush en decoupled_settings
+    ```
+ 
++## The endpoint
++
++One route, read-only:
++
++```
++GET /jsonapi/decoupled/settings
++```
++
++A consumer names itself with the `X-Consumer-ID` header or the `consumerId`
++query parameter. The value is the consumer's **Client ID**, shown on the
++consumer edit form, not its label or its numeric ID.
++
++```bash
++curl -H 'X-Consumer-ID: partner_frontend' \
++  https://example.com/jsonapi/decoupled/settings
++```
++
++A response, trimmed to one key per group:
++
++```json
++{
++  "data": {
++    "type": "decoupled_settings--settings",
++    "id": "decoupled-settings",
++    "attributes": {
++      "consumer": "partner_frontend",
++      "settings": {
++        "system.site": {
++          "name": "Partner Portal",
++          "slogan": "Same code, different consumer",
++          "page": { "front": "/node", "403": "", "404": "" }
++        },
++        "olivero.settings": {
++          "logo": { "url": "/sites/default/files/logo.svg", "use_default": false },
++          "favicon": { "url": "/core/themes/olivero/favicon.ico", "use_default": true }
++        }
++      },
++      "theme": {
++        "default": "olivero",
++        "admin": "claro",
++        "settings_object": "olivero.settings",
++        "regions": { "header": "Header", "content": "Content" },
++        "regions_hidden": ["page_top", "page_bottom"],
++        "breakpoints": {
++          "olivero.md": {
++            "label": "Medium",
++            "mediaQuery": "all and (min-width: 700px)",
++            "weight": 1,
++            "multipliers": ["1x"]
++          }
++        }
++      }
++    }
++  }
++}
++```
++
++Every exposed key is present with its resolved value, whether it was
++overridden or inherited, so a missing key means it was never exposed. An
++override set to an empty string arrives as `""`, not as `null` and not
++absent.
++
++`settings` is keyed by config object name, so those keys contain dots and
++have to be read as `attributes.settings["system.site"]`. `theme` is `null`
++unless the theme structure is exposed.
++
++`logo.url` and `favicon.url` are `null` when the site has no image to point
++at, which happens when the default is switched off and no file is set.
++Handle that, rather than assuming a string.
++
+ ## Configuration
+ 
+-The exposure list is stored in `decoupled_settings.settings`. On install it
+-exposes `system.site` and the active theme's settings, and nothing else.
++Two screens, both under **Configuration > Services**.
++
++| Screen | Path |
++| --- | --- |
++| Decoupled Settings | `/admin/config/services/decoupled-settings` |
++| A consumer's overrides | `/admin/config/services/consumer/{consumer}/decoupled-settings` |
+ 
+-Manage the exposure list at **Configuration > Services > Decoupled Settings**
+-(`/admin/config/services/decoupled-settings`). The page shows what a frontend
+-would read right now, so a key missing for lack of schema is visible rather
+-than silent.
++The Decoupled Settings screen decides what leaves the site. It previews what
++a frontend would read right now, so a key the schema does not declare shows
++up as missing instead of dropping silently.
+ 
+-Reading the exposed settings requires the **Read decoupled settings**
+-permission. It is not granted to anonymous users. Grant it deliberately if a
+-frontend reads settings without authenticating.
++| Setting | Default | Adds to the response |
++| --- | --- | --- |
++| Exposed config objects | `system.site` | Each listed object, schema-declared keys only |
++| Expose the active theme settings | On | The default theme's settings, with logo and favicon resolved |
++| Expose the active theme structure | Off | The `theme` attribute |
+ 
+-Per-consumer overrides are edited on the consumer itself, at
+-**Configuration > Services > Consumers > Settings**
+-(`/admin/config/services/consumer/{consumer}/decoupled-settings`). Tick a
+-setting to override it. Anything left unticked is inherited, and follows the
+-site value when it changes.
++The consumer screen holds one consumer's overrides, and is reached from the
++consumer itself rather than from the Services menu. Tick a setting to
++override it. Anything left unticked is inherited, and follows the site value
++when it changes.
++
++Reading any of this requires the **Read decoupled settings** permission,
++which is not granted to anonymous users. Granting it to the anonymous role
++at `/admin/people/permissions` makes every exposed key public.
+ 
+ ## Features
+ 
+ - Global values are read from the config objects that already hold them.
+   There is no second copy of the site name to drift or sync.
+-- A consumer stores only the settings it overrides. Everything else is
+-  inherited and follows the site value.
+ - An override set to an empty value stays empty. Clearing the override is a
+-  separate action, and restores inheritance.
++  separate action that restores inheritance.
+ - Only listed config objects are exposed, and within them only the keys
+   their schema declares. Internal keys are always dropped, and an exclusion
+   list removes the rest. The site email address and the notification
+   address are excluded by default.
+ - Logo and favicon come from core's theme settings resolution, as usable
+   URLs with core's fallbacks.
++- The active theme's structure is available as a `theme` attribute, so a
++  frontend that lays out blocks by region reads that map instead of
++  hardcoding it.
+ - Responses carry the config cache tags of every object read, and a cache
+-  context for each consumer negotiation mechanism.
++  context for the `X-Consumer-ID` header and the `consumerId` query
++  parameter.
+ 
+ ## FAQ
+ 
+ **Q: How does a consumer identify itself?**
+ 
+ **A:** With the `X-Consumer-ID` request header, or the `consumerId` query
+-parameter. A request that names no consumer, or one that does not exist,
+-reads the global values.
++parameter. A request that does not name a consumer, or names one that does
++not exist, reads the global values.
+ 
+-That fallback is deliberate, and it means a typo in a build variable ships
+-the global branding with a green build. Assert on `data.attributes.consumer`
+-in your build pipeline: it echoes the consumer that was actually resolved,
+-and it is `null` when none was.
++The fallback is deliberate, but it hides typos. A misspelt consumer ID in a
++build variable serves the global branding, and the build still passes.
++Assert on `data.attributes.consumer`, which names the consumer that was
++resolved, or `null` when none was.
+ 
+ **Q: Does this work with Simple OAuth?**
+ 
+-**A:** Yes, and with no extra setup. Simple OAuth sets `X-Consumer-ID` on the
+-request from the token's consumer, so an authenticated app is identified by
+-its token alone. The OAuth client and the settings consumer are the same
+-entity. A functional test pins this against simple_oauth 6.x. There is no
+-hard dependency, so if that interop ever changes, a token-authenticated
+-request falls back to the global values rather than erroring: one more
+-reason to assert on `data.attributes.consumer`.
++**A:** Yes, and with no extra setup. Simple OAuth reads the token's consumer
++and sets `X-Consumer-ID` on the request, so an authenticated app is
++identified by its token alone. The OAuth client and the settings consumer
++are the same entity. A functional test pins this against simple_oauth 6.x.
++
++Simple OAuth is not a hard dependency. If that header ever stops being set,
++a token-authenticated request reads the global values and does not error.
++Assert on `data.attributes.consumer` to catch that.
+ 
+ **Q: How do translations interact with overrides?**
+ 
+-**A:** Exposed values follow interface language negotiation: a request on a
+-language prefix reads that language's config translations. Per-consumer
+-overrides do not: an override replaces its setting in every language. A
+-setting can be translated, or overridden per consumer, not both at once.
++**A:** Exposed values follow interface language negotiation, so a request on
++a language prefix reads that language's config translations. Per-consumer
++overrides do not: an override replaces its setting in every language. Do
++both and the override wins, in every language.
+ 
+ **Q: Can a frontend write settings back?**
+ 
+ **A:** No. The exposed surface is read-only.
+ 
+-**Q: Why is the output wider than I expected?**
++**Q: Why is a setting missing, or one I did not expect present?**
+ 
+-**A:** Every key the schema declares for an exposed object is included
+-unless it is excluded, and the active theme carries more settings than the
+-obvious branding ones. Review the live preview on the settings form and
+-extend the exclusion list to taste.
++**A:** Everything the schema declares for an exposed object is included
++unless it is excluded, and the active theme holds more settings than the
++obvious branding ones. A key is absent for one of three reasons.
+ 
+-**Q: Why is a setting missing from the output?**
++| Cause | Fix |
++| --- | --- |
++| Its config object is not on the exposure list | Add the object |
++| The object's typed config schema does not declare the key | Nothing here. Undeclared keys are dropped rather than guessed at |
++| The key is on the exclusion list | Remove it from the list |
+ 
+-**A:** Either its config object is not on the exposure list, or the key is not
+-declared in that object's typed config schema, or it is on the exclusion list.
+-Undeclared keys are dropped rather than guessed at.
++The live preview on the settings form shows the current answer for every
++key, so check there before changing anything.
+ 
+ **Q: Can a module expose settings that are not config?**
+ 
+-**A:** Yes. Implement `hook_decoupled_settings_global_alter()` to contribute a
++**A:** Yes. Use `hook_decoupled_settings_global_alter()` to contribute a
+ group of computed values. A contributed setting is overridable per consumer,
+ exactly like one read from config. See `decoupled_settings.api.php`.
+ 
++**Q: What is in the theme structure?**
++
++**A:** Six keys, when **Expose the active theme structure** is on.
++
++| Key | Holds |
++| --- | --- |
++| `default` | The active theme's machine name |
++| `admin` | The admin theme's machine name, or `null` |
++| `settings_object` | The config object the theme's settings are read from |
++| `regions` | Machine name to label, in the theme's declared order |
++| `regions_hidden` | The regions the theme hides. See below, this is not a subset of `regions` |
++| `breakpoints` | Each declared breakpoint's label, media query, weight and multipliers |
++
++`settings_object` is the one to reach for first. It names which of the
++exposed settings groups belongs to the theme, so a client reads that group
++instead of guessing.
++
++**Q: What does exposing the theme structure disclose?**
++
++**A:** For a core or contributed theme, everything in the table above is
++already public in its source. The admin theme's name is the one item a
++decoupled site does not otherwise publish, so a site running a custom admin
++theme discloses that name. That is fingerprinting, not access, and it is why
++the attribute is opt-in.
++
++The structure names the admin theme but does not expose its settings. To
++serve those, add `claro.settings`, or whichever theme it is, to the exposure
++list. That entry is a literal object name. It will not follow a later change
++of admin theme, the way **Expose the active theme settings** follows a
++change of default theme.
++
++**Q: Why does `regions_hidden` name regions that are not in `regions`?**
++
++**A:** Core's `system_info_alter()` adds `page_top` and `page_bottom` to
++every theme's hidden list. It does that whether or not the theme declares
++those regions.
++
++Olivero declares 13 regions, and neither `page_top` nor `page_bottom` is one
++of them. Both are on its hidden list. Nothing appears in both lists, so
++filtering one by the other removes nothing:
++
++```js
++// On Olivero this removes nothing, and gives no sign of it.
++const { regions, regions_hidden } = data.attributes.theme
++const visible = Object.keys(regions).filter((r) => !regions_hidden.includes(r))
++```
++
++Filter if you need to, and check the result. A filter that removes nothing
++looks the same as one that works.
++
++**Q: Can a consumer have its own regions, or the nesting order?**
++
++**A:** Neither, today. The structure describes the theme, so it is the same
++for every consumer and is not merged with the overrides. Nesting and render
++order are not included at all: they exist only in the theme's
++`page.html.twig`, and reporting them would mean parsing templates. What is
++reported is the flat map the theme declares, in its declared order.
++
+ ## Maintainers
+ 
+ - Stuart Clark - [deciphered](https://www.drupal.org/u/deciphered)
+diff --git a/config/install/decoupled_settings.settings.yml b/config/install/decoupled_settings.settings.yml
+index a45fc1b..e698e22 100644
+--- a/config/install/decoupled_settings.settings.yml
++++ b/config/install/decoupled_settings.settings.yml
+@@ -4,6 +4,11 @@ exposed_objects:
+   - system.site
+ # Set to true to also expose the settings of the active theme.
+ expose_theme_settings: true
++# Set to true to also describe the active theme: its regions, their labels
++# and declared order, the regions it hides, the admin theme and the
++# breakpoints it declares. Structure, not settings, so it is the same for
++# every consumer.
++expose_theme_manifest: false
+ # Keys that are never exposed, even though their schema declares them.
+ # Schema bounds the shape of an object, not the sensitivity of its values.
+ excluded_keys:
+diff --git a/config/schema/decoupled_settings.schema.yml b/config/schema/decoupled_settings.schema.yml
+index 9e39d63..e734ce9 100644
+--- a/config/schema/decoupled_settings.schema.yml
++++ b/config/schema/decoupled_settings.schema.yml
+@@ -11,6 +11,9 @@ decoupled_settings.settings:
+     expose_theme_settings:
+       type: boolean
+       label: 'Expose the active theme settings'
++    expose_theme_manifest:
++      type: boolean
++      label: 'Expose the active theme structure'
+     excluded_keys:
+       type: sequence
+       label: 'Never exposed keys'
+diff --git a/decoupled_settings.install b/decoupled_settings.install
+index a489291..d59b24d 100644
+--- a/decoupled_settings.install
++++ b/decoupled_settings.install
+@@ -46,3 +46,19 @@ function decoupled_settings_update_10001(): string {
+   }
+   return 'system.site:mail_notification was already excluded.';
+ }
++
++/**
++ * Add the theme manifest exposure flag, switched off.
++ *
++ * The manifest describes the active theme's regions and breakpoints. It is
++ * new, so an existing site is not opted in to sending it: exposure stays a
++ * decision an administrator makes.
++ */
++function decoupled_settings_update_10002(): string {
++  $config = \Drupal::configFactory()->getEditable('decoupled_settings.settings');
++  if ($config->get('expose_theme_manifest') === NULL) {
++    $config->set('expose_theme_manifest', FALSE)->save();
++    return 'The theme manifest is available on the settings form, switched off.';
++  }
++  return 'The theme manifest flag was already set.';
++}
+diff --git a/decoupled_settings.services.yml b/decoupled_settings.services.yml
+index 1b0ab34..2271c3b 100644
+--- a/decoupled_settings.services.yml
++++ b/decoupled_settings.services.yml
+@@ -5,6 +5,13 @@ services:
+       - '@config.factory'
+       - '@?Drupal\Core\Extension\ThemeSettingsProvider'
+ 
++  decoupled_settings.theme_manifest:
++    class: Drupal\decoupled_settings\ThemeManifest
++    arguments:
++      - '@config.factory'
++      - '@theme_handler'
++      - '@?breakpoint.manager'
++
+   decoupled_settings.merger:
+     class: Drupal\decoupled_settings\SettingsMerger
+ 
+diff --git a/src/Form/SettingsForm.php b/src/Form/SettingsForm.php
+index 6a04ef3..dca90d8 100644
+--- a/src/Form/SettingsForm.php
++++ b/src/Form/SettingsForm.php
+@@ -136,6 +136,13 @@ public function buildForm(array $form, FormStateInterface $form_state): array {
+       '#default_value' => (bool) $config->get('expose_theme_settings'),
+     ];
+ 
++    $form['expose_theme_manifest'] = [
++      '#type' => 'checkbox',
++      '#title' => $this->t('Expose the active theme structure'),
++      '#description' => $this->t('Adds the theme regions, their labels and declared order, the hidden regions, the names of the default and admin themes, and the declared breakpoints. A frontend that lays out blocks by region reads them from here instead of hardcoding them. This describes the theme, so every consumer receives the same answer and it cannot be overridden. The admin theme is named, not read: to expose its settings, add them to the list above by name.'),
++      '#default_value' => (bool) $config->get('expose_theme_manifest'),
++    ];
++
+     $form['excluded_keys'] = [
+       '#type' => 'textarea',
+       '#title' => $this->t('Excluded settings'),
+@@ -321,6 +328,7 @@ public function submitForm(array &$form, FormStateInterface $form_state): void {
+     $this->config('decoupled_settings.settings')
+       ->set('exposed_objects', $form_state->get('exposed_working') ?: [])
+       ->set('expose_theme_settings', (bool) $form_state->getValue('expose_theme_settings'))
++      ->set('expose_theme_manifest', (bool) $form_state->getValue('expose_theme_manifest'))
+       ->set('excluded_keys', $this->lines($form_state->getValue('excluded_keys')))
+       ->save();
+ 
+diff --git a/src/Resource/SettingsResource.php b/src/Resource/SettingsResource.php
+index e180b62..2e6cc81 100644
+--- a/src/Resource/SettingsResource.php
++++ b/src/Resource/SettingsResource.php
+@@ -7,9 +7,11 @@
+ use Drupal\consumers\Entity\ConsumerInterface;
+ use Drupal\Core\Cache\CacheableMetadata;
+ use Drupal\Core\Cache\CacheableResponseInterface;
++use Drupal\Core\Config\ConfigFactoryInterface;
+ use Drupal\Core\DependencyInjection\ContainerInjectionInterface;
+ use Drupal\Core\Entity\EntityTypeManagerInterface;
+ use Drupal\decoupled_settings\SettingsResolver;
++use Drupal\decoupled_settings\ThemeManifest;
+ use Drupal\jsonapi\JsonApiResource\LinkCollection;
+ use Drupal\jsonapi\JsonApiResource\ResourceObject;
+ use Drupal\jsonapi\JsonApiResource\ResourceObjectData;
+@@ -33,6 +35,8 @@ final class SettingsResource extends ResourceBase implements ContainerInjectionI
+   public function __construct(
+     private readonly SettingsResolver $settingsResolver,
+     private readonly EntityTypeManagerInterface $entityTypeManager,
++    private readonly ConfigFactoryInterface $configFactory,
++    private readonly ThemeManifest $themeManifest,
+   ) {}
+ 
+   /**
+@@ -42,9 +46,30 @@ public static function create(ContainerInterface $container): self {
+     return new self(
+       $container->get('decoupled_settings.resolver'),
+       $container->get('entity_type.manager'),
++      $container->get('config.factory'),
++      $container->get('decoupled_settings.theme_manifest'),
+     );
+   }
+ 
++  /**
++   * Builds the theme manifest, when the site exposes it.
++   *
++   * @param \Drupal\Core\Cache\CacheableMetadata $cacheability
++   *   Collects the cache tags of everything that is read.
++   *
++   * @return array|null
++   *   The manifest, or NULL when it is not exposed.
++   */
++  private function manifest(CacheableMetadata $cacheability): ?array {
++    $settings = $this->configFactory->get('decoupled_settings.settings');
++    $cacheability->addCacheableDependency($settings);
++    if (!$settings->get('expose_theme_manifest')) {
++      return NULL;
++    }
++
++    return $this->themeManifest->build($cacheability) ?: NULL;
++  }
++
+   /**
+    * Processes the resource request.
+    *
+@@ -82,6 +107,7 @@ public function process(Request $request, array $resource_types): ResourceRespon
+       [
+         'settings' => $resolved,
+         'consumer' => $consumer?->getClientId(),
++        'theme' => $this->manifest($cacheability),
+       ],
+       new LinkCollection([])
+     );
+@@ -128,6 +154,7 @@ public function getRouteResourceTypes(Route $route, string $route_name): array {
+     $fields = [
+       'settings' => new ResourceTypeAttribute('settings'),
+       'consumer' => new ResourceTypeAttribute('consumer'),
++      'theme' => new ResourceTypeAttribute('theme'),
+     ];
+ 
+     // A non-entity, read-only resource type: not internal, locatable, not
+diff --git a/src/ThemeManifest.php b/src/ThemeManifest.php
+new file mode 100644
+index 0000000..bc0e71c
+--- /dev/null
++++ b/src/ThemeManifest.php
+@@ -0,0 +1,143 @@
++<?php
++
++declare(strict_types=1);
++
++namespace Drupal\decoupled_settings;
++
++use Drupal\Core\Cache\CacheableMetadata;
++use Drupal\Core\Config\ConfigFactoryInterface;
++use Drupal\Core\Extension\ThemeHandlerInterface;
++
++/**
++ * Describes the active theme's structure.
++ *
++ * A theme declares its regions in its .info.yml file. Regions are not
++ * entities and not config, so nothing exposes them over JSON:API. A
++ * decoupled frontend that groups blocks by region has to hardcode the region
++ * names and the theme they belong to, and those copies drift from the
++ * backend without any error.
++ *
++ * This class reads what Drupal records, and only that. It does not read
++ * templates.
++ *
++ * The manifest is structure, not settings. It is the same for every
++ * consumer, so it is not merged with the per-consumer overrides.
++ */
++final readonly class ThemeManifest {
++
++  /**
++   * Constructs the manifest builder.
++   *
++   * @param \Drupal\Core\Config\ConfigFactoryInterface $configFactory
++   *   The config factory.
++   * @param \Drupal\Core\Extension\ThemeHandlerInterface $themeHandler
++   *   The theme handler.
++   * @param object|null $breakpointManager
++   *   The breakpoint manager. Typed object on purpose: the service only
++   *   exists while the breakpoint module is installed.
++   */
++  public function __construct(
++    private ConfigFactoryInterface $configFactory,
++    private ThemeHandlerInterface $themeHandler,
++    private ?object $breakpointManager = NULL,
++  ) {}
++
++  /**
++   * Builds the manifest for the site's active theme.
++   *
++   * @param \Drupal\Core\Cache\CacheableMetadata $cacheability
++   *   Collects the cache tags of everything that is read.
++   *
++   * @return array
++   *   The manifest. Empty if the default theme is not installed.
++   */
++  public function build(CacheableMetadata $cacheability): array {
++    $system_theme = $this->configFactory->get('system.theme');
++    $cacheability->addCacheableDependency($system_theme);
++
++    // A theme is added or removed by installing it, which rewrites
++    // core.extension. The .info.yml itself only changes with the code.
++    $cacheability->addCacheTags(['config:core.extension']);
++
++    $default = (string) ($system_theme->get('default') ?? '');
++    $info = $this->themeInfo($default);
++    if ($info === NULL) {
++      return [];
++    }
++
++    $regions = $info['regions'] ?? [];
++
++    return [
++      'default' => $default,
++      // The admin theme is named, not read. Its settings are exposed only
++      // if an administrator lists the object explicitly.
++      'admin' => (string) ($system_theme->get('admin') ?? '') ?: NULL,
++      // The config object the theme's own settings are read from. A client
++      // reads the settings group under this name instead of guessing which
++      // group belongs to the theme. Naming it does not expose it: the group
++      // is absent unless the theme settings are exposed too.
++      'settings_object' => $default . '.settings',
++      // Machine name to label, in the order the theme declares them. That
++      // order is the only ordering Drupal records.
++      'regions' => array_map(strval(...), $regions),
++      // Regions the theme hides from the block layout screen. Core appends
++      // page_top and page_bottom to every theme in system_info_alter(), so
++      // this list is never empty and can name a region the theme does not
++      // declare. It is passed through as recorded, not subtracted from the
++      // regions above, because a client may have its own reason to render
++      // one.
++      'regions_hidden' => array_values($info['regions_hidden'] ?? []),
++      'breakpoints' => $this->breakpoints($default),
++    ];
++  }
++
++  /**
++   * Reads one theme's .info.yml data.
++   *
++   * @return array|null
++   *   The theme info, or NULL if the theme is not installed.
++   */
++  private function themeInfo(string $theme): ?array {
++    if ($theme === '') {
++      return NULL;
++    }
++    try {
++      return $this->themeHandler->getTheme($theme)->info ?? NULL;
++    }
++    catch (\Throwable) {
++      // The default theme names a theme that is not installed. That is a
++      // broken site, but it must not break this endpoint.
++      return NULL;
++    }
++  }
++
++  /**
++   * Reads the breakpoints a theme declares.
++   *
++   * Breakpoints live in a separate .breakpoints.yml file and are only
++   * readable while the breakpoint module is installed.
++   *
++   * @return array
++   *   Breakpoint id to its label, media query and multipliers. Empty when
++   *   the module is not installed or the theme declares none.
++   */
++  private function breakpoints(string $theme): array {
++    $manager = $this->breakpointManager;
++    if ($manager === NULL || !method_exists($manager, 'getBreakpointsByGroup')) {
++      return [];
++    }
++
++    $breakpoints = [];
++    foreach ($manager->getBreakpointsByGroup($theme) as $id => $breakpoint) {
++      $breakpoints[$id] = [
++        'label' => (string) $breakpoint->getLabel(),
++        'mediaQuery' => $breakpoint->getMediaQuery(),
++        'weight' => (int) $breakpoint->getWeight(),
++        'multipliers' => array_values($breakpoint->getMultipliers()),
++      ];
++    }
++
++    return $breakpoints;
++  }
++
++}
+diff --git a/tests/src/Kernel/ThemeManifestTest.php b/tests/src/Kernel/ThemeManifestTest.php
+new file mode 100644
+index 0000000..a803434
+--- /dev/null
++++ b/tests/src/Kernel/ThemeManifestTest.php
+@@ -0,0 +1,187 @@
++<?php
++
++declare(strict_types=1);
++
++namespace Drupal\Tests\decoupled_settings\Kernel;
++
++use Drupal\Core\Cache\CacheableMetadata;
++use Drupal\KernelTests\KernelTestBase;
++
++/**
++ * Tests the description of the active theme's structure.
++ *
++ * Regions come from a theme's .info.yml, which needs a real installed theme,
++ * so this cannot be a unit test.
++ *
++ * @group decoupled_settings
++ *
++ * @covers \Drupal\decoupled_settings\ThemeManifest
++ */
++class ThemeManifestTest extends KernelTestBase {
++
++  /**
++   * {@inheritdoc}
++   */
++  protected static $modules = [
++    'system',
++    'user',
++    'file',
++    'image',
++    'serialization',
++    'jsonapi',
++    'consumers',
++  ];
++
++  /**
++   * The manifest builder under test.
++   *
++   * @var \Drupal\decoupled_settings\ThemeManifest
++   */
++  protected $manifest;
++
++  /**
++   * {@inheritdoc}
++   */
++  protected function setUp(): void {
++    parent::setUp();
++
++    $this->installConfig(['system']);
++    $this->container->get('theme_installer')->install(['stark']);
++    $this->config('system.theme')->set('default', 'stark')->save();
++
++    $this->enableModules(['decoupled_settings']);
++    $this->manifest = $this->container->get('decoupled_settings.theme_manifest');
++  }
++
++  /**
++   * The manifest names the active theme and the object its settings live in.
++   *
++   * The settings object name is the point. A client reading the settings map
++   * cannot otherwise tell which group belongs to the theme.
++   */
++  public function testNamesTheActiveThemeAndItsSettingsObject(): void {
++    $manifest = $this->manifest->build(new CacheableMetadata());
++
++    $this->assertSame('stark', $manifest['default']);
++    $this->assertSame('stark.settings', $manifest['settings_object']);
++  }
++
++  /**
++   * Regions arrive as machine name to label, in the theme's declared order.
++   *
++   * Order is asserted with assertSame on the key list, not on the set,
++   * because the declared order is the only ordering Drupal records and a
++   * frontend laying out a page depends on it.
++   */
++  public function testRegionsKeepTheirDeclaredOrder(): void {
++    $manifest = $this->manifest->build(new CacheableMetadata());
++
++    // Stark declares no regions, so core's defaults apply. That is a real
++    // case: a theme is not required to declare any.
++    $this->assertSame([
++      'sidebar_first',
++      'sidebar_second',
++      'content',
++      'header',
++      'primary_menu',
++      'secondary_menu',
++      'footer',
++      'highlighted',
++      'help',
++      'page_top',
++      'page_bottom',
++      'breadcrumb',
++    ], array_keys($manifest['regions']));
++    $this->assertSame('Left sidebar', $manifest['regions']['sidebar_first']);
++  }
++
++  /**
++   * Hidden regions carry the theme's own list plus the two core reserves.
++   *
++   * Core appends page_top and page_bottom to every theme in
++   * system_info_alter(), because modules populate those from outside the
++   * block system. So the list is never empty, and a theme's own entries
++   * come first.
++   */
++  public function testHiddenRegionsPassThroughWithTheCoreReserves(): void {
++    $this->container->get('theme_installer')->install(['claro']);
++    $this->config('system.theme')->set('default', 'claro')->save();
++    $manifest = $this->container->get('decoupled_settings.theme_manifest')
++      ->build(new CacheableMetadata());
++
++    $this->assertSame(
++      ['sidebar_first', 'page_top', 'page_bottom'],
++      $manifest['regions_hidden']
++    );
++    $this->assertArrayHasKey('sidebar_first', $manifest['regions']);
++  }
++
++  /**
++   * A theme that hides nothing itself still reports the two core reserves.
++   */
++  public function testCoreReservesAreReportedWhenThemeHidesNothing(): void {
++    $manifest = $this->manifest->build(new CacheableMetadata());
++
++    $this->assertSame(['page_top', 'page_bottom'], $manifest['regions_hidden']);
++  }
++
++  /**
++   * Hidden regions are reported beside the regions, never subtracted.
++   *
++   * A hidden region can be one the theme never declared, so a client cannot
++   * treat the list as a subset. Both lists are reported as Drupal records
++   * them and the client decides.
++   */
++  public function testHiddenRegionsAreNotSubtractedFromRegions(): void {
++    $manifest = $this->manifest->build(new CacheableMetadata());
++
++    foreach ($manifest['regions_hidden'] as $hidden) {
++      $this->assertArrayHasKey($hidden, $manifest['regions']);
++    }
++    $this->assertArrayHasKey('page_top', $manifest['regions']);
++  }
++
++  /**
++   * Breakpoints are empty while the breakpoint module is not installed.
++   */
++  public function testBreakpointsAreEmptyWithoutTheModule(): void {
++    $this->assertSame([], $this->manifest->build(new CacheableMetadata())['breakpoints']);
++  }
++
++  /**
++   * Breakpoints arrive with their media query once the module is installed.
++   */
++  public function testBreakpointsArriveWithTheModule(): void {
++    $this->enableModules(['breakpoint']);
++    $manifest = $this->container->get('decoupled_settings.theme_manifest')
++      ->build(new CacheableMetadata());
++
++    $this->assertSame(
++      '(min-width: 0px)',
++      $manifest['breakpoints']['stark.mobile']['mediaQuery']
++    );
++    $this->assertSame('mobile', $manifest['breakpoints']['stark.mobile']['label']);
++    $this->assertSame(['1x'], $manifest['breakpoints']['stark.mobile']['multipliers']);
++  }
++
++  /**
++   * A default theme that is not installed gives nothing, and does not throw.
++   */
++  public function testUninstalledDefaultThemeGivesNothing(): void {
++    $this->config('system.theme')->set('default', 'no_such_theme')->save();
++
++    $this->assertSame([], $this->manifest->build(new CacheableMetadata()));
++  }
++
++  /**
++   * The manifest carries the cache tags that make it change when it should.
++   */
++  public function testCacheabilityCoversTheThemeSelection(): void {
++    $cacheability = new CacheableMetadata();
++    $this->manifest->build($cacheability);
++
++    $this->assertContains('config:system.theme', $cacheability->getCacheTags());
++    $this->assertContains('config:core.extension', $cacheability->getCacheTags());
++  }
++
++}

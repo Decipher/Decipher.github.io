@@ -216,7 +216,9 @@ build:
   stage: build
   script:
     # Validate and install Composer dependencies.
-    - cd drupal && composer validate --strict && composer install --no-interaction --no-progress
+    # Not --strict: the consumer_node_preview commit pin is deliberate, and strict
+    # mode fails on the warning it raises.
+    - cd drupal && composer validate && composer install --no-interaction --no-progress
 
     # Install Nuxt dependencies. Not `npm run build`/`generate` - Druxt
     # fetches the JSON:API index at build time, so building needs a live
@@ -268,60 +270,12 @@ test_generate:
       - nuxt/dist
     expire_in: 1 day
 
-# The documented consumer flow (`npx giget@1 gh:druxt/... my-site
-# --install`) consumes a tarball: no .git, no preinstalled dependencies,
-# and the root npm install stands everything up. git archive produces
-# that same artifact from this exact commit - giget itself can only
-# fetch refs already pushed to GitHub.
-test_consumer_install:
-  extends: .php-node-setup
-  # The documented minimum, so a pass means the lock and the provisioning
-  # actually work there - not just on a newer PHP.
-  image: php:8.3
-  stage: test
-  needs: []
-  script:
-    - git archive --prefix=site/ "$CI_COMMIT_SHA" | tar -x -C /tmp
-    # `env -u CI`: postinstall deliberately steps aside on CI machines -
-    # this job's whole point is to behave like a consumer machine.
-    - cd /tmp/site && env -u CI npm install
-    - . /tmp/site/.env && curl -sf "${BASE_URL}/jsonapi" | grep -q '"jsonapi"'
-    - cd /tmp/site/nuxt && npm run generate
+# The starter kit's own self-tests are not here: installing it the way a new
+# site does, and the install guardrails on machines without a working PHP.
+# This is a site built on the starter kit, not the starter kit, so those jobs
+# test a product this repository consumes and can only fail for reasons nobody
+# here can act on. The GitHub workflow dropped them for the same reason.
 
-# What the root install promises on machines without a working PHP: a
-# consumer's `npm install` must never fail, `npm run setup` must
-# fail loudly, and a too-old PHP must be rejected by the preflight.
-test_install_guardrails:
-  stage: test
-  image: node:22
-  needs: []
-  script:
-    # npm install without PHP: exits 0 and points at `npm run setup`.
-    - env -u CI npm install > /tmp/install.log 2>&1
-    - grep -q 'The backend needs PHP' /tmp/install.log
-    # npm run setup without PHP: fails, and says what is missing.
-    - if npm run setup > /tmp/setup.log 2>&1; then echo "setup should have failed"; exit 1; fi
-    - grep -q 'Missing required tools' /tmp/setup.log
-    # Too-old PHP: the version preflight rejects it.
-    - |
-      SHIM=$(mktemp -d)
-      printf '#!/bin/sh\necho 8.2.29\n' > "$SHIM/php"
-      printf '#!/bin/sh\nexit 0\n' > "$SHIM/composer"
-      chmod +x "$SHIM/php" "$SHIM/composer"
-      if PATH="$SHIM:$PATH" npm run setup > /tmp/old-php.log 2>&1; then echo "setup should have failed"; exit 1; fi
-      grep -q 'too old' /tmp/old-php.log
-    # Too-old PHP through npm install: the preflight exits the process, so
-    # without postinstall screening first this would fail the install.
-    - |
-      SHIM=$(mktemp -d)
-      printf '#!/bin/sh\necho 8.2.29\n' > "$SHIM/php"
-      printf '#!/bin/sh\nexit 0\n' > "$SHIM/composer"
-      chmod +x "$SHIM/php" "$SHIM/composer"
-      PATH="$SHIM:$PATH" env -u CI npm install > /tmp/old-php-install.log 2>&1
-      grep -q 'The backend needs PHP' /tmp/old-php-install.log
-
-#
-# --- Session Stage ---
 #
 # An authoring session: stand the backend up, expose it, hold it open while
 # someone writes, and turn what they wrote into a merge request.
@@ -350,11 +304,12 @@ session:authoring:
   before_script:
     - !reference [.php-node-setup, before_script]
     # cloudflared is not in the image. A Quick Tunnel needs no account and no
-    # credential, so this is just the binary.
-    - curl -sSL -o /usr/local/bin/cloudflared
-      https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64
-    - chmod +x /usr/local/bin/cloudflared
-    - cloudflared --version
+    # credential, so this is just the binary. The script pins the version,
+    # checks the digest and picks the build for the runner's own architecture:
+    # these runners are arm64, and an amd64 binary starts here under emulation
+    # rather than failing, which is worse. It then takes seconds to publish a
+    # hostname where it should take milliseconds.
+    - scripts/install-cloudflared.sh
     # Created up front: a session that fails before the tunnel starts would
     # otherwise have no artifact path, and the upload error masks the real one.
     - mkdir -p drupal/.logs && touch drupal/.logs/.keep
@@ -418,9 +373,7 @@ preview:frontend:
     PREVIEW_MINUTES: '55'
   before_script:
     - !reference [.php-node-setup, before_script]
-    - curl -sSL -o /usr/local/bin/cloudflared
-      https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64
-    - chmod +x /usr/local/bin/cloudflared
+    - scripts/install-cloudflared.sh
     - mkdir -p .logs && touch .logs/.keep
   script:
     - scripts/preview-frontend.sh
@@ -437,3 +390,20 @@ test_visual:
   extends: .playwright
   script:
     - npm run test:visual
+
+# New baselines, made on the runner that compares against them. Manual, and
+# handed back as an artifact rather than committed: a changed baseline is a
+# changed design, and someone approves the design by looking at the PNGs
+# before they replace the committed ones. Never regenerate them on a laptop,
+# where fonts and Chromium differ from the runner's.
+test_visual_update:
+  extends: .playwright
+  when: manual
+  allow_failure: true
+  script:
+    - npm run test:visual:update
+  artifacts:
+    when: always
+    paths:
+      - tests/visual/__screenshots__/
+    expire_in: 1 week

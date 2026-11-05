@@ -68,8 +68,17 @@ typings/
 # nuxt.js build output
 .nuxt
 
-# Nuxt generate
+# Nuxt generate, and any output generated to a side directory with --dist or
+# generate.dir for comparison. One of those was committed once: 113 built files
+# that nothing referenced.
 dist
+dist-*
+
+# ...except a vendored module's build, which is the module. It is not on npm,
+# and a git dependency would break the CI install and fail lint:private, so the
+# built files are committed. See vendor/decoupled-settings/README.md.
+!vendor/*/dist/
+!vendor/*/dist/**
 
 # Nuxt Storybook
 .nuxt-storybook

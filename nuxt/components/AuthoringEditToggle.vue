@@ -1,0 +1,67 @@
+<template>
+  <button
+    v-if="shown"
+    type="button"
+    class="py-3 -my-3 px-1 -mx-1 font-mono text-xs uppercase tracking-eyebrow underline transition-colors"
+    :class="editing ? 'text-accent' : 'text-muted hover:text-accent'"
+    data-testid="authoring-edit-toggle"
+    :aria-pressed="String(editing)"
+    @click="toggle"
+  >
+    {{ editing ? 'Done' : 'Edit' }}
+  </button>
+</template>
+
+<script>
+/**
+ * Turn edit mode on and off.
+ *
+ * One control, in two places, showing only the face that applies. The way in
+ * is a menu item beside the account, because editing is something an account
+ * does; the way out is on the bar that only exists while editing, because that
+ * is where somebody's attention already is. Rendering both faces in both places
+ * put two identical buttons on the page and said "edit" four times over.
+ *
+ * Deliberately independent of being connected or signed in. Editing stages into
+ * the cart, and the cart works with no backend, so requiring one to turn the
+ * mode on would make the offline half unreachable. Committing is where a
+ * backend becomes necessary, and the cart says so there.
+ */
+export default {
+  name: 'AuthoringEditToggle',
+
+  props: {
+    /**
+     * `both` is one control that changes what it says, which is what the
+     * account menu wants. `start` and `stop` split it in two, which is what a
+     * second control somewhere else on the page needed.
+     *
+     * There is no second control any more: the floating bar that held the way
+     * out has been folded into the menu, so one control has to do both jobs or
+     * there is no way to leave edit mode at all.
+     */
+    mode: {
+      type: String,
+      default: 'both',
+      validator: (value) => ['both', 'start', 'stop'].includes(value),
+    },
+  },
+
+  computed: {
+    shown() {
+      if (this.mode === 'both') return true
+      return this.mode === (this.editing ? 'stop' : 'start')
+    },
+
+    editing() {
+      return this.$store.getters['druxtIce/editing']
+    },
+  },
+
+  methods: {
+    toggle() {
+      this.$store.dispatch('druxtIce/setEditing', !this.editing)
+    },
+  },
+}
+</script>

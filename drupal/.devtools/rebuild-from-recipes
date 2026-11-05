@@ -18,11 +18,11 @@
 
 declare(strict_types=1);
 
-namespace QuickstartServerlessDevTools;
+namespace DecipheredDevTools;
 
 require_once __DIR__ . '/helpers.php';
 
-$db_file = resolve_env_value('DB_FILE', '/tmp/quickstart-serverless-drupal-site.sqlite')[0];
+$db_file = resolve_env_value('DB_FILE', default_db_file())[0];
 
 echo '===============================' . PHP_EOL;
 echo '     REBUILD FROM RECIPES      ' . PHP_EOL;

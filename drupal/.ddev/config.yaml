@@ -1,4 +1,4 @@
-name: quickstart-druxt-serverless
+name: deciphered
 type: drupal
 docroot: web
 php_version: "8.4"

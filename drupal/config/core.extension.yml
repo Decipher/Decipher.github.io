@@ -8,10 +8,12 @@ module:
   block_content: 0
   ckeditor5: 0
   config: 0
+  consumers: 0
   contextual: 0
   datetime: 0
   dblog: 0
   decoupled_router: 0
+  decoupled_settings: 0
   druxt: 0
   dynamic_page_cache: 0
   editor: 0

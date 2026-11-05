@@ -2,6 +2,7 @@
   <div class="authoring-login">
     <button
       type="button"
+      v-if="trigger"
       class="font-mono text-xs uppercase tracking-eyebrow text-muted hover:text-accent underline transition-colors"
       data-testid="authoring-login-trigger"
       @click="open"
@@ -77,6 +78,14 @@
             <button type="button" class="rounded border border-hairline px-3 py-1.5 text-sm text-body hover:border-ink hover:text-ink transition-colors" data-testid="authoring-reload" @click="reload">
               Reload
             </button>
+            <button
+              type="button"
+              class="rounded border border-hairline px-3 py-1.5 text-sm text-muted transition-colors hover:border-ink hover:text-ink"
+              data-testid="authoring-login-close"
+              @click="close"
+            >
+              Close
+            </button>
             <button type="button" class="rounded border border-hairline px-3 py-1.5 text-sm text-body hover:border-ink hover:text-ink transition-colors" data-testid="authoring-disconnect" @click="disconnect">
               Disconnect
             </button>
@@ -91,6 +100,14 @@
           </p>
           <div class="mt-5 flex flex-wrap gap-2">
             <button type="button" class="rounded bg-accent px-3 py-1.5 text-sm text-accent-contrast hover:opacity-90 transition-opacity" data-testid="authoring-logout" @click="logout">Log out</button>
+            <button
+              type="button"
+              class="rounded border border-hairline px-3 py-1.5 text-sm text-muted transition-colors hover:border-ink hover:text-ink"
+              data-testid="authoring-login-close"
+              @click="close"
+            >
+              Close
+            </button>
             <button type="button" class="rounded border border-hairline px-3 py-1.5 text-sm text-body hover:border-ink hover:text-ink transition-colors" data-testid="authoring-disconnect" @click="disconnect">
               Disconnect
             </button>
@@ -106,19 +123,34 @@
 export default {
   name: 'AuthoringLogin',
 
+  props: {
+    /**
+     * Whether to render the button that opens the dialog.
+     *
+     * The dialog itself always renders here, wherever "here" is. Drupal's
+     * account menu carries the trigger when it is on the page, and that block
+     * is inside a region Druxt re-renders the moment a backend connects: a
+     * dialog living there would be destroyed by the thing it was opened to do.
+     */
+    trigger: { type: Boolean, default: true },
+  },
+
   data: () => ({
-    dialog: false,
     url: '',
     checking: false,
     error: null,
   }),
 
   computed: {
+    dialog() {
+      return Boolean(this.$druxtIce && this.$druxtIce.state.loginDialog)
+    },
+
     // Both plugins are client-only, so neither exists while `nuxt generate`
     // renders these pages. Without the guards the static build fails on every
     // route.
     state() {
-      return (this.$authoring && this.$authoring.state) || null
+      return (this.$druxtIce && this.$druxtIce.state) || null
     },
 
     connected() {
@@ -126,7 +158,7 @@ export default {
     },
 
     authenticated() {
-      return Boolean(this.$authoringAuth && this.$authoringAuth.authenticated)
+      return Boolean(this.$druxtIce.auth && this.$druxtIce.auth.authenticated)
     },
 
     host() {
@@ -134,7 +166,7 @@ export default {
     },
 
     accountName() {
-      const account = this.$authoringAuth && this.$authoringAuth.account
+      const account = this.$druxtIce.auth && this.$druxtIce.auth.account
       return (account && (account.name || account.preferred_username)) || 'this account'
     },
 
@@ -148,21 +180,41 @@ export default {
     },
   },
 
+  mounted() {
+    document.addEventListener('keydown', this.onKey)
+  },
+
+  beforeDestroy() {
+    document.removeEventListener('keydown', this.onKey)
+  },
+
   methods: {
+    /**
+     * Escape closes it.
+     *
+     * The backdrop already did, which is a dismissal nobody can see and a
+     * keyboard cannot reach. Connecting a backend leaves this open on its
+     * sign-in step, so without a way out the page behind it is unreachable
+     * unless you happen to click the dark part.
+     */
+    onKey(event) {
+      if (event.key === 'Escape' && this.dialog) this.close()
+    },
+
     open() {
       this.error = null
       this.url = (this.state && this.state.url) || ''
-      this.dialog = true
+      this.$druxtIce.openLogin()
     },
 
     close() {
-      this.dialog = false
+      this.$druxtIce.closeLogin()
     },
 
     async verify() {
       this.checking = true
       this.error = null
-      const ok = await this.$authoring.connect(this.url)
+      const ok = await this.$druxtIce.connect(this.url)
       this.checking = false
       if (!ok) this.error = this.state.error
       // Connecting does not change what is on screen. The page was rendered
@@ -173,7 +225,7 @@ export default {
     async login() {
       this.error = null
       try {
-        await this.$authoringAuth.login()
+        await this.$druxtIce.auth.login()
       } catch (e) {
         this.error = e.message
       }
@@ -189,8 +241,8 @@ export default {
      * away and its stored URL would otherwise be retried on every load.
      */
     disconnect() {
-      this.$authoring.disconnect()
-      this.$authoringAuth.logout()
+      this.$druxtIce.disconnect()
+      this.$druxtIce.auth.logout()
       this.url = ''
       this.error = null
       // Reload, or the page keeps showing what it fetched from the backend.
@@ -228,7 +280,7 @@ export default {
     },
 
     async logout() {
-      this.$authoringAuth.logout()
+      this.$druxtIce.auth.logout()
       this.close()
       // Back to what an anonymous visitor would see, rather than leaving
       // authenticated content on screen after signing out.

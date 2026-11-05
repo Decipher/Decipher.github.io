@@ -2,7 +2,11 @@ SHELL=/bin/bash
 
 WEBSERVER_HOST ?= 127.0.0.1
 WEBSERVER_PORT ?= 8888
-DB_FILE ?= /tmp/quickstart-serverless-drupal-site.sqlite
+# One key per checkout names its files in /tmp, so two clones on one machine
+# never share a database. .devtools/helpers.php and scripts/lib.mjs work out
+# the same key, and test/checkout-paths.test.mjs checks the three agree.
+CHECKOUT_KEY := $(shell printf '%s' "$(realpath $(CURDIR))" | sha256sum | cut -c1-12)
+DB_FILE ?= /tmp/deciphered-$(CHECKOUT_KEY)-site.sqlite
 # Recipes read these from the environment (.devtools/*) - a plain
 # `make start WEBSERVER_PORT=9000` sets only the Make variable otherwise.
 export WEBSERVER_HOST WEBSERVER_PORT DB_FILE
@@ -79,6 +83,6 @@ login:
 delete destroy: reset
 
 reset: stop
-	rm -f "$(DB_FILE)" /tmp/quickstart-serverless-drupal-php-server.log /tmp/quickstart-serverless-drupal-php-server.pid > /dev/null 2>&1 || true
+	rm -f "$(DB_FILE)" /tmp/deciphered-$(CHECKOUT_KEY)-php-server.log /tmp/deciphered-$(CHECKOUT_KEY)-php-server.pid > /dev/null 2>&1 || true
 
 .DEFAULT_GOAL := build

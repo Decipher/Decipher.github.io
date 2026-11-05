@@ -1,1 +1,0 @@
-(window.webpackJsonp=window.webpackJsonp||[]).push([[57],{490:function(e){e.exports=JSON.parse('{"id":"media--document--media_library--form","resourceType":"media--document","fields":[],"groups":[],"config":{"entityType":"media","bundle":"document","mode":"media_library","schemaType":"form","href":"/jsonapi/media/document"}}')}}]);

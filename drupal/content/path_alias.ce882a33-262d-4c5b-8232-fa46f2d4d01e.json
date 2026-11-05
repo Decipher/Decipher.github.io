@@ -1,0 +1,27 @@
+{
+    "uuid": [
+        {
+            "value": "ce882a33-262d-4c5b-8232-fa46f2d4d01e"
+        }
+    ],
+    "langcode": [
+        {
+            "value": "en"
+        }
+    ],
+    "path": [
+        {
+            "value": "\/node\/166e2739-f5e9-4d87-a050-b8bb17130f6e"
+        }
+    ],
+    "alias": [
+        {
+            "value": "\/serverless-drupal-on-github-pages"
+        }
+    ],
+    "status": [
+        {
+            "value": true
+        }
+    ]
+}

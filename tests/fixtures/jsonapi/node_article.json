@@ -1,0 +1,253 @@
+{
+  "jsonapi": {
+    "version": "1.1",
+    "meta": {
+      "links": {
+        "self": {
+          "href": "https://jsonapi.org/format/1.1/"
+        }
+      }
+    }
+  },
+  "data": [
+    {
+      "type": "node--article",
+      "id": "34156cc1-48f9-4ee9-acd7-e3970ca00554",
+      "links": {
+        "self": {
+          "href": "http://backend.test/jsonapi/node/article/34156cc1-48f9-4ee9-acd7-e3970ca00554?resourceVersion=id%3A6"
+        },
+        "working-copy": {
+          "href": "http://backend.test/jsonapi/node/article/34156cc1-48f9-4ee9-acd7-e3970ca00554?resourceVersion=rel%3Aworking-copy"
+        }
+      },
+      "attributes": {
+        "drupal_internal__nid": 5,
+        "drupal_internal__vid": 6,
+        "langcode": "en",
+        "revision_timestamp": "2026-09-04T13:48:41+00:00",
+        "revision_log": null,
+        "status": true,
+        "title": "A fixture article",
+        "created": "2026-09-04T13:48:41+00:00",
+        "changed": "2026-09-04T13:48:41+00:00",
+        "promote": true,
+        "sticky": false,
+        "default_langcode": true,
+        "revision_translation_affected": true,
+        "path": {
+          "alias": null,
+          "pid": null,
+          "langcode": "en"
+        },
+        "body": {
+          "value": "<p>Some body text to edit.</p>",
+          "format": "basic_html",
+          "processed": "<p>Some body text to edit.</p>",
+          "summary": null
+        }
+      },
+      "relationships": {
+        "node_type": {
+          "data": {
+            "type": "node_type--node_type",
+            "id": "33408964-a862-4afa-bc88-09120668d2c9",
+            "meta": {
+              "drupal_internal__target_id": "article"
+            }
+          },
+          "links": {
+            "related": {
+              "href": "http://backend.test/jsonapi/node/article/34156cc1-48f9-4ee9-acd7-e3970ca00554/node_type?resourceVersion=id%3A6"
+            },
+            "self": {
+              "href": "http://backend.test/jsonapi/node/article/34156cc1-48f9-4ee9-acd7-e3970ca00554/relationships/node_type?resourceVersion=id%3A6"
+            }
+          }
+        },
+        "revision_uid": {
+          "data": {
+            "type": "user--user",
+            "id": "4816a18c-e7e8-464a-96d0-675084ed414c",
+            "meta": {
+              "drupal_internal__target_id": 1
+            }
+          },
+          "links": {
+            "related": {
+              "href": "http://backend.test/jsonapi/node/article/34156cc1-48f9-4ee9-acd7-e3970ca00554/revision_uid?resourceVersion=id%3A6"
+            },
+            "self": {
+              "href": "http://backend.test/jsonapi/node/article/34156cc1-48f9-4ee9-acd7-e3970ca00554/relationships/revision_uid?resourceVersion=id%3A6"
+            }
+          }
+        },
+        "uid": {
+          "data": {
+            "type": "user--user",
+            "id": "4816a18c-e7e8-464a-96d0-675084ed414c",
+            "meta": {
+              "drupal_internal__target_id": 1
+            }
+          },
+          "links": {
+            "related": {
+              "href": "http://backend.test/jsonapi/node/article/34156cc1-48f9-4ee9-acd7-e3970ca00554/uid?resourceVersion=id%3A6"
+            },
+            "self": {
+              "href": "http://backend.test/jsonapi/node/article/34156cc1-48f9-4ee9-acd7-e3970ca00554/relationships/uid?resourceVersion=id%3A6"
+            }
+          }
+        },
+        "field_image": {
+          "data": null,
+          "links": {
+            "related": {
+              "href": "http://backend.test/jsonapi/node/article/34156cc1-48f9-4ee9-acd7-e3970ca00554/field_image?resourceVersion=id%3A6"
+            },
+            "self": {
+              "href": "http://backend.test/jsonapi/node/article/34156cc1-48f9-4ee9-acd7-e3970ca00554/relationships/field_image?resourceVersion=id%3A6"
+            }
+          }
+        },
+        "field_tags": {
+          "data": [],
+          "links": {
+            "related": {
+              "href": "http://backend.test/jsonapi/node/article/34156cc1-48f9-4ee9-acd7-e3970ca00554/field_tags?resourceVersion=id%3A6"
+            },
+            "self": {
+              "href": "http://backend.test/jsonapi/node/article/34156cc1-48f9-4ee9-acd7-e3970ca00554/relationships/field_tags?resourceVersion=id%3A6"
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "node--article",
+      "id": "159c16c0-1f16-46c8-80d8-59de8a2c4346",
+      "links": {
+        "self": {
+          "href": "http://backend.test/jsonapi/node/article/159c16c0-1f16-46c8-80d8-59de8a2c4346?resourceVersion=id%3A7"
+        },
+        "working-copy": {
+          "href": "http://backend.test/jsonapi/node/article/159c16c0-1f16-46c8-80d8-59de8a2c4346?resourceVersion=rel%3Aworking-copy"
+        }
+      },
+      "attributes": {
+        "drupal_internal__nid": 4,
+        "drupal_internal__vid": 7,
+        "langcode": "en",
+        "revision_timestamp": "2026-09-04T14:26:49+00:00",
+        "revision_log": null,
+        "status": true,
+        "title": "An article with a tag",
+        "created": "2026-09-04T05:08:21+00:00",
+        "changed": "2026-09-04T14:26:49+00:00",
+        "promote": true,
+        "sticky": false,
+        "default_langcode": true,
+        "revision_translation_affected": true,
+        "path": {
+          "alias": "/a-new-alias",
+          "pid": 2,
+          "langcode": "en"
+        },
+        "body": {
+          "value": "<p>Body text from the fixture.</p>",
+          "format": "basic_html",
+          "processed": "<p>Body text from the fixture.</p>",
+          "summary": null
+        }
+      },
+      "relationships": {
+        "node_type": {
+          "data": {
+            "type": "node_type--node_type",
+            "id": "33408964-a862-4afa-bc88-09120668d2c9",
+            "meta": {
+              "drupal_internal__target_id": "article"
+            }
+          },
+          "links": {
+            "related": {
+              "href": "http://backend.test/jsonapi/node/article/159c16c0-1f16-46c8-80d8-59de8a2c4346/node_type?resourceVersion=id%3A7"
+            },
+            "self": {
+              "href": "http://backend.test/jsonapi/node/article/159c16c0-1f16-46c8-80d8-59de8a2c4346/relationships/node_type?resourceVersion=id%3A7"
+            }
+          }
+        },
+        "revision_uid": {
+          "data": {
+            "type": "user--user",
+            "id": "4816a18c-e7e8-464a-96d0-675084ed414c",
+            "meta": {
+              "drupal_internal__target_id": 1
+            }
+          },
+          "links": {
+            "related": {
+              "href": "http://backend.test/jsonapi/node/article/159c16c0-1f16-46c8-80d8-59de8a2c4346/revision_uid?resourceVersion=id%3A7"
+            },
+            "self": {
+              "href": "http://backend.test/jsonapi/node/article/159c16c0-1f16-46c8-80d8-59de8a2c4346/relationships/revision_uid?resourceVersion=id%3A7"
+            }
+          }
+        },
+        "uid": {
+          "data": {
+            "type": "user--user",
+            "id": "4816a18c-e7e8-464a-96d0-675084ed414c",
+            "meta": {
+              "drupal_internal__target_id": 1
+            }
+          },
+          "links": {
+            "related": {
+              "href": "http://backend.test/jsonapi/node/article/159c16c0-1f16-46c8-80d8-59de8a2c4346/uid?resourceVersion=id%3A7"
+            },
+            "self": {
+              "href": "http://backend.test/jsonapi/node/article/159c16c0-1f16-46c8-80d8-59de8a2c4346/relationships/uid?resourceVersion=id%3A7"
+            }
+          }
+        },
+        "field_image": {
+          "data": null,
+          "links": {
+            "related": {
+              "href": "http://backend.test/jsonapi/node/article/159c16c0-1f16-46c8-80d8-59de8a2c4346/field_image?resourceVersion=id%3A7"
+            },
+            "self": {
+              "href": "http://backend.test/jsonapi/node/article/159c16c0-1f16-46c8-80d8-59de8a2c4346/relationships/field_image?resourceVersion=id%3A7"
+            }
+          }
+        },
+        "field_tags": {
+          "data": [
+            {
+              "type": "taxonomy_term--tags",
+              "id": "cf97bdbd-f6fa-4a2b-96b9-e8c1b3404c2f",
+              "meta": {
+                "drupal_internal__target_id": 2
+              }
+            }
+          ],
+          "links": {
+            "related": {
+              "href": "http://backend.test/jsonapi/node/article/159c16c0-1f16-46c8-80d8-59de8a2c4346/field_tags?resourceVersion=id%3A7"
+            },
+            "self": {
+              "href": "http://backend.test/jsonapi/node/article/159c16c0-1f16-46c8-80d8-59de8a2c4346/relationships/field_tags?resourceVersion=id%3A7"
+            }
+          }
+        }
+      }
+    }
+  ],
+  "links": {
+    "self": {
+      "href": "http://backend.test/jsonapi/node/article"
+    }
+  }
+}

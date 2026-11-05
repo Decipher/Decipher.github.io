@@ -5,13 +5,20 @@
  */
 
 import fs from 'node:fs'
-import { backendInfo, exitWithError, readEnv, runDevtools } from './lib.mjs'
+import {
+  backendInfo,
+  defaultDbFile,
+  exitWithError,
+  readEnv,
+  runDevtools,
+  serverLogFile,
+  serverPidFile,
+} from './lib.mjs'
 
 // Same precedence as drupal/.devtools: environment, then .env, then default.
-const dbFile =
-  process.env.DB_FILE || readEnv().DB_FILE || '/tmp/quickstart-serverless-drupal-site.sqlite'
-const logFile = '/tmp/quickstart-serverless-drupal-php-server.log'
-const pidFile = '/tmp/quickstart-serverless-drupal-php-server.pid'
+const dbFile = process.env.DB_FILE || readEnv().DB_FILE || defaultDbFile()
+const logFile = serverLogFile()
+const pidFile = serverPidFile()
 
 try {
   const backend = backendInfo()

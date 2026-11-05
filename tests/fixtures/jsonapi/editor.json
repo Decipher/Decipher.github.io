@@ -1,0 +1,157 @@
+{
+  "jsonapi": {
+    "version": "1.1",
+    "meta": { "links": { "self": { "href": "https:\/\/jsonapi.org\/format\/1.1\/" } } }
+  },
+  "data": [
+    {
+      "type": "editor--editor",
+      "id": "7c658256-4358-4c6f-bb5a-252e4407c3e4",
+      "links": {
+        "self": {
+          "href": "http:\/\/backend.test\/jsonapi\/editor\/editor\/7c658256-4358-4c6f-bb5a-252e4407c3e4"
+        }
+      },
+      "attributes": {
+        "langcode": "en",
+        "status": true,
+        "dependencies": { "config": ["filter.format.basic_html"], "module": ["ckeditor5"] },
+        "drupal_internal__format": "basic_html",
+        "editor": "ckeditor5",
+        "settings": {
+          "toolbar": {
+            "items": [
+              "bold",
+              "italic",
+              "|",
+              "link",
+              "|",
+              "bulletedList",
+              "numberedList",
+              "|",
+              "blockQuote",
+              "drupalInsertImage",
+              "|",
+              "heading",
+              "code",
+              "|",
+              "sourceEditing"
+            ]
+          },
+          "plugins": {
+            "ckeditor5_heading": {
+              "enabled_headings": ["heading2", "heading3", "heading4", "heading5", "heading6"]
+            },
+            "ckeditor5_imageResize": { "allow_resize": true },
+            "ckeditor5_list": {
+              "properties": { "reversed": false, "startIndex": true, "styles": true },
+              "multiBlock": true
+            },
+            "ckeditor5_sourceEditing": {
+              "allowed_tags": [
+                "\u003Ccite\u003E",
+                "\u003Cdl\u003E",
+                "\u003Cdt\u003E",
+                "\u003Cdd\u003E",
+                "\u003Ca hreflang\u003E",
+                "\u003Cblockquote cite\u003E",
+                "\u003Ch2 id\u003E",
+                "\u003Ch3 id\u003E",
+                "\u003Ch4 id\u003E",
+                "\u003Ch5 id\u003E",
+                "\u003Ch6 id\u003E"
+              ]
+            }
+          }
+        },
+        "image_upload": {
+          "status": true,
+          "scheme": "public",
+          "directory": "inline-images",
+          "max_size": null,
+          "max_dimensions": { "width": null, "height": null }
+        }
+      }
+    },
+    {
+      "type": "editor--editor",
+      "id": "ba3a2984-0ddb-4058-97d2-34fecf932f01",
+      "links": {
+        "self": {
+          "href": "http:\/\/backend.test\/jsonapi\/editor\/editor\/ba3a2984-0ddb-4058-97d2-34fecf932f01"
+        }
+      },
+      "attributes": {
+        "langcode": "en",
+        "status": true,
+        "dependencies": { "config": ["filter.format.full_html"], "module": ["ckeditor5"] },
+        "drupal_internal__format": "full_html",
+        "editor": "ckeditor5",
+        "settings": {
+          "toolbar": {
+            "items": [
+              "bold",
+              "italic",
+              "strikethrough",
+              "superscript",
+              "subscript",
+              "removeFormat",
+              "|",
+              "link",
+              "|",
+              "bulletedList",
+              "numberedList",
+              "|",
+              "blockQuote",
+              "drupalInsertImage",
+              "insertTable",
+              "horizontalLine",
+              "|",
+              "heading",
+              "codeBlock",
+              "|",
+              "sourceEditing"
+            ]
+          },
+          "plugins": {
+            "ckeditor5_codeBlock": {
+              "languages": [
+                { "label": "Plain text", "language": "plaintext" },
+                { "label": "C", "language": "c" },
+                { "label": "C#", "language": "cs" },
+                { "label": "C++", "language": "cpp" },
+                { "label": "CSS", "language": "css" },
+                { "label": "Diff", "language": "diff" },
+                { "label": "HTML", "language": "html" },
+                { "label": "Java", "language": "java" },
+                { "label": "JavaScript", "language": "javascript" },
+                { "label": "PHP", "language": "php" },
+                { "label": "Python", "language": "python" },
+                { "label": "Ruby", "language": "ruby" },
+                { "label": "TypeScript", "language": "typescript" },
+                { "label": "XML", "language": "xml" }
+              ]
+            },
+            "ckeditor5_heading": {
+              "enabled_headings": ["heading2", "heading3", "heading4", "heading5", "heading6"]
+            },
+            "ckeditor5_imageResize": { "allow_resize": true },
+            "ckeditor5_list": {
+              "properties": { "reversed": true, "startIndex": true, "styles": true },
+              "multiBlock": true
+            },
+            "ckeditor5_sourceEditing": { "allowed_tags": [] }
+          }
+        },
+        "image_upload": {
+          "status": true,
+          "scheme": "public",
+          "directory": "inline-images",
+          "max_size": null,
+          "max_dimensions": { "width": null, "height": null }
+        }
+      }
+    }
+  ],
+  "links": { "self": { "href": "http:\/\/backend.test\/jsonapi\/editor\/editor" } }
+}

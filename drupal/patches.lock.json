@@ -1,5 +1,5 @@
 {
-    "_hash": "d34d9018f72a3685d9f4a24824d6f11fdb5f3b33c15a86cb46b9cbd4fcecd22a",
+    "_hash": "26ffe17e4fc2c93a8d6801216822d8d025d2d6ed6047031f0b8476ac84a1e4a3",
     "patches": {
         "drupal/tome": [
             {
@@ -17,6 +17,18 @@
                 "description": "Declare normalizer supported types so entity-specific normalizers are used",
                 "url": "patches/tome-normalizer-supported-types.patch",
                 "sha256": "c857235b91961a030bfb0d63673fd2756aca4d72025a3463ddd8445d3bae0b06",
+                "depth": 1,
+                "extra": {
+                    "provenance": "root"
+                }
+            }
+        ],
+        "drupal/decoupled_settings": [
+            {
+                "package": "drupal/decoupled_settings",
+                "description": "Expose the active theme's regions, labels and breakpoints (#15)",
+                "url": "patches/decoupled-settings-15-theme-manifest.patch",
+                "sha256": "e111ee6127ef737dc0427c2c57d48213d3fc4a983772b7fd8f1d16fa046b454e",
                 "depth": 1,
                 "extra": {
                     "provenance": "root"
