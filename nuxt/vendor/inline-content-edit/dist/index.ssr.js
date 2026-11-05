@@ -1117,6 +1117,15 @@ function createAuth(ice, context, whenReady = (fn) => fn()) {
     }
   }
   auth.applyToken = applyToken;
+  function aimedAtBackend(config, axios) {
+    const base = config && config.baseURL || (axios.defaults || {}).baseURL;
+    try {
+      const target = new URL(config && config.url || "", base || void 0);
+      return target.origin === new URL(ice.state.url).origin;
+    } catch (e) {
+      return false;
+    }
+  }
   function sendLiveToken() {
     const client = context.app && context.app.$druxt || context.$druxt;
     const axios = client && client.axios;
@@ -1124,7 +1133,7 @@ function createAuth(ice, context, whenReady = (fn) => fn()) {
     axios.__druxtIceToken = true;
     axios.interceptors.request.use((config) => {
       const token = auth.token;
-      if (!token) return config;
+      if (!token || !aimedAtBackend(config, axios)) return config;
       return {
         ...config,
         headers: { ...config.headers, Authorization: `Bearer ${token}` }
