@@ -80,6 +80,21 @@ describe('cjsEntry', () => {
       './dist/b.cjs'
     )
   })
+
+  it('takes the first condition require would match, in declaration order', () => {
+    assert.equal(
+      cjsEntry({
+        exports: { '.': { require: { node: './dist/node.cjs', default: './dist/fallback.js' } } },
+      }),
+      './dist/node.cjs'
+    )
+    assert.equal(
+      cjsEntry({
+        exports: { '.': { require: { import: './dist/a.mjs', default: './dist/a.cjs' } } },
+      }),
+      './dist/a.cjs'
+    )
+  })
 })
 
 describe('vendoredManifest keeps type for a .cjs build', () => {

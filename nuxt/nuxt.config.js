@@ -359,9 +359,17 @@ export default async () => ({
   // the tokens, and the state and code verifier that an OAuth round trip has
   // to find again on the way back from the backend, which is why the sign-in
   // cannot live in memory only. With no expiry set it is a session cookie,
-  // gone when the browser closes.
+  // gone when the browser closes, and a built site sends it over HTTPS only.
+  // The Nuxt CLI sets NODE_ENV before it reads this file, so a build or a
+  // generate is production and `nuxt dev` is not. Browsers treat localhost as
+  // secure, so a built site previewed there still signs in.
   auth: {
     localStorage: false,
+    cookie: {
+      options: {
+        secure: process.env.NODE_ENV === 'production',
+      },
+    },
   },
 
   // Auto import components: https://go.nuxtjs.dev/config-components

@@ -21,12 +21,15 @@
  */
 export const DROPPED_KEYS = ['scripts', 'devDependencies', 'packageManager', 'publishConfig']
 
-/** The file an export condition names: the string itself, or its `default`, however deep. */
+/** The conditions `require` matches in Node, which takes the first match in declaration order. */
+const REQUIRE_CONDITIONS = new Set(['node', 'require', 'default'])
+
+/** The file an export condition names: the string itself, or the first nested condition `require` would take. */
 function conditionTarget(value) {
   if (typeof value === 'string') return value
   if (!value || typeof value !== 'object') return ''
-  if ('default' in value) return conditionTarget(value.default)
-  for (const nested of Object.values(value)) {
+  for (const [condition, nested] of Object.entries(value)) {
+    if (!REQUIRE_CONDITIONS.has(condition)) continue
     const target = conditionTarget(nested)
     if (target) return target
   }
