@@ -222,6 +222,22 @@ describe('vendorSync', () => {
     assert.equal(fs.existsSync(path.join(vendorDir, 'fake', 'dist', 'index.ssr.js')), true)
   })
 
+  it('takes only dist and what npm always packs when the manifest lists no files', () => {
+    const checkout = makeModule({ files: undefined })
+    fs.mkdirSync(path.join(checkout, 'src'))
+    fs.writeFileSync(path.join(checkout, 'src', 'index.js'), 'export default 1\n')
+    fs.writeFileSync(path.join(checkout, 'LICENSE'), 'MIT\n')
+    git(checkout, '-c', 'user.name=t', '-c', 'user.email=t@example.com', 'add', '-A')
+    git(checkout, '-c', 'user.name=t', '-c', 'user.email=t@example.com', 'commit', '-qm', 'src')
+    const vendorDir = fs.mkdtempSync(path.join(os.tmpdir(), 'vendor-out-'))
+
+    const result = vendorSync({ name: 'fake', checkout, vendorDir })
+
+    assert.deepEqual(result.copied, ['LICENSE', 'dist'])
+    assert.equal(fs.existsSync(path.join(vendorDir, 'fake', 'src')), false)
+    assert.equal(fs.existsSync(path.join(vendorDir, 'fake', 'templates')), false)
+  })
+
   it('keeps the previous copy when the build leaves no entry point', () => {
     const checkout = makeModule({ scripts: { build: 'node -e "0"' } })
     const vendorDir = fs.mkdtempSync(path.join(os.tmpdir(), 'vendor-out-'))

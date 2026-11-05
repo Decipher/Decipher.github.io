@@ -116,11 +116,15 @@ drush('pm:enable simple_oauth');
 $keys_dir = getcwd() . '/keys';
 // A pair that does not match signs tokens nobody can verify, and the checks
 // below only test that the files exist. Derive the public key from the private
-// one and compare, and start again when they differ.
+// one and compare it with the stored one, both as OpenSSL writes them, so the
+// stored file's own line endings and wrapping do not count as a difference.
+// Start again when they differ or either cannot be read.
 if (is_file($keys_dir . '/private.key') && is_file($keys_dir . '/public.key')) {
   $private = openssl_pkey_get_private((string) file_get_contents($keys_dir . '/private.key'));
+  $public = openssl_pkey_get_public((string) file_get_contents($keys_dir . '/public.key'));
   $derived = $private ? (openssl_pkey_get_details($private)['key'] ?? NULL) : NULL;
-  if ($derived === NULL || trim($derived) !== trim((string) file_get_contents($keys_dir . '/public.key'))) {
+  $stored = $public ? (openssl_pkey_get_details($public)['key'] ?? NULL) : NULL;
+  if ($derived === NULL || $stored === NULL || $derived !== $stored) {
     TASK('The OAuth key pair does not match; generating a new one.');
     unlink($keys_dir . '/private.key');
     unlink($keys_dir . '/public.key');

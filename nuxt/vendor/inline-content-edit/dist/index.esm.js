@@ -183,6 +183,15 @@ function responseFromAxios(response) {
     }
   };
 }
+function dropForeignTokens(auth, backend) {
+  if (!auth || !auth.$storage || !auth.strategy) return false;
+  const issuer = auth.$storage.getUniversal(ISSUER_KEY);
+  if (!tokensAreForeign(issuer, backend)) return false;
+  auth.strategy.token.reset();
+  if (auth.strategy.refreshToken) auth.strategy.refreshToken.reset();
+  auth.$storage.setUniversal(ISSUER_KEY, false);
+  return true;
+}
 
 const ADAPTER_METHODS = [
   "editableFields",
@@ -1076,6 +1085,17 @@ function createAuth(ice, context, whenReady = (fn) => fn()) {
       const a = $auth();
       if (a) await a.logout();
       applyToken();
+    },
+    /**
+     * Drop tokens another backend issued, and take them off the client.
+     *
+     * Called when the connection switches, before any request goes to the
+     * new backend, so the header never carries a token it did not mint.
+     */
+    dropForeignTokens(backend) {
+      const dropped = dropForeignTokens($auth(), backend);
+      if (dropped) applyToken();
+      return dropped;
     }
   });
   function applyToken() {
@@ -1139,6 +1159,7 @@ function createIce(options, context) {
       state.url = normaliseUrl(url);
       state.source = source;
       state.status = "connected";
+      ice.auth.dropForeignTokens({ url: state.url });
       pointClientAt(context, state.url);
       writeJson(window.localStorage, BACKEND_KEY, {
         url: state.url,
@@ -2128,4 +2149,4 @@ const NuxtModule = async function(moduleOptions = {}) {
   });
 };
 
-export { ADAPTER_METHODS, ADVANCED_FIELDS, AUTH_STRATEGY, BACKEND_KEY, BUILT, CAPTION_FILTER, CONFORMANCE_UNREACHABLE, DEFAULTS, DELTA_ATTRIBUTE, DESTINATION_METHODS, DIFF_TYPE, DRUPAL_FILES, ENTITY_ATTRIBUTE, FIELD_ATTRIBUTE, ISSUER_KEY, STAGED, STATIC_FILES, TYPE_ATTRIBUTE, absoluteFileUrls, adapterSupports, applyCaptionFilter, asResource, asText, autoCreateTarget, autocompleteUrl, backendFor, bareToken, base64Url, bustCache, callbackUrl, cartKey, changedFields, changedRegion, checkConformance, collectionUrl$1 as collectionUrl, commitOrder, createAuth, createIce, createPlainFieldsAdapter, decodeAttribute, deepEqual, NuxtModule as default, defaultDestination, defer, defineDestination, defineFeature, dependencyMap, destinationRequest, destinationSupports, diffLines, druxtClients, editModeFeature, editorFileUrls, entityAnchors, exportCart, exportSummary, failsFilters, fetchThroughAxios, fieldAnchors, fieldChanged, fieldErrorsFrom, fieldOps, fieldStatus, fileIsAllowed, filterFieldFor, filtersFromResources, findAnchor, fromDateInput, groupFields, hasHeldImage, hasUnfilteredCaption, holdClientUntilConnected, iceStoreModule, imageRelationship, installIce, isAdapterMethod, isDeletion, isDrupalFile, isEmptyResource, isExpired, isLong, isNew, labelFieldFor, labelOf, labelsUrl, listingAccepts, listingTypes, mergeEntry, modesFromDisplays, newResourceId, normaliseUrl, parseSize, patchBody, patchUrl, pointClientAt, pointStrategyAt, previewStagedContent, previewsFor, readJson, readSessionRecord, readyGate, refreshFromBackend, registerIceStore, relativeFileUrls, replaceHeldImage, requestMethod, requestUrl, requireAuth, requiredBy, resolveDestination, resolveFeatures, resolveOptions, resolveSource, rewriteFileUrls, safeFilename, safeStorage, sessionRecordToken, stagedDiff, storedFileUrls, targetResourceTypes, tidyResource, toDateInput, toRelationship, toggleEditMode, tokensAreForeign, uploadHeaders, uploadUrl, valuesBefore, viewModesFor, warningsFrom, withDependencies, withoutComputed, words, writeJson };
+export { ADAPTER_METHODS, ADVANCED_FIELDS, AUTH_STRATEGY, BACKEND_KEY, BUILT, CAPTION_FILTER, CONFORMANCE_UNREACHABLE, DEFAULTS, DELTA_ATTRIBUTE, DESTINATION_METHODS, DIFF_TYPE, DRUPAL_FILES, ENTITY_ATTRIBUTE, FIELD_ATTRIBUTE, ISSUER_KEY, STAGED, STATIC_FILES, TYPE_ATTRIBUTE, absoluteFileUrls, adapterSupports, applyCaptionFilter, asResource, asText, autoCreateTarget, autocompleteUrl, backendFor, bareToken, base64Url, bustCache, callbackUrl, cartKey, changedFields, changedRegion, checkConformance, collectionUrl$1 as collectionUrl, commitOrder, createAuth, createIce, createPlainFieldsAdapter, decodeAttribute, deepEqual, NuxtModule as default, defaultDestination, defer, defineDestination, defineFeature, dependencyMap, destinationRequest, destinationSupports, diffLines, dropForeignTokens, druxtClients, editModeFeature, editorFileUrls, entityAnchors, exportCart, exportSummary, failsFilters, fetchThroughAxios, fieldAnchors, fieldChanged, fieldErrorsFrom, fieldOps, fieldStatus, fileIsAllowed, filterFieldFor, filtersFromResources, findAnchor, fromDateInput, groupFields, hasHeldImage, hasUnfilteredCaption, holdClientUntilConnected, iceStoreModule, imageRelationship, installIce, isAdapterMethod, isDeletion, isDrupalFile, isEmptyResource, isExpired, isLong, isNew, labelFieldFor, labelOf, labelsUrl, listingAccepts, listingTypes, mergeEntry, modesFromDisplays, newResourceId, normaliseUrl, parseSize, patchBody, patchUrl, pointClientAt, pointStrategyAt, previewStagedContent, previewsFor, readJson, readSessionRecord, readyGate, refreshFromBackend, registerIceStore, relativeFileUrls, replaceHeldImage, requestMethod, requestUrl, requireAuth, requiredBy, resolveDestination, resolveFeatures, resolveOptions, resolveSource, rewriteFileUrls, safeFilename, safeStorage, sessionRecordToken, stagedDiff, storedFileUrls, targetResourceTypes, tidyResource, toDateInput, toRelationship, toggleEditMode, tokensAreForeign, uploadHeaders, uploadUrl, valuesBefore, viewModesFor, warningsFrom, withDependencies, withoutComputed, words, writeJson };

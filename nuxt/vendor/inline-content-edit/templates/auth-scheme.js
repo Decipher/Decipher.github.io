@@ -45,9 +45,14 @@ export default class DruxtIceScheme extends DrupalScheme {
     return true
   }
 
-  /** Record which backend the tokens in hand came from. */
+  /**
+   * Record which backend the tokens in hand came from.
+   *
+   * In the browser only: nuxt/auth also mounts the scheme on the server, where
+   * there is no window to read the connection from.
+   */
   recordIssuer() {
-    if (!this.token.get()) return
+    if (typeof window === 'undefined' || !this.token.get()) return
     const backend = backendFor(this.$auth.ctx, safeStorage(window))
     if (backend) this.$auth.$storage.setUniversal(ISSUER_KEY, backend.url)
   }

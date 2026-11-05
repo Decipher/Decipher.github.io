@@ -191,6 +191,15 @@ function responseFromAxios(response) {
     }
   };
 }
+function dropForeignTokens(auth, backend) {
+  if (!auth || !auth.$storage || !auth.strategy) return false;
+  const issuer = auth.$storage.getUniversal(ISSUER_KEY);
+  if (!tokensAreForeign(issuer, backend)) return false;
+  auth.strategy.token.reset();
+  if (auth.strategy.refreshToken) auth.strategy.refreshToken.reset();
+  auth.$storage.setUniversal(ISSUER_KEY, false);
+  return true;
+}
 
 const ADAPTER_METHODS = [
   "editableFields",
@@ -1084,6 +1093,17 @@ function createAuth(ice, context, whenReady = (fn) => fn()) {
       const a = $auth();
       if (a) await a.logout();
       applyToken();
+    },
+    /**
+     * Drop tokens another backend issued, and take them off the client.
+     *
+     * Called when the connection switches, before any request goes to the
+     * new backend, so the header never carries a token it did not mint.
+     */
+    dropForeignTokens(backend) {
+      const dropped = dropForeignTokens($auth(), backend);
+      if (dropped) applyToken();
+      return dropped;
     }
   });
   function applyToken() {
@@ -1147,6 +1167,7 @@ function createIce(options, context) {
       state.url = normaliseUrl(url);
       state.source = source;
       state.status = "connected";
+      ice.auth.dropForeignTokens({ url: state.url });
       pointClientAt(context, state.url);
       writeJson(window.localStorage, BACKEND_KEY, {
         url: state.url,
@@ -2186,6 +2207,7 @@ exports.dependencyMap = dependencyMap;
 exports.destinationRequest = destinationRequest;
 exports.destinationSupports = destinationSupports;
 exports.diffLines = diffLines;
+exports.dropForeignTokens = dropForeignTokens;
 exports.druxtClients = druxtClients;
 exports.editModeFeature = editModeFeature;
 exports.editorFileUrls = editorFileUrls;

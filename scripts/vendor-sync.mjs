@@ -35,6 +35,15 @@ import {
 const NATIVE_DEPENDENCIES = ['esbuild']
 
 /** The files npm would pack from a checkout, as npm resolves the manifest's `files`. */
+/** Files npm packs whatever the manifest says. */
+const ALWAYS_PACKED = /^(README|LICENSE|LICENCE|CHANGELOG|CHANGES|HISTORY|NOTICE)(\.|$)/i
+
+/** Whether a packed file belongs to the default set, for a manifest with no `files`. */
+function isDefaultFile(file, manifest) {
+  if (ALWAYS_PACKED.test(file)) return true
+  return packageFiles(manifest).some((entry) => file === entry || file.startsWith(`${entry}/`))
+}
+
 function packedFiles(cwd) {
   const output = run('npm', ['pack', '--dry-run', '--json', '--ignore-scripts'], cwd)
   const [packed] = JSON.parse(output)
@@ -90,7 +99,13 @@ export function vendorSync({ name, checkout, ref, vendorDir }) {
 
     const manifest = JSON.parse(fs.readFileSync(path.join(worktree, 'package.json'), 'utf8'))
     // The files npm itself would publish, so a glob in `files` is honoured.
-    const files = packedFiles(worktree).filter((file) => file !== 'package.json')
+    // A manifest with no list makes npm pack everything it does not ignore,
+    // sources and tests included; then only the default (dist) and the files
+    // npm always packs are taken.
+    const listed = Array.isArray(manifest.files) && manifest.files.length > 0
+    const files = packedFiles(worktree).filter(
+      (file) => file !== 'package.json' && (listed || isDefaultFile(file, manifest))
+    )
 
     // Into a staging directory first. The vendored copy is replaced only once
     // the build is known to be whole, so a failed build leaves it as it was.
