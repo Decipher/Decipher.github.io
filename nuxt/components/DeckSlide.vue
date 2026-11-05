@@ -77,6 +77,7 @@
 
       <!-- vale: the examples, and a box to try a sentence against the backend. -->
       <template v-else-if="layout === 'vale'">
+        <p v-if="step" class="deck-eyebrow">Demo · step {{ step.step }} of {{ step.of }}</p>
         <h2 class="deck-title">{{ title }}</h2>
         <DeckValeCheck :examples="read.examples" />
       </template>

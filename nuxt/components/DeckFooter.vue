@@ -22,6 +22,15 @@
 import { siteIdentity } from '../lib/settings.mjs'
 
 /**
+ * One settings request per backend for the life of the page.
+ *
+ * The footer is remade on every slide, and asking the backend again each time
+ * was a round trip on every move. A reload empties this, which is what the
+ * settings demo asks for anyway.
+ */
+const settingsRequests = new Map()
+
+/**
  * The band under every slide: the mark, the name, the slogan, the slide number.
  *
  * The slogan is Decoupled Settings. The build bakes it in, and once a backend
@@ -70,14 +79,23 @@ export default {
       if (typeof window === 'undefined' || !this.$druxt || !this.$druxt.axios) return
       try {
         const clientId = ((this.$config || {}).authoring || {}).clientId
-        const { data: body } = await this.$druxt.axios.get(`${url.replace(/\/+$/, '')}/jsonapi/decoupled/settings`, {
-          headers: { Accept: 'application/vnd.api+json', ...(clientId ? { 'X-Consumer-ID': clientId } : {}) },
-        })
+        const endpoint = `${url.replace(/\/+$/, '')}/jsonapi/decoupled/settings`
+        if (!settingsRequests.has(endpoint)) {
+          settingsRequests.set(
+            endpoint,
+            this.$druxt.axios.get(endpoint, {
+              headers: { Accept: 'application/vnd.api+json', ...(clientId ? { 'X-Consumer-ID': clientId } : {}) },
+            })
+          )
+        }
+        const { data: body } = await settingsRequests.get(endpoint)
         const data = Array.isArray(body.data) ? body.data[0] : body.data
         const slogan = siteIdentity((data || {}).attributes, {}).slogan
         if (slogan) this.live = slogan
       } catch {
-        // The baked slogan stands. A footer is not where a request failure shows.
+        // The baked slogan stands. A footer is not where a request failure
+        // shows. The next slide asks again rather than keeping the failure.
+        settingsRequests.clear()
       }
     },
   },

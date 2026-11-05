@@ -132,6 +132,7 @@ export default {
       // No storage, no remembered theme. The default stands.
     }
     window.addEventListener('keydown', this.onKey)
+    this.prefetch()
   },
 
   beforeDestroy() {
@@ -154,6 +155,23 @@ export default {
     },
     go(n) {
       this.$router.push(`${DECK_PATH}/${n}`)
+    },
+    /**
+     * Fetch every slide's payload now, so a move is the crossfade and nothing else.
+     *
+     * A static build has one payload per slide, and Nuxt fetches it on the move
+     * unless it is already in the cache. Over a tunnel that fetch is most of the
+     * wait. Only the static build has payloads, so a server build, which has no
+     * `fetchPayload`, is left alone. A failed warm-up changes nothing: the move
+     * fetches as it always did.
+     */
+    prefetch() {
+      const nuxt = this.$nuxt
+      if (!nuxt || typeof nuxt.fetchPayload !== 'function') return
+      for (let n = 1; n <= this.deck.length; n++) {
+        if (n === this.index + 1) continue
+        Promise.resolve(nuxt.fetchPayload(`${DECK_PATH}/${n}`, true)).catch(() => {})
+      }
     },
     fullscreen() {
       const stage = this.$refs.stage

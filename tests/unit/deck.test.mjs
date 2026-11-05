@@ -39,9 +39,11 @@ test('a demo slide knows which demo it is of how many', () => {
     slide(3, 'code'),
     slide(4, 'demo'),
     slide(5, 'demo'),
+    slide(6, 'vale'),
   ]
-  assert.deepEqual(demoStep(deck, 1), { step: 1, of: 3 })
-  assert.deepEqual(demoStep(deck, 4), { step: 3, of: 3 })
+  assert.deepEqual(demoStep(deck, 1), { step: 1, of: 4 })
+  assert.deepEqual(demoStep(deck, 4), { step: 3, of: 4 })
+  assert.deepEqual(demoStep(deck, 5), { step: 4, of: 4 }, 'the live Vale check is a demo too')
   assert.equal(demoStep(deck, 0), null, 'not a demo slide')
 })
 

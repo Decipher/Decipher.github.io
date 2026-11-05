@@ -29,11 +29,14 @@ function orderOf(slide) {
   return Number.isFinite(value) ? value : Number.MAX_SAFE_INTEGER
 }
 
+/** The layouts that are a live demo, in the room, against the backend. */
+const DEMO_LAYOUTS = ['demo', 'vale']
+
 /** Which demo this slide is, counted among the demo slides, or null. */
 export function demoStep(slides, index) {
   const demos = slides
     .map((slide, at) => ({ at, layout: layoutOf(slide) }))
-    .filter((entry) => entry.layout === 'demo')
+    .filter((entry) => DEMO_LAYOUTS.includes(entry.layout))
   const position = demos.findIndex((entry) => entry.at === index)
   return position === -1 ? null : { step: position + 1, of: demos.length }
 }

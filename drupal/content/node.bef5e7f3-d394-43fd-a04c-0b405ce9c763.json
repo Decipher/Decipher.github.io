@@ -1,0 +1,103 @@
+{
+    "uuid": [
+        {
+            "value": "bef5e7f3-d394-43fd-a04c-0b405ce9c763"
+        }
+    ],
+    "langcode": [
+        {
+            "value": "en"
+        }
+    ],
+    "type": [
+        {
+            "target_id": "slide",
+            "target_type": "node_type",
+            "target_uuid": "ef998fba-c0db-42b5-b8d8-148210b7c2bf"
+        }
+    ],
+    "revision_timestamp": [
+        {
+            "value": "2026-11-05T02:25:48+00:00"
+        }
+    ],
+    "revision_uid": [
+        {
+            "target_type": "user",
+            "target_uuid": "4816a18c-e7e8-464a-96d0-675084ed414c"
+        }
+    ],
+    "revision_log": [],
+    "status": [
+        {
+            "value": true
+        }
+    ],
+    "uid": [
+        {
+            "target_type": "user",
+            "target_uuid": "4816a18c-e7e8-464a-96d0-675084ed414c"
+        }
+    ],
+    "title": [
+        {
+            "value": "A linter for words"
+        }
+    ],
+    "created": [
+        {
+            "value": "2026-11-05T02:25:48+00:00"
+        }
+    ],
+    "changed": [
+        {
+            "value": "2026-11-05T02:25:48+00:00"
+        }
+    ],
+    "promote": [
+        {
+            "value": false
+        }
+    ],
+    "sticky": [
+        {
+            "value": false
+        }
+    ],
+    "default_langcode": [
+        {
+            "value": true
+        }
+    ],
+    "revision_translation_affected": [
+        {
+            "value": true
+        }
+    ],
+    "path": [
+        {
+            "alias": null,
+            "pid": null,
+            "langcode": "en"
+        }
+    ],
+    "body": [
+        {
+            "value": "<p>Vale is a linter for prose.<\/p><p>The Vale module runs it inside Drupal on every save, with your style guide as YAML files in the repository. Errors refuse the save. Warnings travel with it.<\/p>",
+            "format": "basic_html",
+            "processed": "<p>Vale is a linter for prose.<\/p><p>The Vale module runs it inside Drupal on every save, with your style guide as YAML files in the repository. Errors refuse the save. Warnings travel with it.<\/p>",
+            "summary": null
+        }
+    ],
+    "field_layout": [
+        {
+            "value": "statement"
+        }
+    ],
+    "field_link": [],
+    "field_order": [
+        {
+            "value": 7
+        }
+    ]
+}

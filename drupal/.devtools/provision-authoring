@@ -388,8 +388,11 @@ parameters:
     # application/vnd.api+json, which is not a CORS-safelisted value and so
     # makes every write a preflighted request; Content-Disposition because a
     # file upload carries its filename in that header, and without it the
-    # preflight fails and an image can be chosen but never sent.
-    allowedHeaders: ['authorization', 'content-type', 'content-disposition', 'x-csrf-token']
+    # preflight fails and an image can be chosen but never sent;
+    # X-Consumer-ID because Decoupled Settings reads the consumer from it, and
+    # without it the deployed site's request for its own settings is refused
+    # before Drupal sees it.
+    allowedHeaders: ['authorization', 'content-type', 'content-disposition', 'x-csrf-token', 'x-consumer-id']
     # Explicit, not ['*']: an empty list rejects the preflight outright, and a
     # wildcard is not honoured by every browser.
     allowedMethods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS']

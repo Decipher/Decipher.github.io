@@ -612,7 +612,7 @@
 /* Between slides: a short fade, and none at all for people who asked for none. */
 .deck-fade-enter-active,
 .deck-fade-leave-active {
-  transition: opacity 220ms ease;
+  transition: opacity 140ms ease;
 }
 
 .deck-fade-enter,
