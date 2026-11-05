@@ -110,34 +110,10 @@ TASK('Enabling and configuring simple_oauth.');
 drush('pm:enable consumers');
 drush('pm:enable simple_oauth');
 
-// The key paths are committed config and `.devtools/provision` makes the pair,
-// so an existing pair is kept here. Replacing it would log out every session
-// that holds a token signed with it.
+// The key paths are committed config, and the pair is kept or made the same
+// way `.devtools/provision` does it.
 $keys_dir = getcwd() . '/keys';
-// A pair that does not match signs tokens nobody can verify, and the checks
-// below only test that the files exist. Derive the public key from the private
-// one and compare it with the stored one, both as OpenSSL writes them, so the
-// stored file's own line endings and wrapping do not count as a difference.
-// Start again when they differ or either cannot be read.
-if (is_file($keys_dir . '/private.key') && is_file($keys_dir . '/public.key')) {
-  $private = openssl_pkey_get_private((string) file_get_contents($keys_dir . '/private.key'));
-  $public = openssl_pkey_get_public((string) file_get_contents($keys_dir . '/public.key'));
-  $derived = $private ? (openssl_pkey_get_details($private)['key'] ?? NULL) : NULL;
-  $stored = $public ? (openssl_pkey_get_details($public)['key'] ?? NULL) : NULL;
-  if ($derived === NULL || $stored === NULL || $derived !== $stored) {
-    TASK('The OAuth key pair does not match; generating a new one.');
-    unlink($keys_dir . '/private.key');
-    unlink($keys_dir . '/public.key');
-  }
-}
-if (!is_file($keys_dir . '/private.key') || !is_file($keys_dir . '/public.key')) {
-  if (!is_dir($keys_dir) && !mkdir($keys_dir, 0755, TRUE) && !is_dir($keys_dir)) {
-    FAIL('Unable to create %s.', $keys_dir);
-  }
-  // The generate-keys command writes to disk immediately, so it gets an
-  // absolute path rather than relying on this script's own cwd matching web/'s.
-  drush('simple-oauth:generate-keys %s', $keys_dir);
-}
+ensure_oauth_keys($keys_dir);
 PASS('simple_oauth enabled; OAuth keys at %s.', $keys_dir);
 
 TASK('Creating the authoring OAuth Consumer.');
@@ -147,7 +123,16 @@ TASK('Creating the authoring OAuth Consumer.');
 // would mean a second Consumer file on every provision. It is not a secret:
 // it is a public client (PKCE, no secret), and the frontend sends it in every
 // authorize request.
-$client_id = resolve_env_value('OAUTH_CLIENT_ID', 'dfdd3969-6fe2-4a6f-92bb-82b6f59013ed')[0];
+// The committed Consumer is the one the frontend is built for. A checkout
+// that ran an earlier version of this script has that version's default
+// pinned in ../.env, which would otherwise win here, replace the committed
+// Consumer with one the frontend does not know, and be pinned again below.
+$committed_id = committed_consumer_id();
+[$client_id, $client_id_source] = resolve_env_value('OAUTH_CLIENT_ID', $committed_id);
+if ($client_id !== $committed_id) {
+  NOTE('OAUTH_CLIENT_ID %s from %s is not the committed Consumer %s; using the committed one.', $client_id, $client_id_source, $committed_id);
+  $client_id = $committed_id;
+}
 putenv('OAUTH_CLIENT_ID=' . $client_id);
 putenv('OAUTH_CALLBACK=' . $oauth_callback);
 drush('php-eval %s', <<<'PHP'

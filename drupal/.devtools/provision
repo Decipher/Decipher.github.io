@@ -130,23 +130,8 @@ TASK('Running drush site-install --existing-config.');
 drush('site-install --existing-config');
 PASS('Site installed from committed config.');
 
-// The committed simple_oauth settings point at ../keys/*.key, relative to
-// web/. The files are not committed, so a fresh checkout makes its own pair.
-// An existing pair is kept: replacing it would log out every session that
-// holds a token signed with it.
 TASK('Making the OAuth key pair, if this checkout has none.');
-$keys_dir = getcwd() . '/keys';
-if (is_file($keys_dir . '/private.key') && is_file($keys_dir . '/public.key')) {
-  PASS('Keys already present at %s.', $keys_dir);
-}
-else {
-  if (!is_dir($keys_dir) && !mkdir($keys_dir, 0755, TRUE) && !is_dir($keys_dir)) {
-    FAIL('Unable to create %s.', $keys_dir);
-  }
-  // An absolute path: the command writes to disk at once, from its own cwd.
-  drush('simple-oauth:generate-keys %s', $keys_dir);
-  PASS('Keys generated at %s.', $keys_dir);
-}
+ensure_oauth_keys(getcwd() . '/keys');
 
 TASK('Importing Tome-tracked content and files.');
 drush('tome:import');
@@ -156,8 +141,9 @@ PASS('Content and files imported.');
 // install and the import. Each of them was missing once, and each failure
 // showed up only as a failed login on the frontend, so check here instead.
 TASK('Checking that the frontend can sign in against this backend.');
-drush('php-eval %s', <<<'PHP'
-$client_id = "dfdd3969-6fe2-4a6f-92bb-82b6f59013ed";
+$client_id = committed_consumer_id();
+drush('php-eval %s', str_replace('__CLIENT_ID__', $client_id, <<<'PHP'
+$client_id = "__CLIENT_ID__";
 $consumers = \Drupal::entityTypeManager()->getStorage("consumer")->loadByProperties(["client_id" => $client_id]);
 if (count($consumers) !== 1) {
   throw new \RuntimeException(sprintf("Expected one Consumer with client_id %s, found %d. Is drupal/content/consumer.%s.json committed and in content/meta/index.json?", $client_id, count($consumers), $client_id));
@@ -174,8 +160,8 @@ foreach (["public_key", "private_key"] as $key) {
     throw new \RuntimeException(sprintf("simple_oauth.settings %s points at %s, which does not exist.", $key, $path));
   }
 }
-PHP);
-PASS('Consumer %s, the authoring scope and the key pair are all in place.', $client_id ?? 'dfdd3969-6fe2-4a6f-92bb-82b6f59013ed');
+PHP));
+PASS('Consumer %s, the authoring scope and the key pair are all in place.', $client_id);
 
 echo PHP_EOL;
 echo '===============================' . PHP_EOL;

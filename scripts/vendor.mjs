@@ -13,31 +13,39 @@
  * Keys a vendored manifest does not carry.
  *
  * `scripts` and `devDependencies` belong to working on the module, not using
- * it. `type` goes because `dist/index.ssr.js` is CommonJS, and a
- * `"type": "module"` beside it would make Node load it as an ES module and
- * fail. The rest describe publishing, which a vendored copy never does.
+ * it. The rest describe publishing, which a vendored copy never does.
  *
- * `peerDependenciesMeta` stays: it is what marks a peer optional, and without
- * it npm tries to install every optional peer.
+ * `type` is decided per module, in `vendoredManifest`. `peerDependenciesMeta`
+ * stays: it is what marks a peer optional, and without it npm tries to install
+ * every optional peer.
  */
-export const DROPPED_KEYS = [
-  'type',
-  'scripts',
-  'devDependencies',
-  'packageManager',
-  'publishConfig',
-]
+export const DROPPED_KEYS = ['scripts', 'devDependencies', 'packageManager', 'publishConfig']
+
+/** The manifest's CommonJS entry, as `require` resolves it. */
+export function cjsEntry(manifest = {}) {
+  const root = manifest.exports && manifest.exports['.']
+  return (root && root.require) || manifest.main || ''
+}
 
 /** What a built package ships, from its own `files` list. */
 export function packageFiles(manifest = {}) {
   return Array.isArray(manifest.files) && manifest.files.length ? manifest.files : ['dist']
 }
 
-/** The manifest to vendor: the module's own, less what only building needs. */
+/**
+ * The manifest to vendor: the module's own, less what only building needs.
+ *
+ * `type` goes when the CommonJS build is a `.js` file: `dist/index.ssr.js` is
+ * CommonJS, and a `"type": "module"` beside it would make Node load it as an
+ * ES module and fail. A module whose CommonJS build is named `.cjs` keeps
+ * `type`, and its `.js` ES module entry needs it (anchors).
+ */
 export function vendoredManifest(manifest = {}) {
+  const dropType = !cjsEntry(manifest).endsWith('.cjs')
   const out = {}
   for (const [key, value] of Object.entries(manifest)) {
-    if (!DROPPED_KEYS.includes(key)) out[key] = value
+    if (DROPPED_KEYS.includes(key) || (key === 'type' && dropType)) continue
+    out[key] = value
   }
   return out
 }

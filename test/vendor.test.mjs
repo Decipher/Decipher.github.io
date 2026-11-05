@@ -13,6 +13,7 @@ import {
   provenance,
   repositoryName,
   vendoredManifest,
+  cjsEntry,
 } from '../scripts/vendor.mjs'
 
 describe('repositoryName', () => {
@@ -56,6 +57,32 @@ describe('vendoredManifest', () => {
       // Kept: it is what marks a peer optional.
       peerDependenciesMeta: { druxt: { optional: true } },
     })
+  })
+})
+
+describe('cjsEntry', () => {
+  it('reads the require export, then main, then nothing', () => {
+    assert.equal(
+      cjsEntry({ exports: { '.': { require: './dist/a.cjs' } }, main: 'b.js' }),
+      './dist/a.cjs'
+    )
+    assert.equal(cjsEntry({ main: 'dist/index.ssr.js' }), 'dist/index.ssr.js')
+    assert.equal(cjsEntry({}), '')
+  })
+})
+
+describe('vendoredManifest keeps type for a .cjs build', () => {
+  it('leaves `type` on a manifest whose CommonJS build is a .cjs file', () => {
+    const vendored = vendoredManifest({
+      name: '@druxt-contrib/anchors',
+      type: 'module',
+      main: 'dist/index.ssr.cjs',
+      module: 'dist/index.esm.js',
+      exports: { '.': { require: './dist/index.ssr.cjs', import: './dist/index.esm.js' } },
+      scripts: { build: 'siroc build' },
+    })
+    assert.equal(vendored.type, 'module')
+    assert.equal(vendored.scripts, undefined)
   })
 })
 
