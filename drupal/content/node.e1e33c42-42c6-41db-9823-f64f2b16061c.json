@@ -51,7 +51,7 @@
     ],
     "changed": [
         {
-            "value": "2026-11-05T01:54:50+00:00"
+            "value": "2026-11-05T02:11:56+00:00"
         }
     ],
     "promote": [
@@ -96,7 +96,7 @@
     ],
     "field_link": [
         {
-            "uri": "https:\/\/stuar.tc",
+            "uri": "https:\/\/stuar.tc\/?utm_medium=qr&utm_source=drupal-melbourne&utm_campaign=prose-and-cons",
             "resolvable_uri": "https:\/\/stuar.tc",
             "title": "stuar.tc",
             "options": []

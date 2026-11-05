@@ -122,6 +122,12 @@ test('an empty or missing body reads as nothing, not as an error', () => {
 test('only the two hosts the talk points at may be encoded as a QR code', () => {
   assert.equal(linkHostAllowed('https://stuar.tc'), true)
   assert.equal(linkHostAllowed('https://stuar.tc/writing/'), true)
+  assert.equal(
+    linkHostAllowed(
+      'https://stuar.tc/?utm_medium=qr&utm_source=drupal-melbourne&utm_campaign=prose-and-cons'
+    ),
+    true
+  )
   assert.equal(linkHostAllowed('https://github.com/sponsors/Decipher'), true)
   assert.equal(linkHostAllowed('https://github.com/sponsors/Decipher?o=esb'), true)
   assert.equal(linkHostAllowed('https://github.com/Decipher'), false, 'not the sponsors page')
