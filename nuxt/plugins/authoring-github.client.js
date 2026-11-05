@@ -15,7 +15,7 @@
 import Vue from 'vue'
 
 import { checkAccess, findRun, runIsFinished, startBackend } from '../lib/github-client.mjs'
-import { readStoredToken, writeStoredToken } from '../lib/github.mjs'
+import { readStoredToken, workflowRunUrl, writeStoredToken } from '../lib/github.mjs'
 
 const readStored = () => readStoredToken(window.sessionStorage)
 const writeStored = (value) => writeStoredToken(window.sessionStorage, value)
@@ -28,6 +28,8 @@ export default function (context, inject) {
   const state = Vue.observable({
     repository: config.repository || null,
     token: null,
+    // When the token stops working, as GitHub said on sign-in, or null.
+    expiresAt: null,
     login: null,
     defaultBranch: 'main',
     status: 'idle',
@@ -48,6 +50,9 @@ export default function (context, inject) {
     // `error` is only shown to somebody signed out, and this happens to
     // somebody signed in.
     runError: null,
+    // Whether the site is looking out for a backend started on GitHub's own
+    // page, with no token in hand to find the run with.
+    awaiting: false,
   })
 
   /**
@@ -66,6 +71,11 @@ export default function (context, inject) {
 
     get signedIn() {
       return state.status === 'signed-in'
+    },
+
+    /** GitHub's page for starting a backend by hand, or '' with no repository. */
+    get workflowUrl() {
+      return workflowRunUrl(state.repository, state.workflow)
     },
 
     async signIn(token, repository) {
@@ -90,8 +100,16 @@ export default function (context, inject) {
         state.login = result.login || null
         return false
       }
+      // GitHub still answers for a token on its last day. Refusing it here
+      // beats a pull request that fails on it an hour later.
+      if (result.expiresAt && new Date(result.expiresAt).getTime() <= Date.now()) {
+        state.status = 'error'
+        state.error = 'That token has expired. Make a new one.'
+        return false
+      }
 
       state.token = token
+      state.expiresAt = result.expiresAt || null
       state.repository = repository || state.repository
       state.login = result.login
       state.defaultBranch = result.defaultBranch || 'main'
@@ -170,6 +188,41 @@ export default function (context, inject) {
       window.setTimeout(look, 8000)
     },
 
+    /**
+     * Look out for a backend started by hand on GitHub's own page.
+     *
+     * No token, so no run to find: the only sign of it is the session record
+     * it publishes, and that is enough. Stops on connecting, when the author
+     * stops it, or after the time a session could take to come up.
+     */
+    awaitStartedBackend() {
+      const mine = ++generation
+      state.awaiting = true
+      const app = window.$nuxt
+      const deadline = Date.now() + 20 * 60 * 1000
+      const look = async () => {
+        if (mine !== generation) return
+        if (Date.now() > deadline) {
+          state.awaiting = false
+          return
+        }
+        const found = app && app.$druxtIce && (await app.$druxtIce.discover())
+        if (mine !== generation) return
+        if (found && found.connected) {
+          state.started = found
+          state.awaiting = false
+          return
+        }
+        window.setTimeout(look, 10000)
+      }
+      window.setTimeout(look, 8000)
+    },
+
+    stopAwaiting() {
+      generation++
+      state.awaiting = false
+    },
+
     /** Poll for the run, then for its result, and stop when it stops. */
     async watchRun(since, mine = generation) {
       const deadline = Date.now() + 90 * 60 * 1000
@@ -229,6 +282,7 @@ export default function (context, inject) {
       generation++
       Object.assign(state, {
         token: null,
+        expiresAt: null,
         login: null,
         status: 'idle',
         error: null,

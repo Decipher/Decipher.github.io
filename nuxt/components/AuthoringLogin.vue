@@ -56,6 +56,43 @@
             </button>
             <button type="button" class="rounded border border-hairline px-3 py-1.5 text-sm text-body hover:border-ink hover:text-ink transition-colors" @click="close">Cancel</button>
           </div>
+
+          <!--
+            No backend to point at yet? GitHub can start one. Its own page
+            does the starting, with the author's own GitHub sign-in and no
+            token kept here; this site then watches for the backend to say
+            where it is.
+          -->
+          <template v-if="workflowUrl">
+            <p class="eyebrow mt-6 mb-1.5">No backend running?</p>
+            <template v-if="!awaiting">
+              <p class="text-sm text-body mb-3">
+                Start one on GitHub. Its page opens in a new tab; choose <strong>Run workflow</strong> there, and this site connects as soon as the backend is up.
+              </p>
+              <button
+                type="button"
+                class="rounded border border-hairline px-3 py-1.5 text-sm text-body hover:border-accent hover:text-accent transition-colors"
+                data-testid="authoring-start-backend"
+                @click="startBackend"
+              >
+                Start a backend on GitHub
+              </button>
+            </template>
+            <template v-else>
+              <p class="text-sm text-body mb-3 flex items-center gap-2" data-testid="authoring-awaiting">
+                <span class="authoring-spinner" aria-hidden="true"></span>
+                Waiting for the backend. It takes a few minutes to build; this connects the moment it is published.
+              </p>
+              <button
+                type="button"
+                class="rounded border border-hairline px-3 py-1.5 text-sm text-body hover:border-ink hover:text-ink transition-colors"
+                data-testid="authoring-stop-waiting"
+                @click="stopWaiting"
+              >
+                Stop waiting
+              </button>
+            </template>
+          </template>
         </template>
 
         <!-- Step two: a verified backend, so offer the actual login. -->
@@ -174,6 +211,15 @@ export default {
       return this.authenticated ? 'Account' : 'Log in'
     },
 
+    /** GitHub's page for starting a backend, when this site knows its repository. */
+    workflowUrl() {
+      return (this.$authoringGithub && this.$authoringGithub.workflowUrl) || ''
+    },
+
+    awaiting() {
+      return Boolean(this.$authoringGithub && this.$authoringGithub.state.awaiting)
+    },
+
     title() {
       if (this.authenticated) return 'Account'
       return this.connected ? 'Log in' : 'Connect a backend'
@@ -220,6 +266,22 @@ export default {
       // Connecting does not change what is on screen. The page was rendered
       // from a payload baked at build time, so the dialog offers a reload
       // rather than doing it unannounced.
+    },
+
+    /**
+     * Send the author to GitHub to start a backend, and watch for it.
+     *
+     * A new tab, so this dialog is still here, waiting, when the backend
+     * publishes itself; `noopener` keeps that tab from reaching back.
+     */
+    startBackend() {
+      this.error = null
+      window.open(this.workflowUrl, '_blank', 'noopener')
+      this.$authoringGithub.awaitStartedBackend()
+    },
+
+    stopWaiting() {
+      this.$authoringGithub.stopAwaiting()
     },
 
     async login() {

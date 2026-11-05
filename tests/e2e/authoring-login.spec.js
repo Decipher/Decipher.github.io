@@ -46,6 +46,63 @@ async function openLogin(page) {
 test.beforeEach(({ page }) => isolateFromPublishedSessions(page))
 
 test.describe('authoring login', () => {
+  test('a backend can be started on GitHub from the first step, and is joined when it appears', async ({
+    page,
+  }) => {
+    await stubConformingBackend(page)
+    // Opening GitHub is a new tab; here it is only recorded.
+    await page.addInitScript(() => {
+      window.__opened = []
+      window.open = (url) => {
+        window.__opened.push(url)
+        return null
+      }
+    })
+    // The session record the started backend publishes, once it is up. Nothing
+    // there before the click, so the dialog's first step shows as for anyone.
+    let published = false
+    await page.route(/raw\.githubusercontent\.com/, (route) =>
+      published
+        ? route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({ url: BACKEND, clientId: 'client', expiresAt: null }),
+          })
+        : route.abort()
+    )
+
+    await page.goto('/')
+    await appReady(page)
+    await page.getByTestId('authoring-login-trigger').click()
+    await page.getByTestId('authoring-start-backend').click()
+
+    const opened = await page.evaluate(() => window.__opened)
+    expect(opened).toHaveLength(1)
+    expect(opened[0]).toMatch(/^https:\/\/github\.com\/.+\/actions\/workflows\/authoring\.yml$/)
+    await expect(page.getByTestId('authoring-awaiting')).toBeVisible()
+
+    // The backend comes up and says where it is. The dialog looks every few
+    // seconds, so this takes a little while rather than being instant.
+    published = true
+    await expect(page.getByTestId('authoring-continue')).toBeVisible({ timeout: 30000 })
+    await expect(page.getByTestId('authoring-backend-host')).toHaveText('backend.test')
+    await expect(page.getByTestId('authoring-awaiting')).toHaveCount(0)
+  })
+
+  test('waiting for a started backend can be stopped', async ({ page }) => {
+    await page.addInitScript(() => {
+      window.open = () => null
+    })
+    await page.goto('/')
+    await appReady(page)
+    await page.getByTestId('authoring-login-trigger').click()
+    await page.getByTestId('authoring-start-backend').click()
+    await expect(page.getByTestId('authoring-awaiting')).toBeVisible()
+    await page.getByTestId('authoring-stop-waiting').click()
+    await expect(page.getByTestId('authoring-awaiting')).toHaveCount(0)
+    await expect(page.getByTestId('authoring-start-backend')).toBeVisible()
+  })
+
   test('a visitor sees only a login control, and no backend', async ({ page }) => {
     await page.goto('/')
     await appReady(page)

@@ -23,6 +23,8 @@ import {
   readStoredToken,
   requestDocument,
   requestPaths,
+  tokenExpiry,
+  workflowRunUrl,
   writeStoredToken,
 } from '../../nuxt/lib/github.mjs'
 
@@ -175,4 +177,26 @@ test('a browser that refuses to store anything still works', () => {
   }
   assert.equal(readStoredToken(refuses), null)
   assert.doesNotThrow(() => writeStoredToken(refuses, { token: 't' }))
+})
+
+test("the run page is GitHub's own, for the repository however it is written", () => {
+  assert.equal(
+    workflowRunUrl('https://github.com/o/r.git', 'authoring.yml'),
+    'https://github.com/o/r/actions/workflows/authoring.yml'
+  )
+  assert.equal(workflowRunUrl('o/r'), 'https://github.com/o/r/actions/workflows/authoring.yml')
+  assert.equal(workflowRunUrl(null), '')
+  assert.equal(workflowRunUrl('not a repository at all'), '')
+})
+
+test('a token expiry is read from the header GitHub sends, and only from that', () => {
+  const headers = new Map([['github-authentication-token-expiration', '2026-12-01 10:00:00 UTC']])
+  assert.equal(tokenExpiry({ headers }), '2026-12-01T10:00:00.000Z')
+  assert.equal(tokenExpiry({ headers: new Map() }), null)
+  assert.equal(
+    tokenExpiry({ headers: new Map([['github-authentication-token-expiration', 'never']]) }),
+    null
+  )
+  assert.equal(tokenExpiry({}), null)
+  assert.equal(tokenExpiry(null), null)
 })

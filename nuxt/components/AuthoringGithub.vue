@@ -5,6 +5,10 @@
         Signed in to GitHub as <strong>{{ state.login }}</strong>
         <span class="text-muted"> for {{ state.repository }}</span>
       </p>
+      <!-- Said while it is still true, so a token is replaced before it fails. -->
+      <p v-if="expiresOn" class="text-sm text-muted" data-testid="github-token-expiry">
+        This token stops working on {{ expiresOn }}.
+      </p>
       <!--
         Only for someone who can actually start one. Contents and Pull requests
         are enough to propose a change; starting a backend also needs Actions,
@@ -174,6 +178,12 @@ export default {
     },
     ready() {
       return Boolean(this.token.trim() && this.repository.trim())
+    },
+
+    /** The token's last day, in the reader's own calendar, or '' without one. */
+    expiresOn() {
+      if (!this.state.expiresAt) return ''
+      return new Date(this.state.expiresAt).toLocaleDateString(undefined, { dateStyle: 'long' })
     },
 
     /**

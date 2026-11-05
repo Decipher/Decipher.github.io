@@ -360,3 +360,18 @@ test('only a finished run stops the waiting', () => {
   assert.equal(runIsFinished({ status: 'completed' }), true)
   assert.equal(runIsFinished(null), false)
 })
+
+test('the access check reports when the token runs out, when GitHub says', async () => {
+  const gh = fakeGitHub()
+  const headers = new Map([['github-authentication-token-expiration', '2026-12-01 10:00:00 UTC']])
+  const fetch = async (url, init) => {
+    const response = await gh.fetch(url, init)
+    return url.endsWith('/user') ? { ...response, headers } : response
+  }
+  const result = await checkAccess({ repository: 'o/r', token: 't', fetch })
+  assert.equal(result.ok, true)
+  assert.equal(result.expiresAt, '2026-12-01T10:00:00.000Z')
+
+  const plain = await checkAccess({ repository: 'o/r', token: 't', fetch: gh.fetch })
+  assert.equal(plain.expiresAt, null)
+})
