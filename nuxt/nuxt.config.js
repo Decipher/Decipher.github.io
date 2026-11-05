@@ -1,5 +1,6 @@
 import { DEFAULT_PACKAGES as CKEDITOR_PACKAGES } from '@druxt-contrib/ckeditor'
 import { repositoryFromRemotes } from './lib/github.mjs'
+import { DECK_PATH } from './lib/deck.mjs'
 
 require('dotenv').config({ path: '../.env' })
 
@@ -233,7 +234,7 @@ const slideRoutes = async function (baseUrl) {
       timeout: 15000,
     })
     const count = (body.data || []).length
-    return Array.from({ length: count }, (_, i) => `/slides/${i + 1}`)
+    return [DECK_PATH, ...Array.from({ length: count }, (_, i) => `${DECK_PATH}/${i + 1}`)]
   } catch {
     return []
   }

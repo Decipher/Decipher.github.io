@@ -209,3 +209,12 @@ export function keyAction(event) {
   if (typeof target.closest === 'function' && target.closest('.ck, .ck-editor, [contenteditable="true"]')) return null
   return KEYS[event.key] || null
 }
+
+/**
+ * Where the deck lives on the site.
+ *
+ * One talk, one path, named for the event and the title so a later talk gets
+ * a path of its own beside it. The deck itself opens on its first slide, and
+ * every slide after that is numbered under it.
+ */
+export const DECK_PATH = '/drupalmel/prose-and-cons'

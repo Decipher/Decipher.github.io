@@ -35,7 +35,7 @@
 </template>
 
 <script>
-import { codeBlockWarnings, keyAction, layoutOf, linkHostAllowed, orderSlides, readBody } from '../../lib/deck.mjs'
+import { DECK_PATH, codeBlockWarnings, keyAction, layoutOf, linkHostAllowed, orderSlides, readBody } from '../../../lib/deck.mjs'
 
 /** Where the presenter's theme choice is kept between reloads. */
 const THEME_KEY = 'deck.theme'
@@ -82,7 +82,8 @@ export default {
   key: 'deck',
 
   validate({ params }) {
-    return /^\d+$/.test(params.n)
+    // No number is the deck itself, which opens on its first slide.
+    return params.n === undefined || /^\d+$/.test(params.n)
   },
 
   async asyncData({ $druxt, params, error }) {
@@ -92,7 +93,7 @@ export default {
       'page[limit]': 50,
     })
     const deck = orderSlides((collection || {}).data || [])
-    const index = Number(params.n) - 1
+    const index = params.n === undefined ? 0 : Number(params.n) - 1
     const current = deck[index]
     if (!current) {
       return error({ statusCode: 404, message: 'There is no such slide.' })
@@ -152,7 +153,7 @@ export default {
       if (action === 'theme') this.toggleTheme()
     },
     go(n) {
-      this.$router.push(`/slides/${n}`)
+      this.$router.push(`${DECK_PATH}/${n}`)
     },
     fullscreen() {
       const stage = this.$refs.stage
