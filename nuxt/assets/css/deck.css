@@ -197,11 +197,88 @@
 }
 
 .deck-right {
+  position: relative;
   display: grid;
   place-items: center;
   height: 100%;
   border: max(2px, calc(var(--u) * 2)) dashed var(--line);
   border-radius: calc(var(--u) * 8);
+}
+
+/* A refused save, or the warnings an accepted one carried, as a console laid
+   over the stage. Dark in both themes, like a code slide, and a little
+   see-through so the numeral behind it still reads as the stage. */
+.deck-console {
+  position: absolute;
+  inset: calc(var(--u) * 14);
+  display: grid;
+  grid-template-rows: auto 1fr;
+  gap: calc(var(--u) * 12);
+  padding: calc(var(--u) * 20) calc(var(--u) * 24);
+  border: calc(var(--u) * 2) solid var(--code-edge);
+  border-radius: calc(var(--u) * 6);
+  background: rgb(15 15 16 / 0.92);
+  color: var(--code-text);
+  font-family: var(--mono);
+  overflow: auto;
+}
+
+.deck-console__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: calc(var(--u) * 16);
+  padding-bottom: calc(var(--u) * 12);
+  border-bottom: calc(var(--u) * 2) solid var(--code-edge);
+  font-size: calc(var(--u) * 20);
+}
+
+.deck-console__status {
+  color: #fb923c;
+  font-weight: 600;
+}
+
+.deck-console--warned .deck-console__status {
+  color: #4cc38a;
+}
+
+.deck-console__dismiss {
+  font: inherit;
+  color: var(--code-caption);
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.deck-console__dismiss:hover,
+.deck-console__dismiss:focus-visible {
+  color: var(--code-text);
+  outline: none;
+}
+
+.deck-console__body {
+  margin: 0;
+  display: grid;
+  align-content: start;
+  gap: calc(var(--u) * 10);
+  font-size: calc(var(--u) * 26);
+  line-height: 1.4;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.deck-console__line:first-child {
+  color: var(--code-caption);
+}
+
+.deck-console__line:nth-child(2) {
+  color: var(--code-key);
+}
+
+.deck-console__line:last-child:not(:nth-child(2)) {
+  color: var(--code-string);
 }
 
 /* Statement: the bar, the sentence, the line under it. */
@@ -454,10 +531,31 @@
   margin: 0;
   padding: calc(var(--u) * 22) calc(var(--u) * 24);
   font-family: var(--mono);
-  font-size: calc(var(--u) * 28);
+  font-size: calc(var(--u) * 30);
   line-height: 1.5;
   white-space: pre;
-  overflow: visible;
+  /* The block scrolls rather than shrinks: a line the room can read beats
+     a whole payload nobody can. */
+  overflow: auto;
+  max-height: calc(var(--u) * 480);
+  scrollbar-color: var(--code-caption) transparent;
+}
+
+.deck-code__http {
+  color: var(--code-caption);
+  font-weight: 500;
+}
+
+.deck-code__key {
+  color: var(--code-key);
+}
+
+.deck-code__string {
+  color: var(--code-string);
+}
+
+.deck-code__number {
+  color: var(--code-number);
 }
 
 /* A QR code: dark modules on a white tile, in both themes, with its caption. */

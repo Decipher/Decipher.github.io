@@ -55,7 +55,9 @@
         <h2 class="deck-title deck-title--code">{{ title }}</h2>
         <div class="deck-code">
           <div class="deck-code__caption">{{ read.lead || read.language || 'code' }}</div>
-          <pre><code>{{ read.code }}</code></pre>
+          <!-- Coloured by the deck's own tokeniser; the text is escaped before any span is added. -->
+          <!-- eslint-disable-next-line vue/no-v-html -->
+          <pre><code v-html="codeHtml"></code></pre>
         </div>
       </template>
 
@@ -72,6 +74,25 @@
         </div>
         <div class="deck-right" data-testid="deck-stage">
           <span v-if="step" class="deck-numeral" aria-hidden="true">{{ step.step }}</span>
+          <!--
+            A refused save, large enough for the back row: the stage becomes a
+            console until the presenter dismisses it or the next save clears it.
+          -->
+          <div
+            v-if="console && dismissed !== console.key"
+            class="deck-console"
+            :class="`deck-console--${console.kind}`"
+            role="alert"
+            data-testid="deck-console"
+          >
+            <div class="deck-console__head">
+              <span class="deck-console__status">{{ console.status }}</span>
+              <button type="button" class="deck-console__dismiss" data-testid="deck-console-dismiss" @click="dismissed = console.key">
+                Dismiss
+              </button>
+            </div>
+            <pre class="deck-console__body"><span v-for="(line, i) in console.lines" :key="i" class="deck-console__line">{{ line }}</span></pre>
+          </div>
         </div>
       </template>
 
@@ -110,7 +131,7 @@
 <script>
 import { fieldAnchors } from '@druxt-contrib/anchors'
 
-import { demoStep, layoutOf, readBody, sessionLabel } from '../lib/deck.mjs'
+import { demoStep, highlightCode, layoutOf, readBody, refusalLines, sessionLabel } from '../lib/deck.mjs'
 
 /**
  * One slide, drawn from a node by its layout.
@@ -129,6 +150,11 @@ export default {
     /** Inside a node preview: the slide as it would read, with no editing controls. */
     preview: { type: Boolean, default: false },
   },
+  data: () => ({
+    /** The refusal the presenter has dismissed from the stage, if any. */
+    dismissed: '',
+  }),
+
   computed: {
     merged() {
       const next = JSON.parse(JSON.stringify(this.entity || {}))
@@ -198,6 +224,40 @@ export default {
       const fields = this.$store.getters['druxtIce/fieldErrorsFor'](type, id) || {}
       const first = Object.values(fields).flat().find(Boolean)
       return first ? String(first) : ''
+    },
+    /** The refusal, one fact per line, for the console. */
+    refusedLines() {
+      return refusalLines(this.refused)
+    },
+    /** The alerts an accepted save of this slide came back with. */
+    warnings() {
+      const { type, id } = this.merged
+      if (!type || !id) return []
+      return this.$store.getters['druxtIce/warningsFor'](type, id) || []
+    },
+    /**
+     * What the stage console shows: a refusal first, else the warnings an
+     * accepted save carried, else nothing. The key is what Dismiss remembers,
+     * so a new refusal or a new set of warnings shows again.
+     */
+    console() {
+      if (this.refused) {
+        return { kind: 'refused', key: this.refused, status: 'Save refused · 422 Unprocessable Content', lines: this.refusedLines }
+      }
+      if (this.warnings.length) {
+        const lines = this.warnings.flatMap((alert) => [
+          `${alert.field || 'body'}  (${alert.level || 'warning'})`,
+          alert.rule || '',
+          alert.message || '',
+        ])
+        const count = this.warnings.length
+        return { kind: 'warned', key: JSON.stringify(lines), status: `Saved · ${count} warning${count === 1 ? '' : 's'}, not blocking`, lines }
+      }
+      return null
+    },
+    /** The code slide's block, coloured. */
+    codeHtml() {
+      return highlightCode(this.read.code)
     },
   },
 }

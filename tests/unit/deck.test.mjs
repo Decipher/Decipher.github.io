@@ -13,6 +13,8 @@ import {
   flagText,
   keyAction,
   linkHostAllowed,
+  highlightCode,
+  refusalLines,
   orderSlides,
   readBody,
   sessionLabel,
@@ -205,4 +207,52 @@ test('a demo slide says when the session ends, and nothing with no backend', () 
   assert.match(sessionLabel({ url: 'https://x.test', expiresAt: later }, now), /^live until \d/)
   const earlier = new Date('2026-11-06T09:00:00Z').toISOString()
   assert.equal(sessionLabel({ url: 'https://x.test', expiresAt: earlier }, now), 'Session over')
+})
+
+test("a refusal in the Vale module's wording is split one fact per line", () => {
+  assert.deepEqual(
+    refusalLines(
+      `body.0.value: Body: Decipher.AiTells: 'Simply put' is an AI tell. Say it plainly. (line 1: "Simply put")`
+    ),
+    [
+      'body.0.value  (Body)',
+      'Decipher.AiTells',
+      "'Simply put' is an AI tell. Say it plainly.",
+      'line 1: "Simply put"',
+    ]
+  )
+  assert.deepEqual(refusalLines('body.0.value: Body: Decipher.EmDash: No em dashes.'), [
+    'body.0.value  (Body)',
+    'Decipher.EmDash',
+    'No em dashes.',
+  ])
+})
+
+test('a refusal in any other wording is one line, unchanged', () => {
+  assert.deepEqual(refusalLines('Forbidden'), ['Forbidden'])
+  assert.deepEqual(refusalLines(''), [])
+})
+
+test('a code block is coloured by role, with its text escaped first', () => {
+  const html = highlightCode(
+    'PATCH /jsonapi/node/slide/{uuid}\n{ "data": { "id": 7, "value": "<p>Hi</p>" } }\n422 Unprocessable Content'
+  )
+  const lines = html.split('\n')
+  assert.equal(lines[0], '<span class="deck-code__http">PATCH /jsonapi/node/slide/{uuid}</span>')
+  assert.equal(
+    lines[1],
+    '{ <span class="deck-code__key">&quot;data&quot;</span>: { <span class="deck-code__key">&quot;id&quot;</span>: <span class="deck-code__number">7</span>, <span class="deck-code__key">&quot;value&quot;</span>: <span class="deck-code__string">&quot;&lt;p&gt;Hi&lt;/p&gt;&quot;</span> } }'
+  )
+  assert.equal(lines[2], '<span class="deck-code__http">422 Unprocessable Content</span>')
+  assert.equal(highlightCode(''), '')
+})
+
+test('a string that runs past the end of its line does not stop the colouring', () => {
+  const html = highlightCode('  "detail": "body.0.value: Body:\n    (line 1: \\"Simply put\\")",')
+  const lines = html.split('\n')
+  assert.equal(
+    lines[0],
+    '  <span class="deck-code__key">&quot;detail&quot;</span>: <span class="deck-code__string">&quot;body.0.value: Body:</span>'
+  )
+  assert.ok(lines[1].includes('Simply put'))
 })

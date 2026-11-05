@@ -149,6 +149,8 @@ export default {
           const wait = response.headers.get('Retry-After')
           return { message: `Vale is busy. Try again${wait ? ` in ${wait} seconds` : ' shortly'}.` }
         }
+        if (response.status === 401) return { message: 'Your sign-in has expired. Use Account to sign in again.' }
+        if (response.status === 403) return { message: 'Not signed in, or not allowed to check. Use Account to sign in.' }
         if (!response.ok) return { message: `The check was refused with ${response.status}.` }
         const body = await response.json()
         return { alerts: Array.isArray(body.alerts) ? body.alerts : [] }

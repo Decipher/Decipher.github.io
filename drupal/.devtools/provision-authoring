@@ -184,6 +184,9 @@ $values = ([
   // fails with unsupported_grant_type. refresh_token lets the frontend
   // renew a session without sending the user back through login.
   "grant_types"  => ["authorization_code", "refresh_token"],
+  // Long enough to outlive a session. The module's default is five minutes,
+  // and a deck signed in before the talk was answering 401 by the first demo.
+  "access_token_expiration" => 7200,
   // The default scope for this grant: with it set, a request that sends
   // no scope (or an empty one, as druxt-auth does) resolves to this
   // rather than being rejected.

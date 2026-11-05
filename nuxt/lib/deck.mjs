@@ -221,3 +221,82 @@ export function keyAction(event) {
  * every slide after that is numbered under it.
  */
 export const DECK_PATH = '/drupalmel/prose-and-cons'
+
+/**
+ * A refused save's detail, one fact per line, for the console on the stage.
+ *
+ * The Vale module words a refusal as `field: label: rule: message (line n:
+ * "match")`, all on one line, which is right for a JSON:API error and wrong
+ * for a room. Split, the field, the rule and the message each get a line of
+ * their own, and the match gets the last. A detail in any other shape is one
+ * line, unchanged.
+ */
+export function refusalLines(detail) {
+  const text = String(detail || '').trim()
+  if (!text) return []
+  const match = text.match(/^([^:]+): ([^:]+): ([A-Za-z0-9_.-]+): (.*?)(?: \(line (\d+): "(.*)"\))?$/)
+  if (!match) return [text]
+  const [, field, label, rule, message, line, found] = match
+  const lines = [`${field}  (${label})`, rule, message]
+  if (line) lines.push(`line ${line}: "${found}"`)
+  return lines
+}
+
+/** HTML-escape one piece of text. */
+function escapeHtml(text) {
+  return String(text).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+}
+
+/**
+ * A code slide's block, coloured, as HTML.
+ *
+ * A small tokeniser for the JSON-with-HTTP that the talk's code slide is: a
+ * request or status line (`PATCH /path`, `422 Unprocessable Content`) is a
+ * caption, a quoted string before a colon is a key, any other quoted string
+ * is a string, and a bare number is a number. Everything is escaped first,
+ * so the only markup in the result is the spans this adds. Anything the
+ * tokeniser does not recognise comes through as plain text.
+ */
+export function highlightCode(code = '') {
+  const out = []
+  for (const line of String(code).split('\n')) {
+    if (/^(GET|POST|PATCH|PUT|DELETE)\s+\S/.test(line) || /^\d{3}\s+[A-Z]/.test(line)) {
+      out.push(`<span class="deck-code__http">${escapeHtml(line)}</span>`)
+      continue
+    }
+    let html = ''
+    let rest = line
+    while (rest.length) {
+      const key = rest.match(/^("(?:[^"\\]|\\.)*")(\s*:)/)
+      if (key) {
+        html += `<span class="deck-code__key">${escapeHtml(key[1])}</span>${escapeHtml(key[2])}`
+        rest = rest.slice(key[0].length)
+        continue
+      }
+      const string = rest.match(/^"(?:[^"\\]|\\.)*"/)
+      if (string) {
+        html += `<span class="deck-code__string">${escapeHtml(string[0])}</span>`
+        rest = rest.slice(string[0].length)
+        continue
+      }
+      const number = rest.match(/^-?\d+(?:\.\d+)?(?![\w.])/)
+      if (number) {
+        html += `<span class="deck-code__number">${escapeHtml(number[0])}</span>`
+        rest = rest.slice(number[0].length)
+        continue
+      }
+      // A quote with no closing quote on this line: the string runs on to the
+      // next line, as a long detail does when the slide wraps it by hand.
+      const open = rest.match(/^".*$/)
+      if (open) {
+        html += `<span class="deck-code__string">${escapeHtml(open[0])}</span>`
+        break
+      }
+      const plain = rest.match(/^[^"\d-]+|^[-\d]/) || [rest[0]]
+      html += escapeHtml(plain[0])
+      rest = rest.slice(plain[0].length)
+    }
+    out.push(html)
+  }
+  return out.join('\n')
+}
