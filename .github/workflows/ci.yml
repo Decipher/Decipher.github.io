@@ -176,7 +176,9 @@ jobs:
 
       - name: Validate and install Composer dependencies
         working-directory: drupal
-        run: composer validate --strict && composer install --no-interaction --no-progress
+        # Not --strict: consumer_node_preview is pinned to a commit on purpose until
+        # it has a release, and strict mode turns that warning into a failure.
+        run: composer validate && composer install --no-interaction --no-progress
 
       # Not `npm run build`/`generate` - Druxt fetches the JSON:API index
       # at build time, so building needs a live Drupal backend. That

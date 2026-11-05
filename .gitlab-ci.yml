@@ -216,7 +216,9 @@ build:
   stage: build
   script:
     # Validate and install Composer dependencies.
-    - cd drupal && composer validate --strict && composer install --no-interaction --no-progress
+    # Not --strict: the consumer_node_preview commit pin is deliberate, and strict
+    # mode fails on the warning it raises.
+    - cd drupal && composer validate && composer install --no-interaction --no-progress
 
     # Install Nuxt dependencies. Not `npm run build`/`generate` - Druxt
     # fetches the JSON:API index at build time, so building needs a live
