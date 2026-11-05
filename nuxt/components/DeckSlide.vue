@@ -124,7 +124,13 @@
       </template>
     </div>
 
-    <DeckFooter :number="index + 1" :total="deck.length" :closing="layout === 'close'" :refused="refused" />
+    <DeckFooter
+      :number="index + 1"
+      :total="deck.length"
+      :closing="layout === 'close'"
+      :refused="dismissed === refused ? '' : refused"
+      @dismiss="dismissed = refused"
+    />
   </section>
 </template>
 

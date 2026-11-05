@@ -350,7 +350,7 @@
   margin-left: auto;
 }
 
-/* A refused save takes the footer over until the next save. */
+/* A refused save takes the footer over until the next save, or Dismiss. */
 .deck-notice {
   display: flex;
   align-items: center;
@@ -363,13 +363,70 @@
   background: var(--warnbg);
   color: var(--ink);
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .deck-notice strong {
+  flex: none;
   font-weight: 600;
   color: var(--warn);
+}
+
+/* The reason's line: what does not fit is clipped, and drifts into view. */
+.deck-notice__track {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  mask-image: linear-gradient(to right, transparent, #000 calc(var(--u) * 12), #000 calc(100% - var(--u) * 12), transparent);
+}
+
+.deck-notice__text {
+  display: inline-block;
+  will-change: transform;
+}
+
+.deck-notice__text--drift {
+  animation: deck-drift var(--drift-time, 6s) ease-in-out 1.5s infinite alternate;
+}
+
+.deck-notice:hover .deck-notice__text--drift,
+.deck-notice:focus-within .deck-notice__text--drift {
+  animation-play-state: paused;
+}
+
+@keyframes deck-drift {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(var(--drift, 0));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .deck-notice__text--drift {
+    animation: none;
+  }
+  .deck-notice__track {
+    mask-image: none;
+    text-overflow: ellipsis;
+  }
+}
+
+.deck-notice__dismiss {
+  flex: none;
+  font: inherit;
+  color: var(--warn);
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.deck-notice__dismiss:hover,
+.deck-notice__dismiss:focus-visible {
+  color: var(--ink);
+  outline: none;
 }
 
 /* Type. */

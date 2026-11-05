@@ -105,3 +105,4 @@ worktree
 xauth
 zoomable
 drupalmel
+colouring

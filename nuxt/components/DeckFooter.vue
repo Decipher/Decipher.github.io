@@ -1,9 +1,19 @@
 <template>
   <footer class="deck-foot" data-testid="deck-footer">
-    <!-- A refused save takes the footer over until the next save clears it. -->
+    <!--
+      A refused save takes the footer over until the next save clears it, or
+      the presenter dismisses it. A reason longer than the line drifts slowly
+      sideways and back, so the whole of it can be read from the room; it
+      holds still under a pointer, and under reduced motion.
+    -->
     <p v-if="refused" class="deck-notice" role="status" data-testid="deck-refused">
       <strong>Save refused · 422</strong>
-      <span>{{ refused }}</span>
+      <span ref="track" class="deck-notice__track"
+        ><span ref="text" class="deck-notice__text" :class="{ 'deck-notice__text--drift': drift > 0 }" :style="driftStyle">{{
+          refused
+        }}</span></span
+      >
+      <button type="button" class="deck-notice__dismiss" data-testid="deck-refused-dismiss" @click="$emit('dismiss')">Dismiss</button>
     </p>
     <template v-else-if="closing">
       <span data-testid="deck-slogan">Thanks, Drupal Melbourne</span>
@@ -48,7 +58,12 @@ export default {
     /** Why the last save was refused, or nothing. */
     refused: { type: String, default: '' },
   },
-  data: () => ({ live: null }),
+  emits: ['dismiss'],
+  data: () => ({
+    live: null,
+    /** How far the reason overflows its line, in pixels; 0 when it fits. */
+    drift: 0,
+  }),
   computed: {
     slogan() {
       if (this.live) return this.live
@@ -58,8 +73,20 @@ export default {
       const state = (this.$druxtIce && this.$druxtIce.state) || null
       return (state && state.url) || ''
     },
+    /** The drift's distance and pace: about forty pixels a second, both ways. */
+    driftStyle() {
+      if (!this.drift) return null
+      return { '--drift': `-${this.drift}px`, '--drift-time': `${Math.max(4, this.drift / 40)}s` }
+    },
   },
+
   watch: {
+    refused: {
+      immediate: true,
+      handler() {
+        this.$nextTick(this.measure)
+      },
+    },
     backendUrl: {
       immediate: true,
       handler(url) {
@@ -68,7 +95,21 @@ export default {
       },
     },
   },
+  mounted() {
+    window.addEventListener('resize', this.measure)
+  },
+
+  beforeDestroy() {
+    window.removeEventListener('resize', this.measure)
+  },
+
   methods: {
+    /** Measure how much of the reason does not fit on its line. */
+    measure() {
+      const track = this.$refs.track
+      const text = this.$refs.text
+      this.drift = track && text ? Math.max(0, text.scrollWidth - track.clientWidth) : 0
+    },
     /**
      * Ask the connected backend what the slogan is now.
      *
