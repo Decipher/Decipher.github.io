@@ -51,7 +51,7 @@
     ],
     "changed": [
         {
-            "value": "2026-11-05T05:26:10+00:00"
+            "value": "2026-11-05T05:45:29+00:00"
         }
     ],
     "promote": [
@@ -83,9 +83,9 @@
     ],
     "body": [
         {
-            "value": "<ul><li>A throwaway Drupal on a GitHub Actions runner<\/li><li>A Cloudflare quick tunnel in front of it<\/li><li>An address the deck looks up when it loads<\/li><li>About an hour, then it is gone<\/li><\/ul>",
+            "value": "<ul><li>A throwaway Drupal on a GitHub Actions runner<\/li><li>A Cloudflare quick tunnel in front of it<\/li><li>A file in the repository that tells the deck where the backend is<\/li><li>About an hour, then it is gone<\/li><\/ul>",
             "format": "basic_html",
-            "processed": "<ul><li>A throwaway Drupal on a GitHub Actions runner<\/li><li>A Cloudflare quick tunnel in front of it<\/li><li>An address the deck looks up when it loads<\/li><li>About an hour, then it is gone<\/li><\/ul>",
+            "processed": "<ul><li>A throwaway Drupal on a GitHub Actions runner<\/li><li>A Cloudflare quick tunnel in front of it<\/li><li>A file in the repository that tells the deck where the backend is<\/li><li>About an hour, then it is gone<\/li><\/ul>",
             "summary": null
         }
     ],
