@@ -67,7 +67,7 @@
             <p class="eyebrow mt-6 mb-1.5">No backend running?</p>
             <template v-if="!awaiting">
               <p class="text-sm text-body mb-3">
-                Start one on GitHub. Its page opens in a new tab; choose <strong>Run workflow</strong> there, and this site connects as soon as the backend is up.
+                Start one on GitHub. Its page opens in a new tab. Choose <strong>Run workflow</strong> there, and this site connects as soon as the backend is up.
               </p>
               <button
                 type="button"
@@ -81,7 +81,7 @@
             <template v-else>
               <p class="text-sm text-body mb-3 flex items-center gap-2" data-testid="authoring-awaiting">
                 <span class="authoring-spinner" aria-hidden="true"></span>
-                Waiting for the backend. It takes a few minutes to build; this connects the moment it is published.
+                Waiting for the backend. It takes a few minutes to build, and this site connects the moment it is published.
               </p>
               <button
                 type="button"

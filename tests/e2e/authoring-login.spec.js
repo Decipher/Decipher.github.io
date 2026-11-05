@@ -43,6 +43,20 @@ async function openLogin(page) {
   await page.evaluate(() => window.$nuxt.$druxtIce.openLogin())
 }
 
+/**
+ * Tell the site which repository it lives in.
+ *
+ * A build learns that from its own environment, and a runner with no GitHub
+ * remote makes a build that knows no repository, which hides the offer to
+ * start a backend there. Named here so the offer is tested wherever the build
+ * was made.
+ */
+async function nameRepository(page) {
+  await page.evaluate(() => {
+    window.$nuxt.$authoringGithub.state.repository = 'o/r'
+  })
+}
+
 test.beforeEach(({ page }) => isolateFromPublishedSessions(page))
 
 test.describe('authoring login', () => {
@@ -73,12 +87,12 @@ test.describe('authoring login', () => {
 
     await page.goto('/')
     await appReady(page)
+    await nameRepository(page)
     await page.getByTestId('authoring-login-trigger').click()
     await page.getByTestId('authoring-start-backend').click()
 
     const opened = await page.evaluate(() => window.__opened)
-    expect(opened).toHaveLength(1)
-    expect(opened[0]).toMatch(/^https:\/\/github\.com\/.+\/actions\/workflows\/authoring\.yml$/)
+    expect(opened).toEqual(['https://github.com/o/r/actions/workflows/authoring.yml'])
     await expect(page.getByTestId('authoring-awaiting')).toBeVisible()
 
     // The backend comes up and says where it is. The dialog looks every few
@@ -95,6 +109,7 @@ test.describe('authoring login', () => {
     })
     await page.goto('/')
     await appReady(page)
+    await nameRepository(page)
     await page.getByTestId('authoring-login-trigger').click()
     await page.getByTestId('authoring-start-backend').click()
     await expect(page.getByTestId('authoring-awaiting')).toBeVisible()
