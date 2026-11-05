@@ -161,6 +161,17 @@ export default {
     dismissed: '',
   }),
 
+  watch: {
+    // Dismiss hides one refusal, not every refusal with the same words. A new
+    // send starting, or the refusal clearing, means the next one shows again.
+    committing(now) {
+      if (now) this.dismissed = ''
+    },
+    refused(now) {
+      if (!now) this.dismissed = ''
+    },
+  },
+
   computed: {
     merged() {
       const next = JSON.parse(JSON.stringify(this.entity || {}))
@@ -230,6 +241,10 @@ export default {
       const fields = this.$store.getters['druxtIce/fieldErrorsFor'](type, id) || {}
       const first = Object.values(fields).flat().find(Boolean)
       return first ? String(first) : ''
+    },
+    /** A send to the backend is in flight. */
+    committing() {
+      return Boolean(this.$store.state.druxtIce && this.$store.state.druxtIce.committing)
     },
     /** The refusal, one fact per line, for the console. */
     refusedLines() {

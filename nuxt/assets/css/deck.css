@@ -350,6 +350,43 @@
   margin-left: auto;
 }
 
+/* The slogan while a backend is being asked, and the moment its answer lands. */
+.deck-foot__slogan {
+  transition: opacity 200ms ease;
+  border-radius: calc(var(--u) * 4);
+  padding: 0 calc(var(--u) * 4);
+  margin: 0 calc(var(--u) * -4);
+}
+
+.deck-foot__slogan--asking {
+  opacity: 0.45;
+}
+
+.deck-foot__slogan--fresh {
+  animation: deck-fresh 1.8s ease-out;
+}
+
+@keyframes deck-fresh {
+  0% {
+    background: var(--acc);
+    color: #fff;
+  }
+  35% {
+    background: var(--acc);
+    color: #fff;
+  }
+  100% {
+    background: transparent;
+    color: inherit;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .deck-foot__slogan--fresh {
+    animation: none;
+  }
+}
+
 /* A refused save takes the footer over until the next save, or Dismiss. */
 .deck-notice {
   display: flex;

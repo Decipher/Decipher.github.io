@@ -22,7 +22,17 @@
       <DeckMark />
       <span class="deck-foot__name">Stuart Clark</span>
       <span aria-hidden="true">·</span>
-      <span data-testid="deck-slogan">{{ slogan }}</span>
+      <!--
+        Dimmed while a connected backend is being asked, and lit for a moment
+        when its answer differs from the build, so a slogan changed in Drupal
+        is seen to arrive rather than to have been there all along.
+      -->
+      <span
+        class="deck-foot__slogan"
+        :class="{ 'deck-foot__slogan--asking': asking, 'deck-foot__slogan--fresh': fresh }"
+        data-testid="deck-slogan"
+        >{{ slogan }}</span
+      >
     </template>
     <span class="deck-foot__number" data-testid="deck-number">{{ number }} / {{ total }}</span>
   </footer>
@@ -61,6 +71,10 @@ export default {
   emits: ['dismiss'],
   data: () => ({
     live: null,
+    /** A backend has been asked for the slogan and has not answered yet. */
+    asking: false,
+    /** The live slogan just arrived and differs from the build's. */
+    fresh: false,
     /** How far the reason overflows its line, in pixels; 0 when it fits. */
     drift: 0,
   }),
@@ -97,6 +111,12 @@ export default {
   },
   mounted() {
     window.addEventListener('resize', this.measure)
+    // Ask the backend the page already knows about before the editing plugin
+    // has finished its own connection check, which is a round trip the slogan
+    // need not wait for. The later watcher asks the same endpoint and finds
+    // this request in the cache.
+    const early = this.rememberedBackend()
+    if (early) this.refresh(early)
   },
 
   beforeDestroy() {
@@ -104,6 +124,24 @@ export default {
   },
 
   methods: {
+    /**
+     * The backend this page was pointed at, before the plugin confirms it.
+     *
+     * The query string wins, then what the plugin remembered last time. Either
+     * may be missing, and a page with no backend asks nobody.
+     */
+    rememberedBackend() {
+      const query = (this.$route && this.$route.query && this.$route.query.backend) || ''
+      if (query) return String(query)
+      try {
+        const stored = window.localStorage.getItem('authoring.backend') || ''
+        if (!stored) return ''
+        if (stored.startsWith('{')) return String(JSON.parse(stored).url || '')
+        return stored
+      } catch {
+        return ''
+      }
+    },
     /** Measure how much of the reason does not fit on its line. */
     measure() {
       const track = this.$refs.track
@@ -118,6 +156,7 @@ export default {
      */
     async refresh(url) {
       if (typeof window === 'undefined' || !this.$druxt || !this.$druxt.axios) return
+      if (this.live === null) this.asking = true
       try {
         const clientId = ((this.$config || {}).authoring || {}).clientId
         const endpoint = `${url.replace(/\/+$/, '')}/jsonapi/decoupled/settings`
@@ -131,11 +170,22 @@ export default {
         }
         const { data: body } = await settingsRequests.get(endpoint)
         const slogan = siteIdentity(settingsFromDocument(body), {}).slogan
-        if (slogan) this.live = slogan
+        if (slogan && slogan !== this.live) {
+          const baked = siteIdentity((this.$config || {}).decoupledSettings, { slogan: 'Serverless Drupal' }).slogan
+          this.live = slogan
+          if (slogan !== baked) {
+            this.fresh = true
+            window.setTimeout(() => {
+              this.fresh = false
+            }, 1800)
+          }
+        }
       } catch {
         // The baked slogan stands. A footer is not where a request failure
         // shows. The next slide asks again rather than keeping the failure.
         settingsRequests.clear()
+      } finally {
+        this.asking = false
       }
     },
   },
