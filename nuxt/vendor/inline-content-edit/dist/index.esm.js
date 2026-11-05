@@ -99,6 +99,13 @@ function writeJson(storage, key, value) {
     return false;
   }
 }
+function safeStorage(win) {
+  try {
+    return win && win.localStorage || null;
+  } catch (e) {
+    return null;
+  }
+}
 
 const AUTH_STRATEGY = "drupal-authorization_code";
 const BACKEND_KEY = "authoring.backend";
@@ -127,6 +134,54 @@ function pointStrategyAt(options, backend) {
 function bareToken(value) {
   if (!value || typeof value !== "string") return null;
   return value.replace(/^Bearer\s+/i, "") || null;
+}
+const ISSUER_KEY = "authoringIssuer";
+function tokensAreForeign(issuer, backend) {
+  if (!issuer || !backend || !backend.url) return false;
+  return normaliseUrl(issuer) !== normaliseUrl(backend.url);
+}
+function fetchThroughAxios(axios) {
+  if (!axios || typeof axios.request !== "function") return null;
+  return async (url, init = {}) => {
+    const config = {
+      url,
+      method: String(init.method || "GET").toLowerCase(),
+      headers: init.headers || {},
+      data: init.body,
+      // Text, so a refused save's body reaches `json()` whole; axios still
+      // parses JSON it recognises, and either form is read the same below.
+      responseType: "text"
+    };
+    let response;
+    try {
+      response = await axios.request(config);
+    } catch (error) {
+      if (!error || !error.response) throw error;
+      response = error.response;
+    }
+    return responseFromAxios(response);
+  };
+}
+function responseFromAxios(response) {
+  const data = response.data;
+  const text = typeof data === "string" ? data : data == null ? "" : JSON.stringify(data);
+  const headers = response.headers || {};
+  return {
+    ok: response.status >= 200 && response.status < 300,
+    status: response.status,
+    headers: {
+      get(name) {
+        const value = headers[String(name).toLowerCase()];
+        return value == null ? null : String(value);
+      }
+    },
+    async json() {
+      return JSON.parse(text);
+    },
+    async text() {
+      return text;
+    }
+  };
 }
 
 const ADAPTER_METHODS = [
@@ -995,6 +1050,15 @@ function createAuth(ice, context, whenReady = (fn) => fn()) {
       const a = $auth();
       return Boolean(a && a.loggedIn);
     },
+    /**
+     * How the cart sends a save: through the client druxt-auth intercepts,
+     * so an expired token is refreshed and the save replayed, rather than
+     * through a bare `fetch` that nothing recovers.
+     */
+    get request() {
+      const client = context.app && context.app.$druxt || context.$druxt;
+      return fetchThroughAxios(client && client.axios);
+    },
     async login() {
       if (!ice.state.url) throw new Error("No backend connected.");
       if (!ice.state.clientId) {
@@ -1382,6 +1446,18 @@ const state = () => ({
   persistent: true,
   /** Per-entry failure reasons from the last commit. */
   errors: {},
+  /**
+   * Per-entry, per-field reasons from the last commit, where the backend
+   * pointed at a field. The whole-entry message stays in `errors`; this is
+   * what a form shows next to the field it concerns.
+   */
+  fieldErrors: {},
+  /**
+   * Per-entry alerts the backend sent back with an accepted write, as
+   * `meta.vale` carries them. They do not block, so the entry is gone from
+   * the cart by the time they are read, and they survive it going.
+   */
+  warnings: {},
   committing: false
 });
 const getters = {
@@ -1414,7 +1490,16 @@ const getters = {
     })
   ],
   draftFor: (state2) => (type, id) => state2.drafts[cartKey(type, id)] || null,
-  errorFor: (state2) => (type, id) => state2.errors[cartKey(type, id)] || null
+  errorFor: (state2) => (type, id) => state2.errors[cartKey(type, id)] || null,
+  /** `{ field: [reason, ...] }` for an entry the backend refused, or null. */
+  fieldErrorsFor: (state2) => (type, id) => state2.fieldErrors[cartKey(type, id)] || null,
+  /** Alerts the backend sent back with an accepted write, or null. */
+  warningsFor: (state2) => (type, id) => state2.warnings[cartKey(type, id)] || null,
+  /** Every accepted write's alerts, newest last, for a list after a commit. */
+  warnings: (state2) => Object.entries(state2.warnings).map(([key, alerts]) => {
+    const [type, id] = key.split(":");
+    return { type, id, alerts };
+  })
 };
 const mutations = {
   setEditing(state2, editing) {
@@ -1432,14 +1517,18 @@ const mutations = {
   stage(state2, { key, resource }) {
     state2.entries = { ...state2.entries, [key]: resource };
     state2.errors = without(state2.errors, key);
+    state2.fieldErrors = without(state2.fieldErrors, key);
+    state2.warnings = without(state2.warnings, key);
   },
   discardOne(state2, key) {
     state2.entries = without(state2.entries, key);
     state2.errors = without(state2.errors, key);
+    state2.fieldErrors = without(state2.fieldErrors, key);
   },
   discardAll(state2) {
     state2.entries = {};
     state2.errors = {};
+    state2.fieldErrors = {};
   },
   restore(state2, entries) {
     state2.entries = entries;
@@ -1447,8 +1536,12 @@ const mutations = {
   setPersistent(state2, persistent) {
     state2.persistent = persistent;
   },
-  setError(state2, { key, message }) {
+  setError(state2, { key, message, fields }) {
     state2.errors = { ...state2.errors, [key]: message };
+    state2.fieldErrors = fields && Object.keys(fields).length ? { ...state2.fieldErrors, [key]: fields } : without(state2.fieldErrors, key);
+  },
+  setWarnings(state2, { key, alerts }) {
+    state2.warnings = alerts && alerts.length ? { ...state2.warnings, [key]: alerts } : without(state2.warnings, key);
   },
   setCommitting(state2, committing) {
     state2.committing = committing;
@@ -1854,7 +1947,8 @@ const actions = {
     if (!backendUrl) return { ok: false, reason: "No backend connected." };
     if (!token) return { ok: false, reason: "Not signed in to that backend." };
     if (getters2.isEmpty) return { ok: false, reason: "Nothing staged." };
-    const request = fetchImpl || window.fetch.bind(window);
+    const ice = this && this.$druxtIce;
+    const request = fetchImpl || ice && ice.auth && ice.auth.request || window.fetch.bind(window);
     const all = Object.values(state2.entries);
     const chosen = ids ? new Set(withDependencies(ids, all)) : null;
     const sending = chosen ? all.filter((resource) => chosen.has(resource.id)) : all;
@@ -1899,12 +1993,15 @@ const actions = {
         });
         if (!response.ok) {
           const detail = await response.json().catch(() => null);
-          const message = detail && detail.errors && detail.errors[0] && detail.errors[0].detail || `Rejected with ${response.status}.`;
-          commit("setError", { key, message });
+          const errors = detail && detail.errors || [];
+          const message = errors[0] && errors[0].detail || `Rejected with ${response.status}.`;
+          commit("setError", { key, message, fields: fieldErrorsFrom(errors) });
           results.failed += 1;
           continue;
         }
+        const accepted = await response.json().catch(() => null);
         commit("discardOne", key);
+        commit("setWarnings", { key, alerts: warningsFrom(accepted) });
         results.sent += 1;
       } catch (error) {
         commit("setError", { key, message: error.message });
@@ -1916,6 +2013,24 @@ const actions = {
     return { ok: results.failed === 0, ...results };
   }
 };
+function fieldErrorsFrom(errors) {
+  const fields = {};
+  for (const error of Array.isArray(errors) ? errors : []) {
+    const pointer = String(((error || {}).source || {}).pointer || "");
+    const match = /^\/data\/(?:attributes|relationships)\/([^/]+)/.exec(pointer);
+    if (!match) continue;
+    const field = match[1];
+    const reason = String((error || {}).detail || (error || {}).title || "");
+    if (!reason) continue;
+    fields[field] = [...fields[field] || [], reason];
+  }
+  return fields;
+}
+function warningsFrom(document) {
+  const vale = ((document || {}).meta || {}).vale;
+  const alerts = vale && Array.isArray(vale.alerts) ? vale.alerts : [];
+  return alerts.filter((alert) => alert && typeof alert === "object");
+}
 const iceStoreModule = {
   namespaced: true,
   state,
@@ -2013,4 +2128,4 @@ const NuxtModule = async function(moduleOptions = {}) {
   });
 };
 
-export { ADAPTER_METHODS, ADVANCED_FIELDS, AUTH_STRATEGY, BACKEND_KEY, BUILT, CAPTION_FILTER, CONFORMANCE_UNREACHABLE, DEFAULTS, DELTA_ATTRIBUTE, DESTINATION_METHODS, DIFF_TYPE, DRUPAL_FILES, ENTITY_ATTRIBUTE, FIELD_ATTRIBUTE, STAGED, STATIC_FILES, TYPE_ATTRIBUTE, absoluteFileUrls, adapterSupports, applyCaptionFilter, asResource, asText, autoCreateTarget, autocompleteUrl, backendFor, bareToken, base64Url, bustCache, callbackUrl, cartKey, changedFields, changedRegion, checkConformance, collectionUrl$1 as collectionUrl, commitOrder, createAuth, createIce, createPlainFieldsAdapter, decodeAttribute, deepEqual, NuxtModule as default, defaultDestination, defer, defineDestination, defineFeature, dependencyMap, destinationRequest, destinationSupports, diffLines, druxtClients, editModeFeature, editorFileUrls, entityAnchors, exportCart, exportSummary, failsFilters, fieldAnchors, fieldChanged, fieldOps, fieldStatus, fileIsAllowed, filterFieldFor, filtersFromResources, findAnchor, fromDateInput, groupFields, hasHeldImage, hasUnfilteredCaption, holdClientUntilConnected, iceStoreModule, imageRelationship, installIce, isAdapterMethod, isDeletion, isDrupalFile, isEmptyResource, isExpired, isLong, isNew, labelFieldFor, labelOf, labelsUrl, listingAccepts, listingTypes, mergeEntry, modesFromDisplays, newResourceId, normaliseUrl, parseSize, patchBody, patchUrl, pointClientAt, pointStrategyAt, previewStagedContent, previewsFor, readJson, readSessionRecord, readyGate, refreshFromBackend, registerIceStore, relativeFileUrls, replaceHeldImage, requestMethod, requestUrl, requireAuth, requiredBy, resolveDestination, resolveFeatures, resolveOptions, resolveSource, rewriteFileUrls, safeFilename, sessionRecordToken, stagedDiff, storedFileUrls, targetResourceTypes, tidyResource, toDateInput, toRelationship, toggleEditMode, uploadHeaders, uploadUrl, valuesBefore, viewModesFor, withDependencies, withoutComputed, words, writeJson };
+export { ADAPTER_METHODS, ADVANCED_FIELDS, AUTH_STRATEGY, BACKEND_KEY, BUILT, CAPTION_FILTER, CONFORMANCE_UNREACHABLE, DEFAULTS, DELTA_ATTRIBUTE, DESTINATION_METHODS, DIFF_TYPE, DRUPAL_FILES, ENTITY_ATTRIBUTE, FIELD_ATTRIBUTE, ISSUER_KEY, STAGED, STATIC_FILES, TYPE_ATTRIBUTE, absoluteFileUrls, adapterSupports, applyCaptionFilter, asResource, asText, autoCreateTarget, autocompleteUrl, backendFor, bareToken, base64Url, bustCache, callbackUrl, cartKey, changedFields, changedRegion, checkConformance, collectionUrl$1 as collectionUrl, commitOrder, createAuth, createIce, createPlainFieldsAdapter, decodeAttribute, deepEqual, NuxtModule as default, defaultDestination, defer, defineDestination, defineFeature, dependencyMap, destinationRequest, destinationSupports, diffLines, druxtClients, editModeFeature, editorFileUrls, entityAnchors, exportCart, exportSummary, failsFilters, fetchThroughAxios, fieldAnchors, fieldChanged, fieldErrorsFrom, fieldOps, fieldStatus, fileIsAllowed, filterFieldFor, filtersFromResources, findAnchor, fromDateInput, groupFields, hasHeldImage, hasUnfilteredCaption, holdClientUntilConnected, iceStoreModule, imageRelationship, installIce, isAdapterMethod, isDeletion, isDrupalFile, isEmptyResource, isExpired, isLong, isNew, labelFieldFor, labelOf, labelsUrl, listingAccepts, listingTypes, mergeEntry, modesFromDisplays, newResourceId, normaliseUrl, parseSize, patchBody, patchUrl, pointClientAt, pointStrategyAt, previewStagedContent, previewsFor, readJson, readSessionRecord, readyGate, refreshFromBackend, registerIceStore, relativeFileUrls, replaceHeldImage, requestMethod, requestUrl, requireAuth, requiredBy, resolveDestination, resolveFeatures, resolveOptions, resolveSource, rewriteFileUrls, safeFilename, safeStorage, sessionRecordToken, stagedDiff, storedFileUrls, targetResourceTypes, tidyResource, toDateInput, toRelationship, toggleEditMode, tokensAreForeign, uploadHeaders, uploadUrl, valuesBefore, viewModesFor, warningsFrom, withDependencies, withoutComputed, words, writeJson };
