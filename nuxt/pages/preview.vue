@@ -26,7 +26,7 @@
 </template>
 
 <script>
-import { previewEntity, previewMode, previewPath } from '../../lib/preview.mjs'
+import { previewEntity, previewMode, previewPath } from '../lib/preview.mjs'
 
 /** Where the presenter's theme choice is kept, shared with the deck. */
 const THEME_KEY = 'deck.theme'

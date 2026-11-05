@@ -1,5 +1,5 @@
 /**
- * The /node/preview page's reading of its URL.
+ * The /preview page's reading of its URL.
  *
  * consumer_node_preview opens the frontend at a target URL it fills in from a
  * template: the view mode as `vm`, a layout as `layout`, and the path of the

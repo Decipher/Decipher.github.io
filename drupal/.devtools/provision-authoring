@@ -297,7 +297,7 @@ echo PHP_EOL;
  * Tell consumer_node_preview where the frontend renders a preview.
  *
  * A settings target rather than one on the consumer entity, because the origin
- * is the session's and changes every time. The frontend's /node/preview page
+ * is the session's and changes every time. The frontend's /preview page
  * reads the JSON:API preview document from the path in the fragment, through
  * the proxy on its own origin, so the editor's session cookie goes with it.
  */
@@ -307,7 +307,7 @@ function write_preview_settings(string $origin): void {
   if (str_contains($contents, 'consumer_node_preview')) {
     return;
   }
-  $url = var_export($origin . '/node/preview?vm=[view_mode]&layout=[layout]#[jsonapi_node_preview_path]', TRUE);
+  $url = var_export($origin . '/preview?vm=[view_mode]&layout=[layout]#[jsonapi_node_preview_path]', TRUE);
   $contents .= <<<PHP
 
 // Authoring: where a node's Preview button sends the editor.

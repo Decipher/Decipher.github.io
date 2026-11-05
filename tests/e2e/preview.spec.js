@@ -49,7 +49,7 @@ test.describe('the node preview', () => {
     page.on('request', (request) => {
       if (/\/jsonapi\//.test(request.url())) fetched.push(request.url())
     })
-    await page.goto(`/node/preview?vm=default#${PATH}`)
+    await page.goto(`/preview?vm=default#${PATH}`)
     await appReady(page)
     await expect(page.getByTestId('deck-slide')).toHaveAttribute('data-layout', 'bullets')
     await expect(page.getByTestId('deck-slide')).toContainText('A title nobody saved yet')
@@ -67,7 +67,7 @@ test.describe('the node preview', () => {
     page.on('request', (request) => {
       if (/\/jsonapi\//.test(request.url())) fetched.push(request.url())
     })
-    await page.goto(`/node/preview#https://evil.example${PATH}`)
+    await page.goto(`/preview#https://evil.example${PATH}`)
     await appReady(page)
     await expect(page.getByTestId('preview-message')).toContainText('no preview to show')
     expect(fetched).toEqual([])
@@ -75,7 +75,7 @@ test.describe('the node preview', () => {
 
   test('a session Drupal does not accept is said', async ({ page }) => {
     await page.route(`**${PATH}`, (route) => route.fulfill({ status: 403, json: { errors: [] } }))
-    await page.goto(`/node/preview#${PATH}`)
+    await page.goto(`/preview#${PATH}`)
     await appReady(page)
     await expect(page.getByTestId('preview-message')).toContainText(
       'Sign in to Drupal on this site'

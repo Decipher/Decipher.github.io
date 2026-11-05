@@ -511,9 +511,11 @@ export default async () => ({
       // In proxy mode this frontend is the backend's origin as well. The data,
       // sign-in and prose-check routes go to Drupal through the same proxy as
       // the administration, so sign-in, inline editing and a node preview share
-      // one site and one session cookie. /node/preview is this site's own page
+      // one site and one session cookie. /preview is this site's own page
       // and stays out of the list.
-      backendPaths: [...require('@druxt-contrib/admin').BACKEND_PATHS, '/jsonapi', '/router', '/oauth', '/vale'],
+      // `/node/preview` is Drupal's own preview page, the one with the Frontend
+      // tab; this site's preview page lives at `/preview` so the two never meet.
+      backendPaths: [...require('@druxt-contrib/admin').BACKEND_PATHS, '/jsonapi', '/router', '/oauth', '/vale', '/node/preview'],
     },
 
     // Copy the editor builds into this site and load them from here. Needed
