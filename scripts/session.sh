@@ -101,12 +101,23 @@ trap teardown EXIT
 trap 'exit 130' INT TERM
 
 FRONTEND_PID_FILE="$REPO_ROOT/drupal/.logs/frontend.pid"
+# Every process under a pid, deepest first, then the pid itself. npm passes a
+# signal on to its script, which can leave Nuxt itself running and holding the
+# port, so the signal goes to each of them rather than to npm alone.
+kill_tree() {
+  for child in $(pgrep -P "$1" 2>/dev/null); do
+    kill_tree "$child"
+  done
+  kill "$1" 2>/dev/null || true
+}
+
 stop_frontend() {
   if [ -f "$FRONTEND_PID_FILE" ]; then
-    # The whole process group where there is one: npm passes a signal on to
-    # its script, which can leave Nuxt itself running and holding the port.
     FRONTEND_PID="$(cat "$FRONTEND_PID_FILE")"
-    kill -- "-${FRONTEND_PID}" 2>/dev/null || kill "$FRONTEND_PID" 2>/dev/null || true
+    # The whole process group where setsid gave it one, and the process tree
+    # either way, so Nuxt stops with or without setsid.
+    kill -- "-${FRONTEND_PID}" 2>/dev/null || true
+    kill_tree "$FRONTEND_PID"
     rm -f "$FRONTEND_PID_FILE"
   fi
 }

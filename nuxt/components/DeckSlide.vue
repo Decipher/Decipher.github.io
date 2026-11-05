@@ -165,17 +165,44 @@ export default {
     dismissed: '',
   }),
 
-  watch: {
-    // Dismiss hides one refusal, not every refusal with the same words. A new
-    // send starting, or the refusal clearing, means the next one shows again.
-    committing(now) {
-      // Only a send that carries this slide forgets its dismissal. The flag is
-      // the cart's, so a send of something else must not reopen it here.
-      if (now && this.staged) this.dismissed = ''
+  methods: {
+    /** Whether a send includes this slide: by name when it names any, else by being staged. */
+    inSend(payload) {
+      const ids = (payload || {}).ids
+      if (Array.isArray(ids)) return ids.includes(this.merged.id)
+      return this.staged
     },
+  },
+
+  watch: {
+    // Dismiss hides one refusal, not every refusal with the same words. The
+    // refusal clearing means the next one shows again; a send's result for
+    // this slide is handled below, where the send is seen.
     refused(now) {
       if (!now) this.dismissed = ''
     },
+  },
+
+  created() {
+    // A dismissal is forgotten when this slide's own save answers, whatever
+    // the answer: a retry that comes back with the same words is a new
+    // result, and it shows. On the result, not when the send starts, so a
+    // dismissal during the send still gives way to what the send returns. A
+    // send that names other resources and not this one changes nothing here.
+    this.unsubscribeCommit = this.$store.subscribeAction({
+      before: (action) => {
+        if (action.type === 'druxtIce/commit') this.sending = this.inSend(action.payload)
+      },
+      after: (action) => {
+        if (action.type !== 'druxtIce/commit' || !this.sending) return
+        this.sending = false
+        this.dismissed = ''
+      },
+    })
+  },
+
+  beforeDestroy() {
+    if (this.unsubscribeCommit) this.unsubscribeCommit()
   },
 
   computed: {
