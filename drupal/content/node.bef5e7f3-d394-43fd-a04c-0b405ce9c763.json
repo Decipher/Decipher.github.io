@@ -51,7 +51,7 @@
     ],
     "changed": [
         {
-            "value": "2026-11-05T02:25:48+00:00"
+            "value": "2026-11-05T05:37:10+00:00"
         }
     ],
     "promote": [
@@ -83,9 +83,9 @@
     ],
     "body": [
         {
-            "value": "<p>Vale is a linter for prose.<\/p><p>The Vale module runs it inside Drupal on every save, with your style guide as YAML files in the repository. Errors refuse the save. Warnings travel with it.<\/p>",
+            "value": "<p>Vale is a linter for prose.<\/p><p>Your style guide lives as YAML in the repository, and the Vale module runs it inside Drupal on every save.<\/p><p>An error stops the save. A warning is saved alongside it.<\/p>",
             "format": "basic_html",
-            "processed": "<p>Vale is a linter for prose.<\/p><p>The Vale module runs it inside Drupal on every save, with your style guide as YAML files in the repository. Errors refuse the save. Warnings travel with it.<\/p>",
+            "processed": "<p>Vale is a linter for prose.<\/p><p>Your style guide lives as YAML in the repository, and the Vale module runs it inside Drupal on every save.<\/p><p>An error stops the save. A warning is saved alongside it.<\/p>",
             "summary": null
         }
     ],

@@ -29,7 +29,7 @@
 </template>
 
 <script>
-import { siteIdentity } from '../lib/settings.mjs'
+import { settingsFromDocument, siteIdentity } from '../lib/settings.mjs'
 
 /**
  * One settings request per backend for the life of the page.
@@ -130,8 +130,7 @@ export default {
           )
         }
         const { data: body } = await settingsRequests.get(endpoint)
-        const data = Array.isArray(body.data) ? body.data[0] : body.data
-        const slogan = siteIdentity((data || {}).attributes, {}).slogan
+        const slogan = siteIdentity(settingsFromDocument(body), {}).slogan
         if (slogan) this.live = slogan
       } catch {
         // The baked slogan stands. A footer is not where a request failure
