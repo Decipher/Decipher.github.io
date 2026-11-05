@@ -256,3 +256,19 @@ test('a string that runs past the end of its line does not stop the colouring', 
   )
   assert.ok(lines[1].includes('Simply put'))
 })
+
+test('a string that runs on to the next line is coloured as a string there too', () => {
+  const html = highlightCode(
+    '  "detail": "body.0.value: Body:\n    (line 1: \\"Simply put\\")",\n  "source": 1'
+  )
+  const lines = html.split('\n')
+  assert.ok(
+    lines[1].startsWith('<span class="deck-code__string">'),
+    'the continuation opens as a string'
+  )
+  assert.ok(!lines[1].includes('deck-code__number'), 'no number is coloured inside the string')
+  assert.ok(
+    lines[2].includes('<span class="deck-code__key">&quot;source&quot;</span>'),
+    'tokenising resumes after the string closes'
+  )
+})

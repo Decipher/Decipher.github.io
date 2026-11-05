@@ -111,6 +111,12 @@ export default {
   },
   mounted() {
     window.addEventListener('resize', this.measure)
+    // The drawer opening or closing changes the footer's width with no window
+    // resize, and the drift is measured against that width.
+    if (typeof window.ResizeObserver === 'function') {
+      this.observer = new window.ResizeObserver(() => this.measure())
+      this.observer.observe(this.$el)
+    }
     // Ask the backend the page already knows about before the editing plugin
     // has finished its own connection check, which is a round trip the slogan
     // need not wait for. The later watcher asks the same endpoint and finds
@@ -121,6 +127,7 @@ export default {
 
   beforeDestroy() {
     window.removeEventListener('resize', this.measure)
+    if (this.observer) this.observer.disconnect()
   },
 
   methods: {

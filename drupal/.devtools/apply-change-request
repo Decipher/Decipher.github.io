@@ -267,6 +267,18 @@ foreach ($second_pass as $resource) {
     }
     $entity->set($field, $values);
   }
+  // The same validation as the first pass: a deferred reference can still
+  // point at a bundle the field refuses.
+  $violations = $entity->validate();
+  if (count($violations)) {
+    $lines = [];
+    foreach ($violations as $violation) {
+      $lines[] = $violation->getPropertyPath() . ': ' . html_entity_decode(strip_tags((string) $violation->getMessage()), ENT_QUOTES);
+    }
+    throw new \RuntimeException(sprintf(
+      "%s %s was refused:\n  %s", $resource['type'], $resource['id'], implode("\n  ", $lines)
+    ));
+  }
   $entity->save();
   $applied['linked']++;
 }

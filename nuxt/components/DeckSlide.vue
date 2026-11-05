@@ -165,7 +165,9 @@ export default {
     // Dismiss hides one refusal, not every refusal with the same words. A new
     // send starting, or the refusal clearing, means the next one shows again.
     committing(now) {
-      if (now) this.dismissed = ''
+      // Only a send that carries this slide forgets its dismissal. The flag is
+      // the cart's, so a send of something else must not reopen it here.
+      if (now && this.staged) this.dismissed = ''
     },
     refused(now) {
       if (!now) this.dismissed = ''
@@ -246,6 +248,15 @@ export default {
     committing() {
       return Boolean(this.$store.state.druxtIce && this.$store.state.druxtIce.committing)
     },
+    /** This slide has a staged change in the cart. */
+    staged() {
+      const { type, id } = this.merged
+      const entries = this.$store.getters['druxtIce/staged'] || []
+      return entries.some((entry) => {
+        const resource = entry.resource || entry
+        return resource.type === type && resource.id === id
+      })
+    },
     /** The refusal, one fact per line, for the console. */
     refusedLines() {
       return refusalLines(this.refused)
@@ -263,7 +274,16 @@ export default {
      */
     console() {
       if (this.refused) {
-        return { kind: 'refused', key: this.refused, status: 'Save refused · 422 Unprocessable Content', lines: this.refusedLines }
+        // The store keeps the message, not the status. Vale's refusal has a
+        // shape the parser recognises; anything else gets no status it cannot
+        // vouch for.
+        const vale = this.refusedLines.length >= 3
+        return {
+          kind: 'refused',
+          key: this.refused,
+          status: vale ? 'Save refused · 422 Unprocessable Content' : 'Save refused',
+          lines: this.refusedLines,
+        }
       }
       if (this.warnings.length) {
         const lines = this.warnings.flatMap((alert) => [

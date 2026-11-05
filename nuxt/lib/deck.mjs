@@ -259,13 +259,25 @@ function escapeHtml(text) {
  */
 export function highlightCode(code = '') {
   const out = []
+  // A string left open at the end of a line runs on into the next, so the
+  // continuation is coloured as the string it is, not as the tokens it looks like.
+  let inString = false
   for (const line of String(code).split('\n')) {
-    if (/^(GET|POST|PATCH|PUT|DELETE)\s+\S/.test(line) || /^\d{3}\s+[A-Z]/.test(line)) {
+    let html = ''
+    let rest = line
+    if (inString) {
+      const close = rest.match(/^(?:[^"\\]|\\.)*"/)
+      if (!close) {
+        out.push(`<span class="deck-code__string">${escapeHtml(rest)}</span>`)
+        continue
+      }
+      html += `<span class="deck-code__string">${escapeHtml(close[0])}</span>`
+      rest = rest.slice(close[0].length)
+      inString = false
+    } else if (/^(GET|POST|PATCH|PUT|DELETE)\s+\S/.test(line) || /^\d{3}\s+[A-Z]/.test(line)) {
       out.push(`<span class="deck-code__http">${escapeHtml(line)}</span>`)
       continue
     }
-    let html = ''
-    let rest = line
     while (rest.length) {
       const key = rest.match(/^("(?:[^"\\]|\\.)*")(\s*:)/)
       if (key) {
@@ -290,6 +302,7 @@ export function highlightCode(code = '') {
       const open = rest.match(/^".*$/)
       if (open) {
         html += `<span class="deck-code__string">${escapeHtml(open[0])}</span>`
+        inString = true
         break
       }
       const plain = rest.match(/^[^"\d-]+|^[-\d]/) || [rest[0]]
