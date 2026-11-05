@@ -1,5 +1,7 @@
 <template>
-  <div class="deck-vale" data-testid="deck-vale">
+  <!-- Dense once there are more examples than three fit at full size: the
+       list tightens and the box shrinks, so the slide stays one screen. -->
+  <div class="deck-vale" :class="{ 'deck-vale--dense': examples.length > 3 }" data-testid="deck-vale">
     <!-- The preset examples, each marked the way an edit is: the words Vale
          flagged underlined, and a badge in the gutter. -->
     <ul class="deck-bullets">
@@ -35,7 +37,7 @@
       data-testid="deck-vale-text"
       placeholder="Type a sentence, then press Check."
       aria-label="A sentence to check"
-      rows="2"
+      :rows="examples.length > 3 ? 1 : 2"
     ></textarea>
     <div class="deck-vale__row">
       <button type="button" class="deck-button" :disabled="!canCheck" data-testid="deck-vale-check" @click="check">

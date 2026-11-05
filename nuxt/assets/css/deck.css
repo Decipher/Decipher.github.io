@@ -764,6 +764,42 @@
   opacity: 1;
 }
 
+/* More than three examples: the same slide, tighter, so it stays one screen. */
+.deck-vale--dense {
+  gap: calc(var(--u) * 16);
+}
+
+.deck-vale--dense .deck-bullets {
+  gap: calc(var(--u) * 10);
+  font-size: calc(var(--u) * 25);
+  line-height: 1.25;
+}
+
+.deck-vale--dense .deck-bullets li {
+  padding-left: calc(var(--u) * 36);
+}
+
+.deck-vale--dense .deck-bullets li::before {
+  top: 0.38em;
+  width: calc(var(--u) * 12);
+  height: calc(var(--u) * 12);
+}
+
+.deck-vale--dense .deck-bullets li.deck-flagged::after {
+  left: calc(var(--u) * -48);
+  top: 0.1em;
+  width: calc(var(--u) * 26);
+  height: calc(var(--u) * 26);
+  line-height: calc(var(--u) * 26);
+  font-size: calc(var(--u) * 16);
+}
+
+.deck-vale--dense textarea {
+  min-height: calc(var(--u) * 56);
+  padding: calc(var(--u) * 8) calc(var(--u) * 14);
+  font-size: calc(var(--u) * 24);
+}
+
 .deck-vale__row {
   display: flex;
   align-items: center;
