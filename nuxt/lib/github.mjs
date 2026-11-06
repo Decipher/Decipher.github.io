@@ -20,6 +20,18 @@
 
 const API = 'https://api.github.com'
 
+/**
+ * GitHub's own page for running a workflow by hand.
+ *
+ * Opened rather than dispatched: no token is needed, because the author is
+ * signed in to GitHub there and `workflow_dispatch` is gated on write access.
+ */
+export function workflowRunUrl(repository, workflow = 'authoring.yml') {
+  const parsed = parseRepository(repository)
+  if (!parsed) return ''
+  return `https://github.com/${parsed.full}/actions/workflows/${workflow}`
+}
+
 /** `owner/name` from whatever a repository is written as. */
 export function parseRepository(value) {
   const cleaned = String(value || '')

@@ -23,6 +23,7 @@ import {
   readStoredToken,
   requestDocument,
   requestPaths,
+  workflowRunUrl,
   writeStoredToken,
 } from '../../nuxt/lib/github.mjs'
 
@@ -175,4 +176,14 @@ test('a browser that refuses to store anything still works', () => {
   }
   assert.equal(readStoredToken(refuses), null)
   assert.doesNotThrow(() => writeStoredToken(refuses, { token: 't' }))
+})
+
+test("the run page is GitHub's own, for the repository however it is written", () => {
+  assert.equal(
+    workflowRunUrl('https://github.com/o/r.git', 'authoring.yml'),
+    'https://github.com/o/r/actions/workflows/authoring.yml'
+  )
+  assert.equal(workflowRunUrl('o/r'), 'https://github.com/o/r/actions/workflows/authoring.yml')
+  assert.equal(workflowRunUrl(null), '')
+  assert.equal(workflowRunUrl('not a repository at all'), '')
 })

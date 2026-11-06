@@ -43,9 +43,135 @@ async function openLogin(page) {
   await page.evaluate(() => window.$nuxt.$druxtIce.openLogin())
 }
 
+/**
+ * Tell the site which repository it lives in.
+ *
+ * A build learns that from its own environment, and a runner with no GitHub
+ * remote makes a build that knows no repository, which hides the offer to
+ * start a backend there. Named here so the offer is tested wherever the build
+ * was made.
+ */
+async function nameRepository(page) {
+  await page.evaluate(() => {
+    window.$nuxt.$authoringGithub.state.repository = 'o/r'
+  })
+}
+
 test.beforeEach(({ page }) => isolateFromPublishedSessions(page))
 
 test.describe('authoring login', () => {
+  test('a backend can be started on GitHub from the first step, and is joined when it appears', async ({
+    page,
+  }) => {
+    await stubConformingBackend(page)
+    // Opening GitHub is a new tab; here it is only recorded.
+    await page.addInitScript(() => {
+      window.__opened = []
+      window.open = (url) => {
+        window.__opened.push(url)
+        return null
+      }
+    })
+    // The session record the started backend publishes, once it is up. Nothing
+    // there before the click, so the dialog's first step shows as for anyone.
+    let published = false
+    await page.route(/raw\.githubusercontent\.com/, (route) =>
+      published
+        ? route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({ url: BACKEND, clientId: 'client', expiresAt: null }),
+          })
+        : route.abort()
+    )
+
+    await page.goto('/')
+    await appReady(page)
+    await nameRepository(page)
+    await page.getByTestId('authoring-login-trigger').click()
+    await page.getByTestId('authoring-start-backend').click()
+
+    const opened = await page.evaluate(() => window.__opened)
+    expect(opened).toEqual(['https://github.com/o/r/actions/workflows/authoring.yml'])
+    await expect(page.getByTestId('authoring-awaiting')).toBeVisible()
+
+    // The backend comes up and says where it is. The dialog looks every few
+    // seconds, so this takes a little while rather than being instant.
+    published = true
+    await expect(page.getByTestId('authoring-continue')).toBeVisible({ timeout: 30000 })
+    await expect(page.getByTestId('authoring-backend-host')).toHaveText('backend.test')
+    await expect(page.getByTestId('authoring-awaiting')).toHaveCount(0)
+  })
+
+  test('signing out of GitHub ends the wait for a started backend', async ({ page }) => {
+    await page.addInitScript(() => {
+      window.open = () => null
+    })
+    await page.goto('/')
+    await appReady(page)
+    await nameRepository(page)
+    await page.getByTestId('authoring-login-trigger').click()
+    await page.getByTestId('authoring-start-backend').click()
+    await expect(page.getByTestId('authoring-awaiting')).toBeVisible()
+    await page.evaluate(() => window.$nuxt.$authoringGithub.signOut())
+    await expect(page.getByTestId('authoring-awaiting')).toHaveCount(0)
+    await expect(page.getByTestId('authoring-start-backend')).toBeVisible()
+  })
+
+  test('a token sign-in and the wait for a started backend leave each other alone', async ({
+    page,
+  }) => {
+    await page.route('https://api.github.com/**', (route) => {
+      const url = route.request().url()
+      const json = (body) =>
+        route.fulfill({
+          status: 200,
+          headers: { 'content-type': 'application/json', 'access-control-allow-origin': '*' },
+          body: JSON.stringify(body),
+        })
+      if (url.endsWith('/user')) return json({ login: 'someone' })
+      return json({ full_name: 'o/r', default_branch: 'main', permissions: { push: true } })
+    })
+    await page.addInitScript(() => {
+      window.open = () => null
+    })
+    await page.goto('/')
+    await appReady(page)
+    await nameRepository(page)
+    await page.getByTestId('authoring-login-trigger').click()
+    await page.getByTestId('authoring-start-backend').click()
+    await expect(page.getByTestId('authoring-awaiting')).toBeVisible()
+
+    // Signing in with a token, while the wait is on, must neither end the
+    // wait nor be ended by it.
+    const signedIn = await page.evaluate(() =>
+      window.$nuxt.$authoringGithub.signIn('a-token', 'o/r')
+    )
+    expect(signedIn).toBe(true)
+    await expect(page.getByTestId('authoring-awaiting')).toBeVisible()
+    expect(await page.evaluate(() => window.$nuxt.$authoringGithub.state.status)).toBe('signed-in')
+
+    // And the wait ending by hand leaves the sign-in where it was.
+    await page.getByTestId('authoring-stop-waiting').click()
+    await expect(page.getByTestId('authoring-awaiting')).toHaveCount(0)
+    expect(await page.evaluate(() => window.$nuxt.$authoringGithub.state.status)).toBe('signed-in')
+  })
+
+  test('waiting for a started backend can be stopped', async ({ page }) => {
+    await page.addInitScript(() => {
+      window.open = () => null
+    })
+    await page.goto('/')
+    await appReady(page)
+    await nameRepository(page)
+    await page.getByTestId('authoring-login-trigger').click()
+    await page.getByTestId('authoring-start-backend').click()
+    await expect(page.getByTestId('authoring-awaiting')).toBeVisible()
+    await page.getByTestId('authoring-stop-waiting').click()
+    await expect(page.getByTestId('authoring-awaiting')).toHaveCount(0)
+    await expect(page.getByTestId('authoring-start-backend')).toBeVisible()
+  })
+
   test('a visitor sees only a login control, and no backend', async ({ page }) => {
     await page.goto('/')
     await appReady(page)

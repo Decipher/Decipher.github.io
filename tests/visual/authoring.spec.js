@@ -47,12 +47,32 @@ async function stubConformingBackend(page) {
   )
 }
 
+/**
+ * Every weight the page can ask for, loaded, then the document's own promise.
+ *
+ * `document.fonts.ready` resolves for the faces in use when it is asked, and
+ * a bold run inside mocked text can ask for its weight a moment later. On a
+ * slow runner that photographed a synthetic bold, which is wider, and the one
+ * line that holds it moved. Loading the weights by name first settles it.
+ */
+async function fontsSettled(page) {
+  await page.evaluate(() =>
+    Promise.all([
+      document.fonts.load('400 1rem Archivo'),
+      document.fonts.load('600 1rem Archivo'),
+      document.fonts.load('700 1rem Archivo'),
+      document.fonts.load('400 1rem "JetBrains Mono"'),
+      document.fonts.load('500 1rem "JetBrains Mono"'),
+    ]).then(() => document.fonts.ready)
+  )
+}
+
 test('the site as a visitor sees it', async ({ page }) => {
   await isolateFromBackends(page)
   await page.goto('/')
   await hideLoadingBar(page)
   await mockText(page)
-  await page.evaluate(() => document.fonts.ready)
+  await fontsSettled(page)
   await expect(page).toHaveScreenshot('visitor.png', {
     fullPage: true,
     animations: 'disabled',
@@ -66,9 +86,14 @@ test('the backend prompt', async ({ page }) => {
   await expect(page.getByTestId('authoring-backend-url')).toBeVisible()
   await hideLoadingBar(page)
   await mockText(page)
-  await page.evaluate(() => document.fonts.ready)
+  await fontsSettled(page)
+  // This step holds the deck's one bold run in a dialog, and two arm64 Linux
+  // hosts hint that weight apart: 518 pixels on the phone, 1258 at the three
+  // wider sizes, all of them on the one line that holds it. Room for that, and
+  // no more: a moved line or a missing control is thousands.
   await expect(page).toHaveScreenshot('connect.png', {
     animations: 'disabled',
+    maxDiffPixels: 1500,
   })
 })
 
@@ -96,7 +121,7 @@ test('the login step', async ({ page }) => {
   await expect(page.getByTestId('authoring-continue')).toBeVisible()
   await hideLoadingBar(page)
   await mockText(page)
-  await page.evaluate(() => document.fonts.ready)
+  await fontsSettled(page)
   await expect(page).toHaveScreenshot('login.png', {
     animations: 'disabled',
   })
