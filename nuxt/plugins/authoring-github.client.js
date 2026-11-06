@@ -14,7 +14,7 @@
  */
 import Vue from 'vue'
 
-import { checkAccess, findRun, runIsFinished, startBackend } from '../lib/github-client.mjs'
+import { checkAccess, findRun, runIsFinished, runJobs, startBackend } from '../lib/github-client.mjs'
 import { readStoredToken, workflowRunUrl, writeStoredToken } from '../lib/github.mjs'
 
 const readStored = () => readStoredToken(window.sessionStorage)
@@ -53,6 +53,12 @@ export default function (context, inject) {
     // looking without finding one.
     awaiting: false,
     awaitMessage: null,
+    // When the wait began, the run it found and that run's steps, for a slide
+    // that shows the backend being built. The wait's own, apart from `run`
+    // and `started`, which belong to a dispatch made with a token.
+    awaitSince: null,
+    awaitRun: null,
+    steps: [],
   })
 
   /**
@@ -194,6 +200,10 @@ export default function (context, inject) {
       const mine = ++awaitGeneration
       state.awaiting = true
       state.awaitMessage = null
+      state.awaitSince = new Date().toISOString()
+      state.awaitRun = null
+      state.steps = []
+      github.watchStartedRun(mine)
       const app = window.$nuxt
       const deadline = Date.now() + 20 * 60 * 1000
       const look = async () => {
@@ -219,6 +229,53 @@ export default function (context, inject) {
       awaitGeneration++
       state.awaiting = false
       state.awaitMessage = null
+      state.awaitRun = null
+      state.steps = []
+    },
+
+    /**
+     * Follow the run the tokenless wait is waiting for, step by step.
+     *
+     * With no token, the repository's public Actions API is the only view of
+     * it, and sixty reads an hour is the budget, so the run is looked for
+     * every fifteen seconds and its steps every twenty. Stops with the wait,
+     * or when the run stops.
+     */
+    async watchStartedRun(mine) {
+      const since = state.awaitSince
+      const request = window.fetch.bind(window)
+      const look = () =>
+        findRun({
+          repository: state.repository,
+          token: state.token,
+          workflow: state.workflow,
+          since,
+          fetch: request,
+        })
+      const poll = async () => {
+        if (mine !== awaitGeneration || !state.awaiting) return
+        if (!state.awaitRun) {
+          const found = await look()
+          if (mine !== awaitGeneration) return
+          if (found.ok && found.run) state.awaitRun = found.run
+          window.setTimeout(poll, state.awaitRun ? 2000 : 15000)
+          return
+        }
+        const jobs = await runJobs({
+          repository: state.repository,
+          run: state.awaitRun,
+          token: state.token,
+          fetch: request,
+        })
+        if (mine !== awaitGeneration) return
+        if (jobs.ok) state.steps = jobs.steps
+        const found = await look()
+        if (mine !== awaitGeneration) return
+        if (found.ok && found.run) state.awaitRun = found.run
+        if (runIsFinished(state.awaitRun)) return
+        window.setTimeout(poll, 20000)
+      }
+      window.setTimeout(poll, 2000)
     },
 
     /** Poll for the run, then for its result, and stop when it stops. */
@@ -297,6 +354,9 @@ export default function (context, inject) {
         runError: null,
         awaiting: false,
         awaitMessage: null,
+        awaitSince: null,
+        awaitRun: null,
+        steps: [],
       })
       writeStored(null)
     },

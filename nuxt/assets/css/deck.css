@@ -550,6 +550,87 @@
 }
 
 /* The session pill on a demo slide: a green dot, and when the session ends. */
+/* The session panel on a demo stage, until somebody is signed in. */
+.deck-session {
+  position: absolute;
+  inset: calc(var(--u) * 14);
+  display: grid;
+  align-content: center;
+  justify-items: start;
+  gap: calc(var(--u) * 18);
+  padding: calc(var(--u) * 24) calc(var(--u) * 28);
+  font-family: var(--mono);
+  overflow: auto;
+}
+.deck-session__lead,
+.deck-session__status {
+  margin: 0;
+  font-size: calc(var(--u) * 26);
+  line-height: 1.35;
+  color: var(--ink);
+}
+.deck-session__status {
+  color: var(--muted);
+}
+.deck-session__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: calc(var(--u) * 12);
+}
+.deck-session__button {
+  display: inline-flex;
+  align-items: center;
+  height: calc(var(--u) * 48);
+  padding: 0 calc(var(--u) * 20);
+  border: calc(var(--u) * 2) solid var(--line);
+  border-radius: calc(var(--u) * 6);
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: calc(var(--u) * 22);
+  text-decoration: none;
+  cursor: pointer;
+}
+.deck-session__button--primary {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--paper, #fff);
+}
+.deck-session__steps {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: calc(var(--u) * 6);
+  font-size: calc(var(--u) * 22);
+  line-height: 1.4;
+}
+.deck-session__step::before {
+  content: '·';
+  display: inline-block;
+  width: calc(var(--u) * 28);
+  color: var(--muted);
+}
+.deck-session__step--running::before {
+  content: '›';
+  color: var(--accent);
+}
+.deck-session__step--done::before {
+  content: '✓';
+  color: var(--accent);
+}
+.deck-session__step--failed::before {
+  content: '✗';
+}
+.deck-session__step--queued {
+  color: var(--muted);
+}
+.deck-session__note {
+  margin: 0;
+  font-size: calc(var(--u) * 20);
+  color: var(--accent);
+}
+
 .deck-pill {
   display: inline-flex;
   align-items: center;

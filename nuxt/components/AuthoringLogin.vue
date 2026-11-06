@@ -67,7 +67,10 @@
             <p class="eyebrow mt-6 mb-1.5">No backend running?</p>
             <template v-if="!awaiting">
               <p class="text-sm text-body mb-3">
-                Start one on GitHub. Its page opens in a new tab. Choose <strong>Run workflow</strong> there, and this site connects as soon as the backend is up.
+                Start one on GitHub. Its page opens in a new tab. Choose <strong>Run workflow</strong> there, give it this site's address as the origin, and this site connects as soon as the backend is up.
+              </p>
+              <p class="text-sm text-muted mb-3">
+                Origin: <code class="font-mono text-ink" data-testid="authoring-origin">{{ origin }}</code>
               </p>
               <button
                 type="button"
@@ -86,14 +89,24 @@
                 <span class="authoring-spinner" aria-hidden="true"></span>
                 Waiting for the backend. It takes a few minutes to build, and this site connects the moment it is published.
               </p>
-              <button
-                type="button"
-                class="rounded border border-hairline px-3 py-1.5 text-sm text-body hover:border-ink hover:text-ink transition-colors"
-                data-testid="authoring-stop-waiting"
-                @click="stopWaiting"
-              >
-                Stop waiting
-              </button>
+              <div class="flex flex-wrap gap-2">
+                <a
+                  :href="workflowUrl"
+                  target="_blank"
+                  rel="noreferrer noopener"
+                  class="rounded border border-hairline px-3 py-1.5 text-sm text-body hover:border-accent hover:text-accent transition-colors"
+                  data-testid="authoring-workflow-link"
+                  >Open the Run page</a
+                >
+                <button
+                  type="button"
+                  class="rounded border border-hairline px-3 py-1.5 text-sm text-body hover:border-ink hover:text-ink transition-colors"
+                  data-testid="authoring-stop-waiting"
+                  @click="stopWaiting"
+                >
+                  Stop waiting
+                </button>
+              </div>
             </template>
           </template>
         </template>
@@ -225,6 +238,11 @@ export default {
 
     awaitMessage() {
       return (this.$authoringGithub && this.$authoringGithub.state.awaitMessage) || ''
+    },
+
+    /** This site's own address, which the workflow needs as its origin unless this is the deployed site. */
+    origin() {
+      return typeof window === 'undefined' ? '' : window.location.origin
     },
 
     title() {

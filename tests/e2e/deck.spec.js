@@ -36,6 +36,85 @@ test.describe('the deck', () => {
     await expect(page).toHaveURL(/\/prose-and-cons\/1$/)
   })
 
+  test('a demo slide offers a session when there is none, and streams the backend being built', async ({
+    page,
+  }) => {
+    await page.addInitScript(() => {
+      window.__opened = []
+      window.open = (url) => {
+        window.__opened.push(url)
+        return null
+      }
+    })
+    // GitHub's public Actions API, as it answers while a run builds.
+    let asked = 0
+    await page.route('https://api.github.com/**', (route) => {
+      const url = route.request().url()
+      const json = (body) =>
+        route.fulfill({
+          status: 200,
+          headers: { 'content-type': 'application/json', 'access-control-allow-origin': '*' },
+          body: JSON.stringify(body),
+        })
+      asked++
+      if (url.includes('/actions/workflows/')) {
+        return json({
+          workflow_runs: [
+            {
+              id: 7,
+              html_url: 'https://github.com/o/r/actions/runs/7',
+              status: 'in_progress',
+              conclusion: null,
+              created_at: new Date().toISOString(),
+            },
+          ],
+        })
+      }
+      if (url.includes('/actions/runs/7/jobs')) {
+        return json({
+          jobs: [
+            {
+              steps: [
+                { name: 'Assembling', status: 'completed', conclusion: 'success' },
+                { name: 'Opening the tunnel', status: 'in_progress', conclusion: null },
+                { name: 'Provisioning', status: 'queued', conclusion: null },
+              ],
+            },
+          ],
+        })
+      }
+      return json({})
+    })
+
+    await page.goto('/drupalmel/prose-and-cons/5')
+    await appReady(page)
+    await page.evaluate(() => {
+      window.$nuxt.$authoringGithub.state.repository = 'o/r'
+    })
+    const stage = page.getByTestId('deck-stage')
+    await expect(stage.getByTestId('deck-session-start')).toBeVisible()
+    await expect(stage.getByTestId('deck-session-connect')).toBeVisible()
+
+    await stage.getByTestId('deck-session-start').click()
+    expect(await page.evaluate(() => window.__opened)).toEqual([
+      'https://github.com/o/r/actions/workflows/authoring.yml',
+    ])
+    await expect(stage.getByTestId('deck-session-status')).toContainText('Starting on GitHub')
+    // The run is found within seconds, and its steps follow.
+    await expect(stage.getByTestId('deck-session-step')).toHaveCount(3, { timeout: 15000 })
+    await expect(stage.getByTestId('deck-session-step').nth(0)).toHaveClass(
+      /deck-session__step--done/
+    )
+    await expect(stage.getByTestId('deck-session-step').nth(1)).toHaveClass(
+      /deck-session__step--running/
+    )
+    await expect(stage.getByTestId('deck-session-status')).toContainText('1 of 3 steps')
+    expect(asked).toBeGreaterThan(0)
+
+    await stage.getByTestId('deck-session-stop').click()
+    await expect(stage.getByTestId('deck-session-start')).toBeVisible()
+  })
+
   test('the deck path itself opens on the first slide', async ({ page }) => {
     await page.goto('/drupalmel/prose-and-cons')
     await appReady(page)

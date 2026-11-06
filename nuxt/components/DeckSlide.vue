@@ -94,6 +94,14 @@
             </div>
             <pre class="deck-console__body"><span v-for="(line, i) in console.lines" :key="i" class="deck-console__line">{{ line }}</span></pre>
           </div>
+          <!--
+            Until there is a session, the stage offers one: start a backend on
+            GitHub and watch it build, connect one, log in. Client only, since
+            the plugins it reads do not exist while the site is generated.
+          -->
+          <client-only>
+            <DeckSession v-if="!preview && !signedIn" />
+          </client-only>
         </div>
       </template>
 
@@ -242,6 +250,10 @@ export default {
     },
     step() {
       return demoStep(this.deck, this.index)
+    },
+    /** Whether somebody is signed in to a connected backend. */
+    signedIn() {
+      return Boolean(this.$druxtIce && this.$druxtIce.auth && this.$druxtIce.auth.authenticated)
     },
     /** The body names itself, so a diff or an editor can find it on the slide. */
     bodyAnchors() {

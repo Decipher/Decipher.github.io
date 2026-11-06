@@ -263,6 +263,28 @@ export async function findRun({ repository, token, workflow, since, fetch: reque
   }
 }
 
+/**
+ * What a run has done so far: its jobs' steps, in order, with their state.
+ *
+ * Readable with no token on a public repository, which is what lets a slide
+ * show a backend being built by somebody who started it on GitHub's own page.
+ */
+export async function runJobs({ repository, run, token, fetch: request }) {
+  try {
+    const body = await call(request, `${apiUrl(repository)}/actions/runs/${run.id}/jobs`, token)
+    const steps = (body.jobs || []).flatMap((job) =>
+      (job.steps || []).map((step) => ({
+        name: step.name,
+        status: step.status,
+        conclusion: step.conclusion || null,
+      }))
+    )
+    return { ok: true, steps }
+  } catch (error) {
+    return { ok: false, reason: error.message }
+  }
+}
+
 /** Whether a run is still going, and so still worth waiting for. */
 export function runIsFinished(run) {
   return Boolean(run) && run.status !== 'queued' && run.status !== 'in_progress'

@@ -184,6 +184,10 @@ test("the run page is GitHub's own, for the repository however it is written", (
     'https://github.com/o/r/actions/workflows/authoring.yml'
   )
   assert.equal(workflowRunUrl('o/r'), 'https://github.com/o/r/actions/workflows/authoring.yml')
+  assert.equal(
+    workflowRunUrl('o/r', 'a#b?.yml'),
+    'https://github.com/o/r/actions/workflows/a%23b%3F.yml'
+  )
   assert.equal(workflowRunUrl(null), '')
   assert.equal(workflowRunUrl('not a repository at all'), '')
 })
