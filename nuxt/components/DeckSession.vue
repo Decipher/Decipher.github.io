@@ -1,58 +1,68 @@
 <template>
-  <div class="deck-session" data-testid="deck-session-panel">
-    <!-- No backend: start one on GitHub and watch it build, or point at one. -->
-    <template v-if="!connected">
-      <template v-if="awaiting">
-        <p class="deck-session__status" data-testid="deck-session-status">{{ runLine }}</p>
-        <ol v-if="steps.length" class="deck-session__steps">
-          <li
-            v-for="(step, i) in steps"
-            :key="i"
-            class="deck-session__step"
-            :class="`deck-session__step--${stepState(step)}`"
-            data-testid="deck-session-step"
-          >
-            {{ step.name }}
-          </li>
-        </ol>
-        <p v-else class="deck-session__lead">Waiting for GitHub to pick the run up.</p>
-        <div class="deck-session__actions">
-          <a :href="run ? run.url : workflowUrl" target="_blank" rel="noreferrer noopener" class="deck-session__button" data-testid="deck-session-run">{{ run ? 'Watch on GitHub' : 'Open the Run page' }}</a>
-          <button type="button" class="deck-session__button" data-testid="deck-session-stop" @click="stop">Stop waiting</button>
-        </div>
-      </template>
-      <template v-else>
-        <p class="deck-session__lead">No backend yet.</p>
-        <div class="deck-session__actions">
-          <button
-            v-if="workflowUrl"
-            type="button"
-            class="deck-session__button deck-session__button--primary"
-            data-testid="deck-session-start"
-            @click="start"
-          >
-            Start a backend on GitHub
-          </button>
-          <button type="button" class="deck-session__button" data-testid="deck-session-connect" @click="connect">
-            Connect one
-          </button>
-        </div>
-        <p v-if="awaitMessage" class="deck-session__note" data-testid="deck-session-message">{{ awaitMessage }}</p>
-      </template>
-    </template>
+  <div
+    class="deck-session"
+    :class="{ 'deck-session--live': live, 'deck-session--failed': failed }"
+    data-testid="deck-session-panel"
+  >
+    <div class="deck-session__head">
+      <span class="deck-session__status" data-testid="deck-session-status">{{ status }}</span>
+      <span v-if="awaiting" class="deck-session__clock" data-testid="deck-session-clock">{{ elapsed }}</span>
+    </div>
 
-    <!-- A backend, and nobody signed in to it yet. -->
-    <template v-else-if="!authenticated">
-      <p class="deck-session__lead">
-        Connected to <code class="deck-session__host">{{ host }}</code>.
-      </p>
-      <div class="deck-session__actions">
-        <button type="button" class="deck-session__button deck-session__button--primary" data-testid="deck-session-login" @click="login">
-          Log in
-        </button>
-      </div>
-      <p v-if="error" class="deck-session__note" data-testid="deck-session-error">{{ error }}</p>
-    </template>
+    <div class="deck-session__body">
+      <!-- No backend: start one on GitHub and watch it build, or point at one. -->
+      <template v-if="!connected">
+        <template v-if="awaiting">
+          <ol v-if="steps.length" class="deck-session__steps">
+            <li
+              v-for="(step, i) in steps"
+              :key="i"
+              class="deck-session__step"
+              :class="`deck-session__step--${stepState(step)}`"
+              data-testid="deck-session-step"
+            >
+              {{ step.name }}
+            </li>
+          </ol>
+          <p v-else class="deck-session__line">Waiting for GitHub to pick the run up.</p>
+          <div class="deck-session__actions">
+            <a :href="run ? run.url : workflowUrl" target="_blank" rel="noreferrer noopener" class="deck-session__button" data-testid="deck-session-run">{{ run ? 'watch on GitHub' : 'open the Run page' }}</a>
+            <button type="button" class="deck-session__button" data-testid="deck-session-stop" @click="stop">stop waiting</button>
+          </div>
+        </template>
+        <template v-else>
+          <p class="deck-session__line">Start one on GitHub and watch it build, or connect one already running.</p>
+          <div class="deck-session__actions">
+            <button
+              v-if="workflowUrl"
+              type="button"
+              class="deck-session__button deck-session__button--primary"
+              data-testid="deck-session-start"
+              @click="start"
+            >
+              start a backend on GitHub
+            </button>
+            <button type="button" class="deck-session__button" data-testid="deck-session-connect" @click="connect">
+              connect one
+            </button>
+          </div>
+          <p v-if="awaitMessage" class="deck-session__line deck-session__line--note" data-testid="deck-session-message">{{ awaitMessage }}</p>
+        </template>
+      </template>
+
+      <!-- A backend, and nobody signed in to it yet. -->
+      <template v-else-if="!authenticated">
+        <p class="deck-session__line">
+          Connected to <code class="deck-session__host">{{ host }}</code>. Nobody is signed in yet.
+        </p>
+        <div class="deck-session__actions">
+          <button type="button" class="deck-session__button deck-session__button--primary" data-testid="deck-session-login" @click="login">
+            log in
+          </button>
+        </div>
+        <p v-if="error" class="deck-session__line deck-session__line--note" data-testid="deck-session-error">{{ error }}</p>
+      </template>
+    </div>
   </div>
 </template>
 
@@ -111,11 +121,20 @@ export default {
       const seconds = Math.max(0, Math.floor((this.now - new Date(since).getTime()) / 1000))
       return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`
     },
-    runLine() {
+    /** The head's one line: where things stand, without the clock. */
+    status() {
+      if (this.connected) return 'Connected'
+      if (!this.awaiting) return 'No backend'
+      if (!this.run) return 'Starting on GitHub'
+      if (this.failed) return `The run ${this.run.conclusion}`
       const done = this.steps.filter((step) => step.status === 'completed').length
-      if (!this.run) return `Starting on GitHub · ${this.elapsed}`
-      if (this.run.conclusion && this.run.conclusion !== 'success') return `The run ${this.run.conclusion} · ${this.elapsed}`
-      return `Building the backend · ${done} of ${this.steps.length} steps · ${this.elapsed}`
+      return `Building · ${done} of ${this.steps.length} steps`
+    },
+    failed() {
+      return Boolean(this.run && this.run.conclusion && this.run.conclusion !== 'success')
+    },
+    live() {
+      return this.connected || (this.awaiting && Boolean(this.run) && !this.failed)
     },
   },
 

@@ -550,87 +550,160 @@
 }
 
 /* The session pill on a demo slide: a green dot, and when the session ends. */
-/* The session panel on a demo stage, until somebody is signed in. */
+/* The session panel on a demo stage, until somebody is signed in. The same
+   console the stage becomes for a refused save: dark, mono, a status line
+   across the top and the lines under it, so it reads from the back row. */
 .deck-session {
   position: absolute;
   inset: calc(var(--u) * 14);
+  z-index: 1;
   display: grid;
-  align-content: center;
-  justify-items: start;
-  gap: calc(var(--u) * 18);
-  padding: calc(var(--u) * 24) calc(var(--u) * 28);
-  /* Over the stage's numeral, not through it. */
-  background: var(--bg);
+  grid-template-rows: auto 1fr;
+  gap: calc(var(--u) * 12);
+  padding: calc(var(--u) * 20) calc(var(--u) * 24);
+  border: calc(var(--u) * 2) solid var(--code-edge);
+  border-radius: calc(var(--u) * 6);
+  /* Opaque, unlike the save console: the numeral behind it is noise here. */
+  background: var(--code-bg);
+  color: var(--code-text);
   font-family: var(--mono);
   overflow: auto;
 }
-.deck-session__lead,
-.deck-session__status {
-  margin: 0;
-  font-size: calc(var(--u) * 26);
-  line-height: 1.35;
-  color: var(--ink);
-}
-.deck-session__status {
-  color: var(--muted);
-}
-.deck-session__actions {
+
+.deck-session__head {
   display: flex;
-  flex-wrap: wrap;
-  gap: calc(var(--u) * 12);
+  align-items: baseline;
+  justify-content: space-between;
+  gap: calc(var(--u) * 16);
+  padding-bottom: calc(var(--u) * 12);
+  border-bottom: calc(var(--u) * 2) solid var(--code-edge);
+  font-size: calc(var(--u) * 20);
+  color: var(--code-caption);
 }
-.deck-session__button {
-  display: inline-flex;
-  align-items: center;
-  height: calc(var(--u) * 48);
-  padding: 0 calc(var(--u) * 20);
-  border: calc(var(--u) * 2) solid var(--line);
-  border-radius: calc(var(--u) * 6);
-  background: transparent;
-  color: var(--ink);
+
+.deck-session__status {
+  font-weight: 600;
+}
+
+.deck-session__clock {
+  white-space: nowrap;
+}
+
+.deck-session--live .deck-session__status {
+  color: #4cc38a;
+}
+
+.deck-session--failed .deck-session__status {
+  color: #fb923c;
+}
+
+.deck-session__body {
+  display: grid;
+  align-content: start;
+  gap: calc(var(--u) * 10);
+  font-size: calc(var(--u) * 26);
+  line-height: 1.4;
+}
+
+.deck-session__line {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: var(--code-caption);
+}
+
+.deck-session__line--note {
+  color: #fb923c;
+}
+
+.deck-session__host {
   font: inherit;
-  font-size: calc(var(--u) * 22);
-  text-decoration: none;
-  cursor: pointer;
+  color: var(--code-string);
 }
-.deck-session__button--primary {
-  border-color: var(--accent);
-  background: var(--accent);
-  color: var(--paper, #fff);
-}
+
+/* The steps of the run, one per line, like a job log. A step that wraps
+   keeps its second line under its first, not under the mark. */
 .deck-session__steps {
   margin: 0;
   padding: 0;
   list-style: none;
   display: grid;
   gap: calc(var(--u) * 6);
-  font-size: calc(var(--u) * 22);
-  line-height: 1.4;
 }
+
+.deck-session__step {
+  display: grid;
+  grid-template-columns: calc(var(--u) * 32) 1fr;
+}
+
 .deck-session__step::before {
   content: '·';
-  display: inline-block;
-  width: calc(var(--u) * 28);
-  color: var(--muted);
+  color: var(--code-caption);
 }
+
+.deck-session__step--queued {
+  color: var(--code-caption);
+}
+
+.deck-session__step--running {
+  color: var(--code-key);
+}
+
 .deck-session__step--running::before {
   content: '›';
-  color: var(--accent);
 }
+
 .deck-session__step--done::before {
   content: '✓';
-  color: var(--accent);
+  color: #4cc38a;
 }
+
+.deck-session__step--failed {
+  color: #fb923c;
+}
+
 .deck-session__step--failed::before {
   content: '✗';
+  color: #fb923c;
 }
-.deck-session__step--queued {
-  color: var(--muted);
+
+/* What the presenter can do next, written as commands at a prompt. The
+   prompt is its own column, so a command that wraps lines up under itself. */
+.deck-session__actions {
+  display: grid;
+  justify-items: start;
+  gap: calc(var(--u) * 6);
+  padding-top: calc(var(--u) * 8);
 }
-.deck-session__note {
-  margin: 0;
-  font-size: calc(var(--u) * 20);
-  color: var(--accent);
+
+.deck-session__button {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  column-gap: calc(var(--u) * 14);
+  padding: calc(var(--u) * 4) 0;
+  border: 0;
+  background: none;
+  color: var(--code-key);
+  font: inherit;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.deck-session__button::before {
+  content: '$';
+  color: var(--code-caption);
+}
+
+.deck-session__button--primary {
+  color: #4cc38a;
+}
+
+.deck-session__button:hover,
+.deck-session__button:focus-visible {
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+  outline: none;
 }
 
 .deck-pill {
