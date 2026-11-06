@@ -559,6 +559,8 @@
   justify-items: start;
   gap: calc(var(--u) * 18);
   padding: calc(var(--u) * 24) calc(var(--u) * 28);
+  /* Over the stage's numeral, not through it. */
+  background: var(--bg);
   font-family: var(--mono);
   overflow: auto;
 }
