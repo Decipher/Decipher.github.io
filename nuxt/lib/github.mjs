@@ -29,7 +29,7 @@ const API = 'https://api.github.com'
 export function workflowRunUrl(repository, workflow = 'authoring.yml') {
   const parsed = parseRepository(repository)
   if (!parsed) return ''
-  return `https://github.com/${parsed.full}/actions/workflows/${workflow}`
+  return `https://github.com/${parsed.full}/actions/workflows/${encodeURIComponent(workflow)}`
 }
 
 /** `owner/name` from whatever a repository is written as. */

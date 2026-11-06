@@ -12,6 +12,7 @@ import {
   findRun,
   openChangeRequest,
   runIsFinished,
+  runJobs,
   startBackend,
 } from '../../nuxt/lib/github-client.mjs'
 
@@ -359,4 +360,37 @@ test('only a finished run stops the waiting', () => {
   assert.equal(runIsFinished({ status: 'in_progress' }), false)
   assert.equal(runIsFinished({ status: 'completed' }), true)
   assert.equal(runIsFinished(null), false)
+})
+
+test("a run's steps are read in order, with their state, and without a token", async () => {
+  const gh = fakeGitHub({
+    overrides: {
+      '/actions/runs/7/jobs': {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          jobs: [
+            {
+              steps: [
+                { name: 'Assembling', status: 'completed', conclusion: 'success' },
+                { name: 'Provisioning', status: 'in_progress', conclusion: null },
+                { name: 'Holding the session open', status: 'queued', conclusion: null },
+              ],
+            },
+          ],
+        }),
+      },
+    },
+  })
+  const result = await runJobs({ repository: 'o/r', run: { id: 7 }, token: null, fetch: gh.fetch })
+  assert.deepEqual(result, {
+    ok: true,
+    steps: [
+      { name: 'Assembling', status: 'completed', conclusion: 'success' },
+      { name: 'Provisioning', status: 'in_progress', conclusion: null },
+      { name: 'Holding the session open', status: 'queued', conclusion: null },
+    ],
+  })
+  const call = gh.calls.find((c) => c.path === '/repos/o/r/actions/runs/7/jobs')
+  assert.ok(call, 'the jobs of that run were asked for')
 })
