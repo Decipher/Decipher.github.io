@@ -35,7 +35,7 @@
     "axios": "^0.34.0",
     "ckeditor5": "35.4.0",
     "core-js": "3.25.1",
-    "dotenv": "^16.0.3",
+    "dotenv": "^18.0.9",
     "druxt-auth": "^0.5.1",
     "druxt-site": "^0.15.0",
     "nuxt": "2.15.8",
