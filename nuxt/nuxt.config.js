@@ -1,5 +1,6 @@
 import { DEFAULT_PACKAGES as CKEDITOR_PACKAGES } from '@druxt-contrib/ckeditor'
 import { repositoryFromRemotes } from './lib/github.mjs'
+import { DECK_PATH } from './lib/deck.mjs'
 
 require('dotenv').config({ path: '../.env' })
 
@@ -215,6 +216,30 @@ const declaredRegions = async function (baseUrl) {
   }
 }
 
+/**
+ * One route per published slide, in deck order.
+ *
+ * Asked of the build backend the same way the regions are, and for the same
+ * reason: the deck is static, so the build has to know how many slides there
+ * are. A backend that does not answer builds a site with no deck rather than
+ * no site.
+ */
+const slideRoutes = async function (baseUrl) {
+  const axios = require('axios')
+  const endpoint = `${String(baseUrl).replace(/\/+$/, '')}/jsonapi/node/slide`
+  try {
+    const { data: body } = await axios.get(endpoint, {
+      params: { 'filter[status]': 1, 'fields[node--slide]': 'field_order', 'page[limit]': 50 },
+      headers: { Accept: 'application/vnd.api+json' },
+      timeout: 15000,
+    })
+    const count = (body.data || []).length
+    return [DECK_PATH, ...Array.from({ length: count }, (_, i) => `${DECK_PATH}/${i + 1}`)]
+  } catch {
+    return []
+  }
+}
+
 const localhostListenURL = function () {
   this.nuxt.hook('listen', (server, listener) => {
     listener.host = 'localhost'
@@ -227,7 +252,11 @@ const localhostListenURL = function () {
 // loaded. Nuxt 2 accepts a function returning a promise here.
 export default async () => ({
   // Target full static build.
-  target: 'static',
+  // Static for the deployed site. A session builds a server target instead,
+  // because the proxy that puts Drupal under the frontend's origin is server
+  // middleware, and neither the generated files nor `nuxt start` on them run
+  // it. See scripts/session.sh.
+  target: process.env.NUXT_TARGET === 'server' ? 'server' : 'static',
 
   // Serving path. A `<user>.github.io` user site serves from the domain root
   // and needs nothing here, which is why the PoC targets one. A project site at
@@ -237,9 +266,26 @@ export default async () => ({
     base: process.env.ROUTER_BASE || '/',
   },
 
-  // Ensure the root route is generated and crawled.
+  // Ensure the root route is generated and crawled, and generate every slide:
+  // the deck's routes are not linked from the site, so the crawler never
+  // reaches them on its own.
   generate: {
-    routes: ['/']
+    routes: async () => ['/', ...(await slideRoutes(baseUrl))],
+  },
+
+  // A route that throws while generating is a page the site would ship broken,
+  // or not at all. Nuxt 2 logs it and still exits 0, so a deploy could carry a
+  // missing slide or a QR code that points somewhere it must not. Fail the
+  // build instead. A handled error, such as a 404 the page asked for, is not
+  // one of these.
+  hooks: {
+    'generate:done': (generator, errors) => {
+      const unhandled = (errors || []).filter((e) => e.type === 'unhandled')
+      if (unhandled.length) {
+        const routes = unhandled.map((e) => e.route).join(', ')
+        throw new Error(`${unhandled.length} route(s) failed to generate: ${routes}`)
+      }
+    },
   },
 
   // Nuxt 2 defaults to binding 'localhost' (loopback only), which is not
@@ -283,8 +329,15 @@ export default async () => ({
     // the whole family.
     '@fontsource/archivo/400.css',
     '@fontsource/archivo/600.css',
+    '@fontsource/archivo/700.css',
     '@fontsource/jetbrains-mono/400.css',
+    '@fontsource/jetbrains-mono/500.css',
+    '@fontsource/jetbrains-mono/600.css',
+    '@fontsource/jetbrains-mono/700.css',
     '~/assets/css/main.css',
+    // The deck's own tokens and frame. Global because Nuxt 2 CSS is, and
+    // harmless elsewhere: everything in it is scoped under `.deck`.
+    '~/assets/css/deck.css',
   ],
 
   // Plugins to run before rendering page: https://go.nuxtjs.dev/config-plugins
@@ -435,6 +488,11 @@ export default async () => ({
     // the site's own origin, where nothing answers. Absolute requests to the
     // connected backend are what CORS is configured for.
     proxy: { api: false },
+    // No server cache. Druxt 0.25 caches JSON:API responses on the server in
+    // production. A generated site has no server, so it changes nothing there,
+    // but a `nuxt start` session frontend would serve stale menus and settings
+    // while the backend is being edited live.
+    cache: false,
     // Disable deprecated Entity fields.
     entity: { components: { fields: false }},
     // Disable the router middleware (redirect support) in favour of serverless.
@@ -450,6 +508,14 @@ export default async () => ({
     // nor `nuxt start` on them run server middleware.
     admin: {
       mode: process.env.DRUXT_ADMIN_MODE || 'link',
+      // In proxy mode this frontend is the backend's origin as well. The data,
+      // sign-in and prose-check routes go to Drupal through the same proxy as
+      // the administration, so sign-in, inline editing and a node preview share
+      // one site and one session cookie. /preview is this site's own page
+      // and stays out of the list.
+      // `/node/preview` is Drupal's own preview page, the one with the Frontend
+      // tab; this site's preview page lives at `/preview` so the two never meet.
+      backendPaths: [...require('@druxt-contrib/admin').BACKEND_PATHS, '/jsonapi', '/router', '/oauth', '/vale', '/node/preview'],
     },
 
     // Copy the editor builds into this site and load them from here. Needed

@@ -23,6 +23,20 @@ export function configObject(settings, name) {
 }
 
 /**
+ * The settings map inside the endpoint's JSON:API document.
+ *
+ * The document is `{ data: { attributes: { settings, consumer, theme } } }`,
+ * and the map `siteIdentity` reads is `attributes.settings`, keyed by config
+ * name. Reading `attributes` itself finds no `system.site` and falls back
+ * silently, which is how a changed slogan once failed to show.
+ */
+export function settingsFromDocument(body) {
+  const data = (body || {}).data
+  const resource = Array.isArray(data) ? data[0] : data
+  return ((resource || {}).attributes || {}).settings || {}
+}
+
+/**
  * The site's identity, with what to show when Drupal has not been asked yet.
  *
  * A static build serves visitors who never connect a backend, so the fallbacks

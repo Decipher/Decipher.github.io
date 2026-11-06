@@ -1,0 +1,103 @@
+{
+    "uuid": [
+        {
+            "value": "b88bbcf4-645c-4708-8e86-3c39e89ab3eb"
+        }
+    ],
+    "langcode": [
+        {
+            "value": "en"
+        }
+    ],
+    "type": [
+        {
+            "target_id": "slide",
+            "target_type": "node_type",
+            "target_uuid": "ef998fba-c0db-42b5-b8d8-148210b7c2bf"
+        }
+    ],
+    "revision_timestamp": [
+        {
+            "value": "2026-11-05T02:52:26+00:00"
+        }
+    ],
+    "revision_uid": [
+        {
+            "target_type": "user",
+            "target_uuid": "4816a18c-e7e8-464a-96d0-675084ed414c"
+        }
+    ],
+    "revision_log": [],
+    "status": [
+        {
+            "value": true
+        }
+    ],
+    "uid": [
+        {
+            "target_type": "user",
+            "target_uuid": "27a72419-c5b9-44d0-8b2d-6f9b0cca9354"
+        }
+    ],
+    "title": [
+        {
+            "value": "Edit this slide"
+        }
+    ],
+    "created": [
+        {
+            "value": "2026-10-29T06:55:53+00:00"
+        }
+    ],
+    "changed": [
+        {
+            "value": "2026-11-05T02:53:33+00:00"
+        }
+    ],
+    "promote": [
+        {
+            "value": false
+        }
+    ],
+    "sticky": [
+        {
+            "value": false
+        }
+    ],
+    "default_langcode": [
+        {
+            "value": true
+        }
+    ],
+    "revision_translation_affected": [
+        {
+            "value": true
+        }
+    ],
+    "path": [
+        {
+            "alias": null,
+            "pid": null,
+            "langcode": "en"
+        }
+    ],
+    "body": [
+        {
+            "value": "<p>Edit this slide inline. Break a rule, and the save is refused with Vale's message.<\/p><p>Fix it, and it saves, warnings and all.<\/p><p>Saved to the session, not published. The public site is static, and publishing is a deploy.<\/p>",
+            "format": "basic_html",
+            "processed": "<p>Edit this slide inline. Break a rule, and the save is refused with Vale's message.<\/p><p>Fix it, and it saves, warnings and all.<\/p><p>Saved to the session, not published. The public site is static, and publishing is a deploy.<\/p>",
+            "summary": null
+        }
+    ],
+    "field_layout": [
+        {
+            "value": "demo"
+        }
+    ],
+    "field_link": [],
+    "field_order": [
+        {
+            "value": 8
+        }
+    ]
+}

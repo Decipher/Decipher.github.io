@@ -1,0 +1,103 @@
+{
+    "uuid": [
+        {
+            "value": "a823e880-3ddf-4dd8-896d-04d14f86221a"
+        }
+    ],
+    "langcode": [
+        {
+            "value": "en"
+        }
+    ],
+    "type": [
+        {
+            "target_id": "slide",
+            "target_type": "node_type",
+            "target_uuid": "ef998fba-c0db-42b5-b8d8-148210b7c2bf"
+        }
+    ],
+    "revision_timestamp": [
+        {
+            "value": "2026-10-29T06:55:53+00:00"
+        }
+    ],
+    "revision_uid": [
+        {
+            "target_type": "user",
+            "target_uuid": "27a72419-c5b9-44d0-8b2d-6f9b0cca9354"
+        }
+    ],
+    "revision_log": [],
+    "status": [
+        {
+            "value": true
+        }
+    ],
+    "uid": [
+        {
+            "target_type": "user",
+            "target_uuid": "27a72419-c5b9-44d0-8b2d-6f9b0cca9354"
+        }
+    ],
+    "title": [
+        {
+            "value": "Decoupled Settings"
+        }
+    ],
+    "created": [
+        {
+            "value": "2026-10-29T06:55:53+00:00"
+        }
+    ],
+    "changed": [
+        {
+            "value": "2026-11-04T20:34:20+00:00"
+        }
+    ],
+    "promote": [
+        {
+            "value": false
+        }
+    ],
+    "sticky": [
+        {
+            "value": false
+        }
+    ],
+    "default_langcode": [
+        {
+            "value": true
+        }
+    ],
+    "revision_translation_affected": [
+        {
+            "value": true
+        }
+    ],
+    "path": [
+        {
+            "alias": null,
+            "pid": null,
+            "langcode": "en"
+        }
+    ],
+    "body": [
+        {
+            "value": "<p>Change the slogan for this consumer in Drupal, then reload.<\/p><p>The footer of every slide reads it live. No rebuild.<\/p>",
+            "format": "basic_html",
+            "processed": "<p>Change the slogan for this consumer in Drupal, then reload.<\/p><p>The footer of every slide reads it live. No rebuild.<\/p>",
+            "summary": null
+        }
+    ],
+    "field_layout": [
+        {
+            "value": "demo"
+        }
+    ],
+    "field_link": [],
+    "field_order": [
+        {
+            "value": 6
+        }
+    ]
+}

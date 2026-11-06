@@ -1,0 +1,8 @@
+# "very" is a warning: the save goes through, and the alert arrives in the
+# response's meta.vale so the editor can show it without blocking.
+extends: existence
+message: "'%s' adds nothing. Cut it, or pick a stronger word."
+level: warning
+ignorecase: true
+tokens:
+  - very

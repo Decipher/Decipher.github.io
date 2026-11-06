@@ -1,0 +1,103 @@
+{
+    "uuid": [
+        {
+            "value": "0c6f8d14-721f-4a51-b033-12f17308cc4c"
+        }
+    ],
+    "langcode": [
+        {
+            "value": "en"
+        }
+    ],
+    "type": [
+        {
+            "target_id": "slide",
+            "target_type": "node_type",
+            "target_uuid": "ef998fba-c0db-42b5-b8d8-148210b7c2bf"
+        }
+    ],
+    "revision_timestamp": [
+        {
+            "value": "2026-11-05T03:26:06+00:00"
+        }
+    ],
+    "revision_uid": [
+        {
+            "target_type": "user",
+            "target_uuid": "4816a18c-e7e8-464a-96d0-675084ed414c"
+        }
+    ],
+    "revision_log": [],
+    "status": [
+        {
+            "value": true
+        }
+    ],
+    "uid": [
+        {
+            "target_type": "user",
+            "target_uuid": "4816a18c-e7e8-464a-96d0-675084ed414c"
+        }
+    ],
+    "title": [
+        {
+            "value": "Drupal's APIs without Drupal"
+        }
+    ],
+    "created": [
+        {
+            "value": "2026-11-05T03:26:06+00:00"
+        }
+    ],
+    "changed": [
+        {
+            "value": "2026-11-05T03:26:06+00:00"
+        }
+    ],
+    "promote": [
+        {
+            "value": false
+        }
+    ],
+    "sticky": [
+        {
+            "value": false
+        }
+    ],
+    "default_langcode": [
+        {
+            "value": true
+        }
+    ],
+    "revision_translation_affected": [
+        {
+            "value": true
+        }
+    ],
+    "path": [
+        {
+            "alias": null,
+            "pid": null,
+            "langcode": "en"
+        }
+    ],
+    "body": [
+        {
+            "value": "<ul><li>decoupled-drupal-mock: JSON:API, Decoupled Router, menus and Simple OAuth, answered from a recording of a real site<\/li><li>Built for Druxt, works for any JSON:API client, runs in Node or in the browser<\/li><li>Live now: druxtjs.org\/playground, choose the mock backend, pick a component<\/li><li>Nothing leaves the page. Watch the network tab.<\/li><\/ul>",
+            "format": "basic_html",
+            "processed": "<ul><li>decoupled-drupal-mock: JSON:API, Decoupled Router, menus and Simple OAuth, answered from a recording of a real site<\/li><li>Built for Druxt, works for any JSON:API client, runs in Node or in the browser<\/li><li>Live now: druxtjs.org\/playground, choose the mock backend, pick a component<\/li><li>Nothing leaves the page. Watch the network tab.<\/li><\/ul>",
+            "summary": null
+        }
+    ],
+    "field_layout": [
+        {
+            "value": "bullets"
+        }
+    ],
+    "field_link": [],
+    "field_order": [
+        {
+            "value": 12
+        }
+    ]
+}

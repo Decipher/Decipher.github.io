@@ -26,7 +26,8 @@ export default {
     label() {
       const authoring = this.$druxtIce || {}
       if (!authoring.connected) return 'Log in'
-      return authoring.authenticated ? 'Account' : 'Log in'
+      // The module keeps sign-in under `auth`, not on the plugin itself.
+      return authoring.auth && authoring.auth.authenticated ? 'Account' : 'Log in'
     },
   },
 }

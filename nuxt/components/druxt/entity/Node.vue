@@ -229,6 +229,16 @@ export default {
 
   data: () => ({
     open: false,
+    /**
+     * What the backend holds, kept apart from the `entity` prop.
+     *
+     * Druxt 0.25 feeds what this component emits back in as `entity`, so the
+     * prop no longer stays what was fetched. This copy does, which is what
+     * makes discarding a change put the page back with no reload.
+     */
+    fetched: null,
+    /** The last merged entity emitted, as JSON, so an echo of it is known. */
+    shown: '',
     /** Whether the panel is showing the fields or the result of them. */
     view: 'form',
     /** Display modes this bundle has, which is however many it has. */
@@ -326,7 +336,7 @@ export default {
      * discarding a change put the page back with no reload.
      */
     merged() {
-      const next = JSON.parse(JSON.stringify(this.entity || {}))
+      const next = JSON.parse(JSON.stringify(this.fetched || this.entity || {}))
       for (const layer of [this.entry, this.draft]) {
         if (!layer) continue
         next.attributes = { ...(next.attributes || {}), ...(layer.attributes || {}) }
@@ -429,10 +439,19 @@ export default {
       handler: 'showStaged',
     },
 
-    // A refetch replaces what was fetched, so the overlay goes on again.
+    // A refetch replaces what was fetched, so the overlay goes on again. The
+    // merged entity this component emits comes back the same way, through the
+    // module's model, and that echo is not a refetch: acting on it would emit
+    // again, and again, with no end.
     entity: {
       deep: true,
-      handler: 'showStaged',
+      immediate: true,
+      handler(next) {
+        const json = JSON.stringify(next || {})
+        if (json === this.shown) return
+        this.fetched = JSON.parse(json)
+        this.showStaged()
+      },
     },
   },
 
@@ -494,7 +513,11 @@ export default {
      * compare the staged value against itself and never unstage it.
      */
     showStaged() {
-      this.$emit('input', this.merged)
+      const next = this.merged
+      const json = JSON.stringify(next)
+      if (json === this.shown) return
+      this.shown = json
+      this.$emit('input', next)
     },
   },
 }

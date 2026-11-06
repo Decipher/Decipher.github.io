@@ -38,6 +38,11 @@ require_once __DIR__ . '/helpers.php';
 // backend at a different frontend is a one-variable change.
 $site_origin = rtrim(resolve_env_value('SITE_ORIGIN', 'https://decipher.github.io')[0], '/');
 $oauth_callback = resolve_env_value('OAUTH_CALLBACK', $site_origin . '/callback')[0];
+// A session serves the frontend itself, on a tunnel hostname assigned just
+// before this runs. That origin signs in too, and it is where a node preview
+// renders, so it gets a redirect URI and the preview target. Empty outside a
+// session, and then the deployed site's origin is both.
+$session_origin = rtrim(resolve_env_value('SESSION_ORIGIN', '')[0], '/');
 
 // -----------------------------------------------------------------------------
 
@@ -70,6 +75,9 @@ if ($dirty !== '') {
 
 NOTE('Frontend origin: %s', $site_origin);
 NOTE('OAuth callback:  %s', $oauth_callback);
+if ($session_origin) {
+  NOTE('Session origin:  %s', $session_origin);
+}
 echo PHP_EOL;
 
 // -----------------------------------------------------------------------------
@@ -96,6 +104,10 @@ PASS('cors.config written to web/sites/default/authoring.services.yml.');
 TASK('Trusting tunnel hostnames and the local webserver.');
 write_host_settings();
 PASS('Trusted host and reverse proxy settings written.');
+
+TASK('Pointing consumer_node_preview at the frontend.');
+write_preview_settings($session_origin ?: $site_origin);
+PASS('Preview target written.');
 
 // -----------------------------------------------------------------------------
 // 4. OAuth: keys, a scope, and a consumer.
@@ -135,6 +147,7 @@ if ($client_id !== $committed_id) {
 }
 putenv('OAUTH_CLIENT_ID=' . $client_id);
 putenv('OAUTH_CALLBACK=' . $oauth_callback);
+putenv('SESSION_CALLBACK=' . ($session_origin ? $session_origin . '/callback' : ''));
 drush('php-eval %s', <<<'PHP'
 // Simple OAuth 6 rejects an authorize request when it cannot resolve a
 // scope, and its default provider is "Dynamic (entity)" with no scopes
@@ -142,10 +155,20 @@ drush('php-eval %s', <<<'PHP'
 // ScopeRepository::finalizeScopes() falls back to. The scope is committed
 // under drupal/config as an umbrella over an editor scope and an
 // administrator scope, so a token carries whichever of those roles the
-// account holds. `provision` has already checked it arrived.
+// account holds. A backend provisioned before the umbrella existed still
+// has the old shape, so the three are brought in line with the committed
+// files here, in place, rather than by a reinstall.
 $scope_id = "authoring";
-if (!\Drupal::entityTypeManager()->getStorage("oauth2_scope")->load($scope_id)) {
-  throw new \RuntimeException("The `authoring` scope is missing. It is committed under drupal/config; run .devtools/provision first.");
+$sync = \Drupal::service("config.storage.sync");
+$scopes = \Drupal::entityTypeManager()->getStorage("oauth2_scope");
+foreach ([$scope_id, "authoring_editor", "authoring_administrator"] as $id) {
+  $values = $sync->read("simple_oauth.oauth2_scope." . $id);
+  if (!$values) {
+    throw new \RuntimeException("drupal/config has no simple_oauth.oauth2_scope.$id.yml.");
+  }
+  $scope = $scopes->load($id);
+  $scope = $scope ? $scopes->updateFromStorageRecord($scope, $values) : $scopes->createFromStorageRecord($values);
+  $scope->save();
 }
 
 $client_id = getenv("OAUTH_CLIENT_ID") ?: \Drupal::service("uuid")->generate();
@@ -171,6 +194,9 @@ $values = ([
   // fails with unsupported_grant_type. refresh_token lets the frontend
   // renew a session without sending the user back through login.
   "grant_types"  => ["authorization_code", "refresh_token"],
+  // Long enough to outlive a session. The module's default is five minutes,
+  // and a deck signed in before the talk was answering 401 by the first demo.
+  "access_token_expiration" => 7200,
   // The default scope for this grant: with it set, a request that sends
   // no scope (or an empty one, as druxt-auth does) resolves to this
   // rather than being rejected.
@@ -180,7 +206,7 @@ $values = ([
   // 3000 lands on the next free HOST port when 3000 is taken - league then
   // rejects the unregistered redirect_uri as, confusingly, invalid_client.
   "redirect"     => array_values(array_unique(array_merge(
-    [$callback],
+    array_filter([$callback, getenv("SESSION_CALLBACK") ?: NULL]),
     array_map(fn ($port) => "http://localhost:{$port}/callback", range(3000, 3009)),
   ))),
 ]);
@@ -278,6 +304,39 @@ echo '  .devtools/tunnel          # Expose it, and trust the hostname' . PHP_EOL
 echo PHP_EOL;
 
 /**
+ * Tell consumer_node_preview where the frontend renders a preview.
+ *
+ * A settings target rather than one on the consumer entity, because the origin
+ * is the session's and changes every time. The frontend's /preview page
+ * reads the JSON:API preview document from the path in the fragment, through
+ * the proxy on its own origin, so the editor's session cookie goes with it.
+ */
+function write_preview_settings(string $origin): void {
+  $settings_local = 'web/sites/default/settings.local.php';
+  $contents = file_exists($settings_local) ? (string) file_get_contents($settings_local) : "<?php\n";
+  if (str_contains($contents, 'consumer_node_preview')) {
+    return;
+  }
+  $url = var_export($origin . '/preview?vm=[view_mode]&layout=[layout]#[jsonapi_node_preview_path]', TRUE);
+  $contents .= <<<PHP
+
+// Authoring: where a node's Preview button sends the editor.
+\$settings['consumer_node_preview'] = [
+  'targets' => [
+    'frontend' => [
+      'label' => 'Frontend',
+      'url' => {$url},
+      'layouts' => ['default'],
+    ],
+  ],
+  'default' => 'settings:frontend',
+];
+
+PHP;
+  file_put_contents($settings_local, $contents);
+}
+
+/**
  * Trust the hostnames a session can be served on.
  *
  * Drupal refuses a request whose Host header matches no trusted pattern, and a
@@ -342,8 +401,11 @@ parameters:
     # application/vnd.api+json, which is not a CORS-safelisted value and so
     # makes every write a preflighted request; Content-Disposition because a
     # file upload carries its filename in that header, and without it the
-    # preflight fails and an image can be chosen but never sent.
-    allowedHeaders: ['authorization', 'content-type', 'content-disposition', 'x-csrf-token']
+    # preflight fails and an image can be chosen but never sent;
+    # X-Consumer-ID because Decoupled Settings reads the consumer from it, and
+    # without it the deployed site's request for its own settings is refused
+    # before Drupal sees it.
+    allowedHeaders: ['authorization', 'content-type', 'content-disposition', 'x-csrf-token', 'x-consumer-id']
     # Explicit, not ['*']: an empty list rejects the preflight outright, and a
     # wildcard is not honoured by every browser.
     allowedMethods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS']

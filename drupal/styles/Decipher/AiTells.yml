@@ -1,0 +1,22 @@
+# Phrases a model reaches for and a person rarely does. An error: the save is
+# refused, and the check endpoint reports it as one.
+extends: existence
+message: "'%s' is an AI tell. Say it plainly."
+level: error
+ignorecase: true
+tokens:
+  - simply put
+  - it is worth noting
+  - it's worth noting
+  - to be clear
+  - stated plainly
+  - in essence
+  - that said
+  - at the end of the day
+  - delve
+  - delves
+  - delving
+  - leverage
+  - leverages
+  - leveraged
+  - leveraging

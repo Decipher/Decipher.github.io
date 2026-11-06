@@ -1,0 +1,110 @@
+{
+    "uuid": [
+        {
+            "value": "e1e33c42-42c6-41db-9823-f64f2b16061c"
+        }
+    ],
+    "langcode": [
+        {
+            "value": "en"
+        }
+    ],
+    "type": [
+        {
+            "target_id": "slide",
+            "target_type": "node_type",
+            "target_uuid": "ef998fba-c0db-42b5-b8d8-148210b7c2bf"
+        }
+    ],
+    "revision_timestamp": [
+        {
+            "value": "2026-10-29T06:55:53+00:00"
+        }
+    ],
+    "revision_uid": [
+        {
+            "target_type": "user",
+            "target_uuid": "27a72419-c5b9-44d0-8b2d-6f9b0cca9354"
+        }
+    ],
+    "revision_log": [],
+    "status": [
+        {
+            "value": true
+        }
+    ],
+    "uid": [
+        {
+            "target_type": "user",
+            "target_uuid": "27a72419-c5b9-44d0-8b2d-6f9b0cca9354"
+        }
+    ],
+    "title": [
+        {
+            "value": "Prose and Cons"
+        }
+    ],
+    "created": [
+        {
+            "value": "2026-10-29T06:55:53+00:00"
+        }
+    ],
+    "changed": [
+        {
+            "value": "2026-11-05T02:11:56+00:00"
+        }
+    ],
+    "promote": [
+        {
+            "value": false
+        }
+    ],
+    "sticky": [
+        {
+            "value": false
+        }
+    ],
+    "default_langcode": [
+        {
+            "value": true
+        }
+    ],
+    "revision_translation_affected": [
+        {
+            "value": true
+        }
+    ],
+    "path": [
+        {
+            "alias": null,
+            "pid": null,
+            "langcode": "en"
+        }
+    ],
+    "body": [
+        {
+            "value": "<p>Stuart Clark<\/p><p>Deciphered<\/p><p>Drupal Melbourne \u00b7 5 November 2026<\/p>",
+            "format": "basic_html",
+            "processed": "<p>Stuart Clark<\/p><p>Deciphered<\/p><p>Drupal Melbourne \u00b7 5 November 2026<\/p>",
+            "summary": null
+        }
+    ],
+    "field_layout": [
+        {
+            "value": "intro"
+        }
+    ],
+    "field_link": [
+        {
+            "uri": "https:\/\/stuar.tc\/?utm_medium=qr&utm_source=drupal-melbourne&utm_campaign=prose-and-cons",
+            "resolvable_uri": "https:\/\/stuar.tc",
+            "title": "stuar.tc",
+            "options": []
+        }
+    ],
+    "field_order": [
+        {
+            "value": 1
+        }
+    ]
+}

@@ -1,0 +1,23 @@
+uuid: 57454f6a-f4e6-4fac-8368-fbf468f89cb6
+langcode: en
+status: true
+dependencies:
+  config:
+    - field.storage.node.field_link
+    - node.type.slide
+  module:
+    - link
+id: node.slide.field_link
+field_name: field_link
+entity_type: node
+bundle: slide
+label: Link
+description: 'For the intro and sponsor slides: the URL the QR code encodes, with its caption as the link text.'
+required: false
+translatable: true
+default_value: {  }
+default_value_callback: ''
+settings:
+  title: 1
+  link_type: 16
+field_type: link

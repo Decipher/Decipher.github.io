@@ -22,6 +22,7 @@ cd "$(dirname "$0")/.."
 
 LOG_DIR=".logs"
 PID_FILE="$LOG_DIR/cloudflared.pid"
+PORT_FILE="$LOG_DIR/cloudflared.port"
 LOG_FILE="$LOG_DIR/cloudflared.log"
 ENV_FILE="../.env"
 
@@ -52,7 +53,7 @@ extract_url() {
 stop_tunnel() {
   if [ -f "$PID_FILE" ]; then
     kill "$(cat "$PID_FILE")" 2>/dev/null || true
-    rm -f "$PID_FILE"
+    rm -f "$PID_FILE" "$PORT_FILE"
   fi
   env_clear TUNNEL_URL
   echo "[tunnel] Stopped."
@@ -61,6 +62,14 @@ stop_tunnel() {
 if [ "${1:-}" = "--stop" ]; then
   stop_tunnel
   exit 0
+fi
+
+# `--no-wait` reports the hostname as soon as it is assigned, without waiting
+# for the origin to answer. A session opens its tunnel before the frontend it
+# will serve exists, because provisioning needs the hostname first.
+NO_WAIT=0
+if [ "${1:-}" = "--no-wait" ]; then
+  NO_WAIT=1
 fi
 
 # Resolve cloudflared: prefer PATH, then mise. mise installs it without
@@ -83,28 +92,41 @@ mkdir -p "$LOG_DIR"
 
 WEBSERVER_PORT="${WEBSERVER_PORT:-$(grep -m1 '^WEBSERVER_PORT=' "$ENV_FILE" 2>/dev/null | cut -d= -f2- || true)}"
 WEBSERVER_PORT="${WEBSERVER_PORT:-8888}"
+# The port to expose: the backend's by default, or TUNNEL_PORT, which a session
+# sets to the frontend's so that one hostname serves the site with Drupal
+# proxied under it.
+TUNNEL_PORT="${TUNNEL_PORT:-$WEBSERVER_PORT}"
 
 # Health-check an existing tunnel before reusing it. A live cloudflared process
 # does not mean a live tunnel: quick tunnels can be dropped at the edge while
 # the process stays up perfectly happily, and reusing one of those gives a
 # session whose URL simply does not answer.
+# And only a tunnel to the same port: a healthy tunnel to the backend is the
+# wrong tunnel for a session, which publishes a URL that must serve the
+# frontend. Drupal answers the readiness checks too, so nothing later would
+# notice.
 if [ -f "$PID_FILE" ] && kill -0 "$(cat "$PID_FILE")" 2>/dev/null; then
   EXISTING_URL="$(extract_url)"
-  if [ -n "$EXISTING_URL" ] && curl -sf -o /dev/null -m 5 "$EXISTING_URL"; then
+  EXISTING_PORT="$(cat "$PORT_FILE" 2>/dev/null || true)"
+  if [ "$EXISTING_PORT" != "$TUNNEL_PORT" ]; then
+    echo "[tunnel] Existing tunnel serves port ${EXISTING_PORT:-unknown}, not ${TUNNEL_PORT}; restarting."
+  elif [ -n "$EXISTING_URL" ] && curl -sf -o /dev/null -m 5 "$EXISTING_URL"; then
     echo "[tunnel] Reusing healthy tunnel: ${EXISTING_URL}"
     env_write TUNNEL_URL "$EXISTING_URL"
     exit 0
+  else
+    echo "[tunnel] Existing tunnel is unhealthy; restarting."
   fi
-  echo "[tunnel] Existing tunnel is unhealthy; restarting."
   kill "$(cat "$PID_FILE")" 2>/dev/null || true
   sleep 1
 fi
 
-echo "[tunnel] Starting for http://localhost:${WEBSERVER_PORT} ..."
+echo "[tunnel] Starting for http://localhost:${TUNNEL_PORT} ..."
 : > "$LOG_FILE"
-nohup "$CLOUDFLARED" tunnel --url "http://localhost:${WEBSERVER_PORT}" --no-autoupdate \
+nohup "$CLOUDFLARED" tunnel --url "http://localhost:${TUNNEL_PORT}" --no-autoupdate \
   >"$LOG_FILE" 2>&1 &
 echo $! > "$PID_FILE"
+echo "$TUNNEL_PORT" > "$PORT_FILE"
 
 URL=""
 for _ in $(seq 1 30); do
@@ -123,6 +145,11 @@ fi
 # Cloudflare hands back the hostname before the edge is necessarily routing to
 # it, so wait for the URL to actually answer rather than reporting success on a
 # name alone.
+if [ "$NO_WAIT" = 1 ]; then
+  env_write TUNNEL_URL "$URL"
+  echo "[tunnel] Assigned: ${URL} (not waiting for the origin)."
+  exit 0
+fi
 for _ in $(seq 1 30); do
   if curl -sf -o /dev/null -m 5 "$URL"; then
     env_write TUNNEL_URL "$URL"

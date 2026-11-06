@@ -53,7 +53,7 @@ const PNG = Buffer.from(
  * Returns the writes it received, so a test can assert that staging sent
  * nothing and that committing sent exactly one thing.
  */
-async function stubBackend(page) {
+async function stubBackend(page, { answerWrite } = {}) {
   const writes = []
 
   await page.route(`${BACKEND}/**`, async (route, request) => {
@@ -98,11 +98,13 @@ async function stubBackend(page) {
 
     if (request.method() !== 'GET') {
       writes.push({ method: request.method(), url: request.url(), body: request.postDataJSON() })
-      return route.fulfill({
+      // A test can say what the backend makes of a write: refused, or accepted
+      // with something to add. By default it is accepted and says nothing.
+      const answer = (answerWrite && answerWrite(request)) || {
         status: 200,
-        headers,
-        body: JSON.stringify({ data: { type: 'node--article', id: ARTICLE, attributes: {} } }),
-      })
+        body: { data: { type: 'node--article', id: ARTICLE, attributes: {} } },
+      }
+      return route.fulfill({ status: answer.status, headers, body: JSON.stringify(answer.body) })
     }
 
     // An individual resource, by uuid.
@@ -541,6 +543,92 @@ test.describe('the edit form', () => {
     const image = patch.body.data.relationships.field_image.data
     expect(image.id).toBe('uploaded-file-id')
     expect(image.meta.alt).toBe('A small red square')
+  })
+
+  test('a save the backend refuses is explained at the field it points at', async ({ page }) => {
+    await stubBackend(page, {
+      answerWrite: (request) =>
+        request.method() === 'PATCH'
+          ? {
+              status: 422,
+              body: {
+                errors: [
+                  {
+                    status: '422',
+                    detail:
+                      'body.0.value: Body: Decipher.EmDash: Use a comma, a full stop or a colon instead of an em dash. (line 1: "—")',
+                    source: { pointer: '/data/attributes/body/value' },
+                  },
+                ],
+              },
+            }
+          : null,
+    })
+    await openForm(page)
+    await page.getByTestId('field-input').first().fill('A title with — an em dash')
+    await page.getByTestId('authoring-stage').click()
+    await expect(page.getByTestId('authoring-stage-message')).toContainText('Staged')
+
+    await page.evaluate(() =>
+      window.$nuxt.$store.dispatch('druxtIce/commit', {
+        backendUrl: 'http://backend.test',
+        token: 'stub-token',
+      })
+    )
+
+    // Still staged, and the cart says why.
+    await expect(page.getByTestId('authoring-cart-error')).toContainText('Decipher.EmDash')
+    // In the form, which is still open, the reason sits under the field the
+    // backend pointed at.
+    const refused = page.getByTestId('authoring-field-refused')
+    await expect(refused).toHaveCount(1)
+    await expect(refused).toContainText('Decipher.EmDash')
+    await expect(
+      refused.locator('xpath=ancestor::div[contains(@class, "authoring-field")][1]')
+    ).toContainText('Body')
+  })
+
+  test('a save the backend accepts with alerts shows them, and they do not block', async ({
+    page,
+  }) => {
+    const alert = {
+      entity_type: 'node',
+      bundle: 'article',
+      field: 'body',
+      level: 'warning',
+      rule: 'Decipher.Very',
+      message: "'very' adds nothing. Cut it, or pick a stronger word.",
+      line: 1,
+    }
+    const writes = await stubBackend(page, {
+      answerWrite: (request) =>
+        request.method() === 'PATCH'
+          ? {
+              status: 200,
+              body: {
+                data: { type: 'node--article', id: ARTICLE, attributes: {} },
+                meta: { vale: { checked: true, alerts: [alert] } },
+              },
+            }
+          : null,
+    })
+    await openForm(page)
+    await page.getByTestId('field-input').first().fill('A very plain title')
+    await page.getByTestId('authoring-stage').click()
+    await expect(page.getByTestId('authoring-stage-message')).toContainText('Staged')
+
+    await page.evaluate(() =>
+      window.$nuxt.$store.dispatch('druxtIce/commit', {
+        backendUrl: 'http://backend.test',
+        token: 'stub-token',
+      })
+    )
+
+    expect(writes.filter((w) => w.method === 'PATCH')).toHaveLength(1)
+    // Sent, gone from the cart, and the alert is listed rather than lost.
+    await expect(page.getByTestId('authoring-cart-warnings')).toContainText('Decipher.Very')
+    await expect(page.getByTestId('authoring-cart-error')).toHaveCount(0)
+    await expect(page.getByTestId(`cart-select-${ARTICLE}`)).toHaveCount(0)
   })
 
   test('staging nothing stages nothing', async ({ page }) => {

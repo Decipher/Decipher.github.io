@@ -21,6 +21,7 @@ endswith
 extensionless
 gdlib
 giget
+gstatic
 hverlin
 instantiator
 intelephense
@@ -66,6 +67,8 @@ phpsab
 phpstan
 phpunit
 PKCE
+qrcode
+qrserver
 quantisation
 recognise
 recognised
@@ -78,6 +81,8 @@ siroc
 Stanislav
 starterkit
 startswith
+stuar
+subline
 tokenless
 toolbarview
 travelled
@@ -99,3 +104,5 @@ viewports
 worktree
 xauth
 zoomable
+drupalmel
+colouring

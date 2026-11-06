@@ -7,7 +7,12 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { configObject, faviconUrl, siteIdentity } from '../../nuxt/lib/settings.mjs'
+import {
+  configObject,
+  faviconUrl,
+  settingsFromDocument,
+  siteIdentity,
+} from '../../nuxt/lib/settings.mjs'
 
 const SETTINGS = {
   'system.site': { name: 'Deciphered', slogan: 'Serverless Drupal', page: { front: '/node' } },
@@ -55,4 +60,21 @@ test('a favicon is resolved against the backend that serves it', () => {
   assert.equal(faviconUrl(absolute, 'x', 'http://backend.test'), 'https://cdn.test/f.ico')
   // Nothing to point at without a backend, and saying so beats a broken link.
   assert.equal(faviconUrl(SETTINGS, 'olivero', ''), '')
+})
+
+test('the settings map is read from inside the endpoint document, not from its attributes', () => {
+  const body = {
+    data: {
+      type: 'decoupled_settings--settings',
+      id: 'decoupled-settings',
+      attributes: {
+        settings: { 'system.site': { slogan: 'Edited live' } },
+        consumer: null,
+        theme: {},
+      },
+    },
+  }
+  assert.equal(siteIdentity(settingsFromDocument(body), { slogan: 'baked' }).slogan, 'Edited live')
+  assert.equal(siteIdentity(settingsFromDocument({ data: [body.data] }), {}).slogan, 'Edited live')
+  assert.equal(siteIdentity(settingsFromDocument({}), { slogan: 'baked' }).slogan, 'baked')
 })

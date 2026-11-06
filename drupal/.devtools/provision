@@ -103,6 +103,17 @@ file_put_contents(
 );
 PASS('Forwarded scheme and host will be honoured.');
 
+// Where the vale module finds its binary and rules: the pinned install from
+// .devtools/assemble, and the committed .vale.ini beside the web root.
+TASK('Pointing the vale module at its binary and rules.');
+file_put_contents(
+  'web/sites/default/settings.local.php',
+  "\n\$settings['vale_binary'] = \$app_root . '/../bin/vale';\n"
+    . "\$settings['vale_config'] = \$app_root . '/../.vale.ini';\n",
+  FILE_APPEND
+);
+PASS('Vale settings written.');
+
 // The authoring provisioner writes its CORS settings to their own file and
 // registers it here. This script rewrites this file from scratch, so a plain
 // re-provision drops that registration and takes cross-origin authoring with
@@ -168,6 +179,13 @@ $granted = $scope_provider->getRoles($scope_provider->load("authoring"));
 foreach (["content_editor", "administrator"] as $role) {
   if (!in_array($role, $granted, TRUE)) {
     throw new \RuntimeException(sprintf("The `authoring` scope grants the roles [%s], not %s, so that account's token could not edit.", implode(", ", $granted), $role));
+  }
+}
+// And the editor role has to be able to edit what this site is made of.
+$editor = \Drupal\user\Entity\Role::load("content_editor");
+foreach (["create slide content", "edit any slide content"] as $permission) {
+  if (!$editor->hasPermission($permission)) {
+    throw new \RuntimeException(sprintf("The content_editor role lacks `%s`, so an editor's token could sign in but not edit a slide.", $permission));
   }
 }
 PHP));

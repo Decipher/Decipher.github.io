@@ -1,0 +1,23 @@
+uuid: 19eced58-31eb-4f95-8d6b-44078d320c6a
+langcode: en
+status: true
+dependencies:
+  config:
+    - field.storage.node.field_order
+    - node.type.slide
+id: node.slide.field_order
+field_name: field_order
+entity_type: node
+bundle: slide
+label: Order
+description: 'Where the slide sits in the deck. Lowest first.'
+required: true
+translatable: true
+default_value: {  }
+default_value_callback: ''
+settings:
+  min: 1
+  max: null
+  prefix: ''
+  suffix: ''
+field_type: integer

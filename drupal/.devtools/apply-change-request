@@ -75,6 +75,11 @@ $directory = getenv('CHANGE_REQUEST_DIR');
 $applied = ['created' => 0, 'updated' => 0, 'deleted' => 0, 'files' => 0, 'linked' => 0];
 $second_pass = [];
 
+// As the site's first user, not the command line's anonymous one. Validation
+// judges a text format by who is saving, and anonymous may use none of them,
+// so without this every request fails on its format before Vale is reached.
+\Drupal::service('account_switcher')->switchTo(\Drupal\user\Entity\User::load(1));
+
 $repository = \Drupal::service('entity.repository');
 $manager = \Drupal::entityTypeManager();
 
@@ -214,6 +219,20 @@ foreach ($document['resources'] as $resource) {
     $entity->set($field, $values);
   }
 
+  // The same constraints a JSON:API write runs, Vale's among them. Without
+  // this the save goes straight through, and a change request would publish
+  // prose the backend itself would have refused.
+  $violations = $entity->validate();
+  if (count($violations)) {
+    $lines = [];
+    foreach ($violations as $violation) {
+      $lines[] = $violation->getPropertyPath() . ': ' . html_entity_decode(strip_tags((string) $violation->getMessage()), ENT_QUOTES);
+    }
+    throw new \RuntimeException(sprintf(
+      "%s %s was refused:\n  %s", $resource['type'], $resource['id'], implode("\n  ", $lines)
+    ));
+  }
+
   $entity->save();
   $applied[empty($new) ? 'updated' : 'created']++;
   unset($new);
@@ -247,6 +266,18 @@ foreach ($second_pass as $resource) {
       );
     }
     $entity->set($field, $values);
+  }
+  // The same validation as the first pass: a deferred reference can still
+  // point at a bundle the field refuses.
+  $violations = $entity->validate();
+  if (count($violations)) {
+    $lines = [];
+    foreach ($violations as $violation) {
+      $lines[] = $violation->getPropertyPath() . ': ' . html_entity_decode(strip_tags((string) $violation->getMessage()), ENT_QUOTES);
+    }
+    throw new \RuntimeException(sprintf(
+      "%s %s was refused:\n  %s", $resource['type'], $resource['id'], implode("\n  ", $lines)
+    ));
   }
   $entity->save();
   $applied['linked']++;
