@@ -32,22 +32,6 @@ export function workflowRunUrl(repository, workflow = 'authoring.yml') {
   return `https://github.com/${parsed.full}/actions/workflows/${workflow}`
 }
 
-/**
- * When a token stops working, as GitHub states it on every response.
- *
- * Read from the header a fine-grained token's responses carry, as an ISO
- * string, or null for a token with no expiry or a response that says nothing.
- */
-export function tokenExpiry(response) {
-  const value =
-    response && response.headers && typeof response.headers.get === 'function'
-      ? response.headers.get('github-authentication-token-expiration')
-      : null
-  if (!value) return null
-  const date = new Date(value)
-  return Number.isNaN(date.getTime()) ? null : date.toISOString()
-}
-
 /** `owner/name` from whatever a repository is written as. */
 export function parseRepository(value) {
   const cleaned = String(value || '')

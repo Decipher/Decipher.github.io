@@ -21,17 +21,10 @@ import {
   pullRequestBody,
   requestDocument,
   requestPaths,
-  tokenExpiry,
 } from './github.mjs'
 
 /** Ask GitHub something, and turn a refusal into a reason rather than a throw. */
 async function call(request, url, token, init = {}) {
-  const { body } = await callWithResponse(request, url, token, init)
-  return body
-}
-
-/** The same call, keeping the response for what its headers say. */
-async function callWithResponse(request, url, token, init = {}) {
   const response = await request(url, {
     ...init,
     headers: { ...headers(token), ...(init.headers || {}) },
@@ -43,7 +36,7 @@ async function callWithResponse(request, url, token, init = {}) {
     error.status = response.status
     throw error
   }
-  return { body, response }
+  return body
 }
 
 /**
@@ -54,8 +47,8 @@ async function callWithResponse(request, url, token, init = {}) {
  */
 export async function checkAccess({ repository, token, workflow, fetch: request }) {
   try {
-    const [{ body: user, response: userResponse }, repo] = await Promise.all([
-      callWithResponse(request, 'https://api.github.com/user', token),
+    const [user, repo] = await Promise.all([
+      call(request, 'https://api.github.com/user', token),
       call(request, apiUrl(repository), token),
     ])
     if (!canWrite(repo)) {
@@ -66,9 +59,6 @@ export async function checkAccess({ repository, token, workflow, fetch: request 
       login: user.login,
       repository: repo.full_name,
       defaultBranch: repo.default_branch,
-      // When the token stops working, so the interface can say so before a
-      // pull request fails on it.
-      expiresAt: tokenExpiry(userResponse),
       // Asked now rather than found out by a button that fails. Someone with
       // Contents and Pull requests can propose a change; starting a backend
       // additionally needs Actions, and most people editing a site will not

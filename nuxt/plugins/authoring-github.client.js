@@ -28,8 +28,6 @@ export default function (context, inject) {
   const state = Vue.observable({
     repository: config.repository || null,
     token: null,
-    // When the token stops working, as GitHub said on sign-in, or null.
-    expiresAt: null,
     login: null,
     defaultBranch: 'main',
     status: 'idle',
@@ -51,8 +49,10 @@ export default function (context, inject) {
     // somebody signed in.
     runError: null,
     // Whether the site is looking out for a backend started on GitHub's own
-    // page, with no token in hand to find the run with.
+    // page, with no token in hand to find the run with, and why it stopped
+    // looking without finding one.
     awaiting: false,
+    awaitMessage: null,
   })
 
   /**
@@ -65,6 +65,10 @@ export default function (context, inject) {
    * signing out or signing in again ends the old ones rather than racing them.
    */
   let generation = 0
+  // The tokenless wait has a counter of its own. It shares nothing with the
+  // sign-in's loops, so starting it cannot end a run being watched, and a
+  // sign-in cannot leave the dialog waiting on a loop that has stopped.
+  let awaitGeneration = 0
 
   const github = {
     state,
@@ -100,16 +104,7 @@ export default function (context, inject) {
         state.login = result.login || null
         return false
       }
-      // GitHub still answers for a token on its last day. Refusing it here
-      // beats a pull request that fails on it an hour later.
-      if (result.expiresAt && new Date(result.expiresAt).getTime() <= Date.now()) {
-        state.status = 'error'
-        state.error = 'That token has expired. Make a new one.'
-        return false
-      }
-
       state.token = token
-      state.expiresAt = result.expiresAt || null
       state.repository = repository || state.repository
       state.login = result.login
       state.defaultBranch = result.defaultBranch || 'main'
@@ -196,18 +191,20 @@ export default function (context, inject) {
      * stops it, or after the time a session could take to come up.
      */
     awaitStartedBackend() {
-      const mine = ++generation
+      const mine = ++awaitGeneration
       state.awaiting = true
+      state.awaitMessage = null
       const app = window.$nuxt
       const deadline = Date.now() + 20 * 60 * 1000
       const look = async () => {
-        if (mine !== generation) return
+        if (mine !== awaitGeneration) return
         if (Date.now() > deadline) {
           state.awaiting = false
+          state.awaitMessage = 'Gave up waiting after twenty minutes. Start it again, or look at the run on GitHub.'
           return
         }
         const found = app && app.$druxtIce && (await app.$druxtIce.discover())
-        if (mine !== generation) return
+        if (mine !== awaitGeneration) return
         if (found && found.connected) {
           state.started = found
           state.awaiting = false
@@ -219,8 +216,9 @@ export default function (context, inject) {
     },
 
     stopAwaiting() {
-      generation++
+      awaitGeneration++
       state.awaiting = false
+      state.awaitMessage = null
     },
 
     /** Poll for the run, then for its result, and stop when it stops. */
@@ -278,11 +276,12 @@ export default function (context, inject) {
 
     signOut() {
       // Ends the watchers first, so nothing in flight writes a run or a session
-      // back over the state this is about to clear.
+      // back over the state this is about to clear. The tokenless wait ends
+      // too: signing out of GitHub ends everything GitHub this plugin was doing.
       generation++
+      awaitGeneration++
       Object.assign(state, {
         token: null,
-        expiresAt: null,
         login: null,
         status: 'idle',
         error: null,
@@ -296,6 +295,8 @@ export default function (context, inject) {
         run: null,
         starting: false,
         runError: null,
+        awaiting: false,
+        awaitMessage: null,
       })
       writeStored(null)
     },

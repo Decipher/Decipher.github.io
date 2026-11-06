@@ -103,6 +103,60 @@ test.describe('authoring login', () => {
     await expect(page.getByTestId('authoring-awaiting')).toHaveCount(0)
   })
 
+  test('signing out of GitHub ends the wait for a started backend', async ({ page }) => {
+    await page.addInitScript(() => {
+      window.open = () => null
+    })
+    await page.goto('/')
+    await appReady(page)
+    await nameRepository(page)
+    await page.getByTestId('authoring-login-trigger').click()
+    await page.getByTestId('authoring-start-backend').click()
+    await expect(page.getByTestId('authoring-awaiting')).toBeVisible()
+    await page.evaluate(() => window.$nuxt.$authoringGithub.signOut())
+    await expect(page.getByTestId('authoring-awaiting')).toHaveCount(0)
+    await expect(page.getByTestId('authoring-start-backend')).toBeVisible()
+  })
+
+  test('a token sign-in and the wait for a started backend leave each other alone', async ({
+    page,
+  }) => {
+    await page.route('https://api.github.com/**', (route) => {
+      const url = route.request().url()
+      const json = (body) =>
+        route.fulfill({
+          status: 200,
+          headers: { 'content-type': 'application/json', 'access-control-allow-origin': '*' },
+          body: JSON.stringify(body),
+        })
+      if (url.endsWith('/user')) return json({ login: 'someone' })
+      return json({ full_name: 'o/r', default_branch: 'main', permissions: { push: true } })
+    })
+    await page.addInitScript(() => {
+      window.open = () => null
+    })
+    await page.goto('/')
+    await appReady(page)
+    await nameRepository(page)
+    await page.getByTestId('authoring-login-trigger').click()
+    await page.getByTestId('authoring-start-backend').click()
+    await expect(page.getByTestId('authoring-awaiting')).toBeVisible()
+
+    // Signing in with a token, while the wait is on, must neither end the
+    // wait nor be ended by it.
+    const signedIn = await page.evaluate(() =>
+      window.$nuxt.$authoringGithub.signIn('a-token', 'o/r')
+    )
+    expect(signedIn).toBe(true)
+    await expect(page.getByTestId('authoring-awaiting')).toBeVisible()
+    expect(await page.evaluate(() => window.$nuxt.$authoringGithub.state.status)).toBe('signed-in')
+
+    // And the wait ending by hand leaves the sign-in where it was.
+    await page.getByTestId('authoring-stop-waiting').click()
+    await expect(page.getByTestId('authoring-awaiting')).toHaveCount(0)
+    expect(await page.evaluate(() => window.$nuxt.$authoringGithub.state.status)).toBe('signed-in')
+  })
+
   test('waiting for a started backend can be stopped', async ({ page }) => {
     await page.addInitScript(() => {
       window.open = () => null

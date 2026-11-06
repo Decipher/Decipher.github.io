@@ -77,6 +77,9 @@
               >
                 Start a backend on GitHub
               </button>
+              <p v-if="awaitMessage" class="text-sm text-accent mt-3" data-testid="authoring-await-message">
+                {{ awaitMessage }}
+              </p>
             </template>
             <template v-else>
               <p class="text-sm text-body mb-3 flex items-center gap-2" data-testid="authoring-awaiting">
@@ -218,6 +221,10 @@ export default {
 
     awaiting() {
       return Boolean(this.$authoringGithub && this.$authoringGithub.state.awaiting)
+    },
+
+    awaitMessage() {
+      return (this.$authoringGithub && this.$authoringGithub.state.awaitMessage) || ''
     },
 
     title() {
