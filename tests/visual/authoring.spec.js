@@ -87,8 +87,13 @@ test('the backend prompt', async ({ page }) => {
   await hideLoadingBar(page)
   await mockText(page)
   await fontsSettled(page)
+  // This step holds the deck's one bold run in a dialog, and two arm64 Linux
+  // hosts hint that weight apart: 518 pixels on the phone, 1258 at the three
+  // wider sizes, all of them on the one line that holds it. Room for that, and
+  // no more: a moved line or a missing control is thousands.
   await expect(page).toHaveScreenshot('connect.png', {
     animations: 'disabled',
+    maxDiffPixels: 1500,
   })
 })
 

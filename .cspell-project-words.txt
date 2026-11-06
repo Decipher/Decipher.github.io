@@ -1,17 +1,20 @@
 adipiscing
 amet
 appserver
+Archivo
 autop
 behaviour
 bmewburn
 bootstrapvue
 colour
+colouring
 commitlint
 davidanson
 dbaeumer
 ddev
 devpod
 docroot
+drupalmel
 drush
 druxt
 druxtjs
@@ -104,5 +107,3 @@ viewports
 worktree
 xauth
 zoomable
-drupalmel
-colouring
