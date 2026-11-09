@@ -1,0 +1,54 @@
+{
+  "version": 1,
+  "generatedAt": "2026-09-06T00:41:54.483Z",
+  "resources": [
+    {
+      "type": "node--article",
+      "id": "33d29813-5922-445c-b8f3-251ded6f4b2f",
+      "attributes": {
+        "title": "Hello world!",
+        "body": {
+          "value": "<p>Hi, my name is Stuart Clark and I built this (kinda, used AI of course).</p>"
+        }
+      },
+      "relationships": {
+        "field_image": {
+          "data": {
+            "type": "file--file",
+            "id": "10997e28-7ccc-4a2e-afda-c9c04411c4c9",
+            "meta": {
+              "alt": "Stuart Clark"
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "node--page",
+      "id": "648e997a-4062-44d7-8d31-02972e38624f",
+      "attributes": {
+        "title": "Test page",
+        "path": {
+          "alias": "/test-page"
+        },
+        "body": {
+          "value": "<p>Test Page</p>"
+        }
+      }
+    }
+  ],
+  "deletions": [],
+  "files": [
+    {
+      "resource": {
+        "type": "node--article",
+        "id": "33d29813-5922-445c-b8f3-251ded6f4b2f"
+      },
+      "field": "field_image",
+      "id": "10997e28-7ccc-4a2e-afda-c9c04411c4c9",
+      "name": "161090.jpeg",
+      "contentType": "image/jpeg",
+      "path": "requests/edits-20260906-004154/files/10997e28-7ccc-4a2e-afda-c9c04411c4c9-161090.jpeg"
+    }
+  ]
+}
