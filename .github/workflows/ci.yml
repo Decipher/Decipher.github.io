@@ -217,7 +217,7 @@ jobs:
             nuxt/package-lock.json
 
       - name: Cache Composer downloads
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.cache/composer
           key: composer-${{ runner.os }}-${{ hashFiles('drupal/composer.lock') }}
@@ -317,7 +317,7 @@ jobs:
           path: nuxt/dist
 
       - name: Cache root dependencies
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: node_modules
           key: node-modules-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('package-lock.json') }}
@@ -357,7 +357,7 @@ jobs:
           path: nuxt/dist
 
       - name: Cache root dependencies
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: node_modules
           key: node-modules-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('package-lock.json') }}
