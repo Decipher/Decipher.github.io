@@ -38,7 +38,7 @@
     "dotenv": "^16.0.3",
     "druxt-auth": "^0.5.1",
     "druxt-site": "^0.15.0",
-    "nuxt": "2.15.8",
+    "nuxt": "4.6.4",
     "qrcode": "^1.5.4",
     "vue-server-renderer": "^2.7.14",
     "vue-template-compiler": "^2.7.14",
